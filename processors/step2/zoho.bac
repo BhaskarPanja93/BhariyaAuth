@@ -1,0 +1,113 @@
+package verify2step
+
+import (
+	StringProcessor "BhariyaAuth/processors/string"
+	Stores "BhariyaAuth/stores"
+	Important "BhariyaAuth/values/important"
+	Secrets "BhariyaAuth/values/secrets"
+	"bytes"
+	"github.com/goccy/go-json"
+	"fmt"
+	"net/http"
+	"time"
+)
+
+func RefreshAccessToken() string {
+	url := "https://accounts.zoho.in/oauth/v2/token"
+
+	data := fmt.Sprintf(
+		"refresh_token=%s&client_id=%s&client_secret=%s&grant_type=refresh_token",
+		Secrets.ZohoRefreshToken, Secrets.ZohoClientId, Secrets.ZohoClientSecret,
+	)
+
+	resp, err := http.Post(url, "application/x-www-form-urlencoded", bytes.NewBufferString(data))
+	if err != nil {
+		time.Sleep(time.Second)
+		return RefreshAccessToken()
+	}
+	defer resp.Body.Close()
+
+	var res map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		time.Sleep(time.Second)
+		return RefreshAccessToken()
+	}
+
+	token, ok := res["access_token"].(string)
+	if !ok || token == "" {
+		time.Sleep(time.Second)
+		return RefreshAccessToken()
+	}
+	Stores.RedisClient.Set(Stores.Ctx, Important.RedisZohoMailAccessToken, token, 0)
+	return token
+}
+
+func sendInternal(mail, otp string, trial int) bool {
+	if trial >= 3 {
+		return false
+	}
+	accessToken, _ := Stores.RedisClient.Get(Stores.Ctx, Important.RedisZohoMailAccessToken).Result()
+	if accessToken == "" {
+		accessToken = RefreshAccessToken()
+	}
+	headers := map[string]string{
+		"Authorization": fmt.Sprintf("Zoho-oauthtoken %s", accessToken),
+		"Content-Type":  "application/json",
+	}
+	client := &http.Client{Timeout: 10 * time.Second}
+	payload := map[string]string{
+		"fromAddress": "bhaskarpanja93@zohomail.in",
+		"toAddress":   mail,
+		"subject":     "BhariyaAuth OTP",
+		"content":     fmt.Sprintf("Your OTP (valid for 5 Minutes) for BhariyaAuth is: <b>%s</b>", otp),
+	}
+
+	body, _ := json.Marshal(payload)
+	sendURL := "https://mail.zoho.in/api/accounts/7664754000000002002/messages"
+	req2, _ := http.NewRequest("POST", sendURL, bytes.NewBuffer(body))
+	for k, v := range headers {
+		req2.Header.Set(k, v)
+	}
+
+	resp2, err := client.Do(req2)
+	if err != nil {
+		fmt.Printf("Error sending email: %v\n", err)
+		time.Sleep(time.Duration(trial) * time.Second)
+		return sendInternal(mail, otp, trial+1)
+	}
+	defer resp2.Body.Close()
+
+	if resp2.StatusCode >= 400 {
+		fmt.Printf("Failed Zoho Mail send, status: %d\n", resp2.StatusCode)
+		time.Sleep(time.Duration(trial) * time.Second)
+		return sendInternal(mail, otp, trial+1)
+	}
+	return true
+}
+
+func SendMailOTP(mail string) (string, time.Duration) {
+	canSend, alreadySentCount, currentDelay := CheckCanSendOTP(mail)
+	if canSend {
+		otp := StringProcessor.GenerateSafeString(4)
+		if success := sendInternal(mail, otp, 0); !success {
+			return "", currentDelay
+		}
+		verification := StringProcessor.GenerateSafeString(10)
+		key := fmt.Sprintf("%s:%s:%s", Important.RedisServerOTPVerification, mail, verification)
+		Stores.RedisClient.Set(Stores.Ctx, key, otp, 5*time.Minute)
+		currentDelay = RecordSendOTP(mail, alreadySentCount+1)
+		return verification, currentDelay
+	} else {
+		return "", currentDelay
+	}
+}
+
+func ValidateMailOTP(mail, verification, otp string) bool {
+	key := fmt.Sprintf("%s:%s:%s", Important.RedisServerOTPVerification, mail, verification)
+	value, _ := Stores.RedisClient.Get(Stores.Ctx, key).Result()
+	if value == otp && otp != "" {
+		Stores.RedisClient.Del(Stores.Ctx, key)
+		return true
+	}
+	return false
+}
