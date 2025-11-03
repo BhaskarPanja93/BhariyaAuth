@@ -4,6 +4,7 @@ import (
 	Important "BhariyaAuth/constants/config"
 	TokenModels "BhariyaAuth/models/tokens"
 	UserTypes "BhariyaAuth/models/users"
+	"BhariyaAuth/processors/generator"
 	StringProcessor "BhariyaAuth/processors/string"
 	Stores "BhariyaAuth/stores"
 	"time"
@@ -42,8 +43,8 @@ func RefreshIsBlacklisted(userID uint32, refreshID uint16, fromDB bool) bool {
 	return blocked
 }
 
-func CreateFreshToken(userID uint32, refreshID uint16, userType UserTypes.T, remember bool, identifier string, identifierType string) TokenModels.NewTokenT {
-	csrf := StringProcessor.GenerateSafeString(256)
+func CreateFreshToken(userID uint32, refreshID uint16, userType UserTypes.T, remember bool, identifierType string) TokenModels.NewTokenT {
+	csrf := generator.SafeString(128)
 	atUnEnc, err := json.Marshal(TokenModels.AccessTokenT{
 		UserID:         userID,
 		RefreshID:      refreshID,
@@ -66,7 +67,6 @@ func CreateFreshToken(userID uint32, refreshID uint16, userType UserTypes.T, rem
 		UserType:       userType,
 		CSRF:           csrf,
 		RememberMe:     remember,
-		IdentifierUsed: identifier,
 		IdentifierType: identifierType,
 	})
 	if err != nil {
@@ -84,7 +84,7 @@ func CreateFreshToken(userID uint32, refreshID uint16, userType UserTypes.T, rem
 }
 
 func CreateRenewToken(refresh TokenModels.RefreshTokenT) TokenModels.NewTokenT {
-	csrf := StringProcessor.GenerateSafeString(256)
+	csrf := generator.SafeString(128)
 	atUnEnc, err := json.Marshal(TokenModels.AccessTokenT{
 		UserID:         refresh.UserID,
 		RefreshID:      refresh.RefreshID,
@@ -107,7 +107,6 @@ func CreateRenewToken(refresh TokenModels.RefreshTokenT) TokenModels.NewTokenT {
 		UserType:       refresh.UserType,
 		CSRF:           csrf,
 		RememberMe:     refresh.RememberMe,
-		IdentifierUsed: refresh.IdentifierUsed,
 		IdentifierType: refresh.IdentifierType,
 	})
 	if err != nil {

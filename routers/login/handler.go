@@ -4,6 +4,7 @@ import (
 	ResponseModels "BhariyaAuth/models/responses"
 	TokenModels "BhariyaAuth/models/tokens"
 	UserModels "BhariyaAuth/models/users"
+	Generators "BhariyaAuth/processors/generator"
 
 	AccountProcessor "BhariyaAuth/processors/account"
 	ResponseProcessor "BhariyaAuth/processors/response"
@@ -215,8 +216,8 @@ func Step2(ctx fiber.Ctx) error {
 			nil,
 		))
 	} else {
-		refreshID := StringProcessor.GenerateRefreshID()
-		if !AccountProcessor.RecordReturningUser(refreshID, SignInData) {
+		refreshID := Generators.RefreshID()
+		if !AccountProcessor.RecordReturningUser(refreshID, SignInData.UserID, SignInData.RememberMe) {
 			return ctx.Status(fiber.StatusOK).JSON(ResponseProcessor.CombineResponses(
 				ResponseModels.Unknown,
 				ResponseModels.DefaultAuth,
@@ -230,10 +231,9 @@ func Step2(ctx fiber.Ctx) error {
 				refreshID,
 				UserModels.Find(AccountProcessor.GetUserType(SignInData.UserID)),
 				SignInData.RememberMe,
-				SignInData.Mail,
 				"email-login",
 			)
-			ResponseProcessor.AttachCookies(ctx, ResponseProcessor.GenerateCookies(token))
+			ResponseProcessor.AttachAuthCookies(ctx, ResponseProcessor.GenerateAuthCookies(token))
 			return ctx.Status(fiber.StatusOK).JSON(ResponseProcessor.CombineResponses(
 				ResponseModels.SignedIn,
 				ResponseModels.AuthT{

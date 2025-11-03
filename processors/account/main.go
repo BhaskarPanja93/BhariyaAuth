@@ -1,7 +1,6 @@
 package account
 
 import (
-	TokenModels "BhariyaAuth/models/tokens"
 	UserTypes "BhariyaAuth/models/users"
 	TokenProcessor "BhariyaAuth/processors/token"
 	Stores "BhariyaAuth/stores"
@@ -131,18 +130,17 @@ func _HashPassword(password string) string {
 	return string(hash)
 }
 
-func RecordNewUser(userID uint32, SignUpData TokenModels.SignUpT) bool {
+func RecordNewUser(userID uint32, password string, mail string, name string) bool {
 	var hash string
-	if SignUpData.Password != "" {
-		hash = _HashPassword(SignUpData.Password)
+	if password != "" {
+		hash = _HashPassword(password)
 	}
 	_, err := Stores.MySQLClient.Exec(
-		"INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?)",
 		userID,
 		UserTypes.All.Viewer.Short,
-		SignUpData.Mail,
-		SignUpData.First,
-		SignUpData.Last,
+		mail,
+		name,
 		false,
 		hash,
 		time.Now(),
@@ -153,15 +151,15 @@ func RecordNewUser(userID uint32, SignUpData TokenModels.SignUpT) bool {
 	return true
 }
 
-func RecordReturningUser(refreshID uint16, SignInData TokenModels.SignInT) bool {
+func RecordReturningUser(refreshID uint16, userID uint32, rememberMe bool) bool {
 	_, err := Stores.MySQLClient.Exec(
 		"INSERT INTO activities VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		SignInData.UserID,
+		userID,
 		refreshID,
 		1,
 		"",
 		false,
-		SignInData.RememberMe,
+		rememberMe,
 		time.Now(),
 		time.Now(),
 	)

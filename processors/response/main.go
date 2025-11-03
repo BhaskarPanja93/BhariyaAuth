@@ -26,7 +26,7 @@ func CombineResponses(
 	}
 }
 
-func GenerateCookies(token TokenModels.NewTokenT) CookieModels.ResponseCookiesT {
+func GenerateAuthCookies(token TokenModels.NewTokenT) CookieModels.ResponseCookiesT {
 	return CookieModels.ResponseCookiesT{
 		Refresh: fiber.Cookie{
 			Name:     Important.RefreshTokenInCookie,
@@ -34,7 +34,7 @@ func GenerateCookies(token TokenModels.NewTokenT) CookieModels.ResponseCookiesT 
 			Domain:   Important.CookieDomain,
 			HTTPOnly: true,
 			Secure:   true,
-			SameSite: fiber.CookieSameSiteLaxMode,
+			SameSite: fiber.CookieSameSiteStrictMode,
 		},
 		Csrf: fiber.Cookie{
 			Name:     Important.CSRFInCookie,
@@ -42,51 +42,45 @@ func GenerateCookies(token TokenModels.NewTokenT) CookieModels.ResponseCookiesT 
 			Domain:   Important.CookieDomain,
 			HTTPOnly: false,
 			Secure:   true,
-			SameSite: fiber.CookieSameSiteLaxMode,
+			SameSite: fiber.CookieSameSiteStrictMode,
 		},
 	}
 }
 
-func SSOSuccessResponse(newToken TokenModels.NewTokenT, origin string) string {
-	return fmt.Sprintf(`
+func SSOSuccessResponse(ctx fiber.Ctx, token string, state string, origin string) error {
+	return ctx.Type("html").SendString(fmt.Sprintf(`
 <html>
 <head>
 <script>
-window.addEventListener('beforeunload', () => {
-    if (!window._authSuccess) {
-        window.opener?.postMessage({ type: 'SSO_CLOSED' }, '%s');
-    }
-});
-function onAuthSuccess(token) {
+function onAuthSuccess(value) {
     window._authSuccess = true;
-    window.opener?.postMessage({ type: 'SSO_SUCCESS', auth_token: token }, '%s');
+    window.opener?.postMessage({ type: 'SSO_SUCCESS', token: value, state: '%s'}, '%s');
     window.close();
 }
+window.addEventListener('beforeunload', () => {
+    if (!window._authSuccess) {
+        window.opener?.postMessage({ type: 'SSO_CLOSED', state: '%s'}, '%s');
+    }
+});
 </script>
 </head>
 <body onload="onAuthSuccess('%s')">
 <h2>That was easy!</h2>
 </body>
 </html>
-`, origin, origin, newToken.AccessToken)
+`, state, origin, state, origin, token))
 }
 
-func SSOFailureResponse() string {
-	return `
-<html>
-<body>
-<h2>This didn't work, maybe try again!</h2>
-</body>
-</html>
-`
+func SSOFailureResponse(ctx fiber.Ctx, reason string) error {
+	return ctx.Type("html").SendString(fmt.Sprintf("<html><body><h2>%s</h2></body></html>", reason))
 }
 
-func AttachCookies(ctx fiber.Ctx, cookies CookieModels.ResponseCookiesT) {
+func AttachAuthCookies(ctx fiber.Ctx, cookies CookieModels.ResponseCookiesT) {
 	ctx.Cookie(&cookies.Refresh)
 	ctx.Cookie(&cookies.Csrf)
 }
 
-func DetachCookies(ctx fiber.Ctx) {
+func DetachAuthCookies(ctx fiber.Ctx) {
 	ctx.ClearCookie(Important.RefreshTokenInCookie)
 	ctx.ClearCookie(Important.CSRFInCookie)
 }

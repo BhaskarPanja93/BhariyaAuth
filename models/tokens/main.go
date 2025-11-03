@@ -18,16 +18,17 @@ type SignUpT struct {
 	TokenType  string `json:"tt"`
 	Mail       string `json:"mail"`
 	RememberMe bool   `json:"remember"`
-	First      string `json:"first"`
-	Last       string `json:"last"`
+	Name       string `json:"name"`
 	Password   string `json:"password"`
 	Step2Code  string `json:"2_code"`
 }
 
 type SSOStateT struct {
-	Provider   string `json:"provider"`
-	Origin     string `json:"origin"`
-	RememberMe bool   `json:"remember"`
+	Provider      string    `json:"pro"`
+	Expiry        time.Time `json:"exp"`
+	FrontendState string    `json:"fro"`
+	Origin        string    `json:"ori"`
+	RememberMe    bool      `json:"rem"`
 }
 
 type AccessTokenT struct {
@@ -49,7 +50,6 @@ type RefreshTokenT struct {
 	UserType       UsersModel.T `json:"typ"`
 	CSRF           string       `json:"csr"`
 	RememberMe     bool         `json:"rem"`
-	IdentifierUsed string       `json:"sii"`
 	IdentifierType string       `json:"siu"`
 }
 

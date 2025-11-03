@@ -1,4 +1,4 @@
-package root
+package account
 
 import (
 	Config "BhariyaAuth/constants/config"
@@ -64,7 +64,7 @@ func ProcessRefresh(ctx fiber.Ctx) error {
 						nil,
 					))
 				}
-				ResponseProcessor.AttachCookies(ctx, ResponseProcessor.GenerateCookies(token))
+				ResponseProcessor.AttachAuthCookies(ctx, ResponseProcessor.GenerateAuthCookies(token))
 				return ctx.Status(fiber.StatusOK).JSON(ResponseProcessor.CombineResponses(
 					ResponseModels.RefreshSucceeded,
 					ResponseModels.AuthT{
@@ -82,7 +82,7 @@ func ProcessRefresh(ctx fiber.Ctx) error {
 }
 
 func ProcessLogout(ctx fiber.Ctx) error {
-	ResponseProcessor.DetachCookies(ctx)
+	ResponseProcessor.DetachAuthCookies(ctx)
 	return ctx.Status(fiber.StatusOK).JSON(ResponseProcessor.CombineResponses(
 		ResponseModels.SignedOut,
 		ResponseModels.AuthT{

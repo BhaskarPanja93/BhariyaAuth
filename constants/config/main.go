@@ -6,10 +6,10 @@ import (
 )
 
 var (
-	ServerFor    = "bhariya"
-	ServerRole   = "auth"
-	CookieDomain = "bhariya-hidden.ddns.net"
-	ServerURL    = "https://bhariya-hidden.ddns.net"
+	ServerFor            = "bhariya"
+	ServerRole           = "auth"
+	CookieDomain         = "bhariya-hidden.ddns.net"
+	ServerSSOCallbackURL = "https://bhariya-hidden.ddns.net/auth/sso/callback"
 )
 
 var (
@@ -17,6 +17,7 @@ var (
 	AccessTokenInHeader  = "Authorization"
 	CSRFInCookie         = fmt.Sprintf("%s_csrf", ServerFor)
 	RefreshTokenInCookie = fmt.Sprintf("%s_refresh", ServerFor)
+	SSOStateInCookie     = fmt.Sprintf("%s_sso_state", ServerFor)
 
 	AccessTokenFreshnessExpireDelta = time.Minute * 5
 	AccessTokenExpireDelta          = time.Minute * 15

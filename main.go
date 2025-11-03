@@ -2,10 +2,11 @@ package main
 
 import (
 	Middlewares "BhariyaAuth/middlewares"
+	AccountRouters "BhariyaAuth/routers/account"
 	LoginRouters "BhariyaAuth/routers/login"
 	RegisterRouters "BhariyaAuth/routers/register"
-	RootRouters "BhariyaAuth/routers/root"
 	SSORouters "BhariyaAuth/routers/sso"
+	StatusRouters "BhariyaAuth/routers/status"
 	Stores "BhariyaAuth/stores"
 
 	"flag"
@@ -76,12 +77,14 @@ func main() {
 	Stores.ConnectMySQL()
 
 	MainApp := fiber.New(fiber.Config{TrustProxyConfig: fiber.TrustProxyConfig{Loopback: true}})
-	AuthApp := MainApp.Group("/auth")
 
 	MainApp.Use(Middlewares.ProfilingMiddleware())
 	MainApp.Use(recover.New())
 
-	RootRouters.AttachRoutes(AuthApp)
+	AuthApp := MainApp.Group("/auth")
+
+	AccountRouters.AttachRoutes(AuthApp)
+	StatusRouters.AttachRoutes(AuthApp)
 	RegisterRouters.AttachRoutes(AuthApp)
 	LoginRouters.AttachRoutes(AuthApp)
 	SSORouters.AttachRoutes(AuthApp)

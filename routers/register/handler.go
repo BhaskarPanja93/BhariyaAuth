@@ -4,6 +4,7 @@ import (
 	ResponseModels "BhariyaAuth/models/responses"
 	TokenModels "BhariyaAuth/models/tokens"
 	UserModels "BhariyaAuth/models/users"
+	"BhariyaAuth/processors/generator"
 
 	AccountProcessor "BhariyaAuth/processors/account"
 	ResponseProcessor "BhariyaAuth/processors/response"
@@ -19,8 +20,7 @@ import (
 
 type Step1T struct {
 	MailAddress string `form:"mail_address"`
-	FirstName   string `form:"first_name"`
-	LastName    string `form:"last_name"`
+	Name        string `form:"name"`
 	Password    string `form:"password"`
 	RememberMe  bool   `form:"remember_me"`
 }
@@ -40,7 +40,7 @@ func Step1(ctx fiber.Ctx) error {
 		}
 	}
 
-	if form.FirstName == "" || form.LastName == "" {
+	if form.Name == "" {
 		return ctx.Status(fiber.StatusOK).JSON(
 			ResponseProcessor.CombineResponses(
 				ResponseModels.InvalidEntries,
@@ -82,8 +82,7 @@ func Step1(ctx fiber.Ctx) error {
 				TokenType:  "SignUp",
 				Mail:       form.MailAddress,
 				RememberMe: form.RememberMe,
-				First:      form.FirstName,
-				Last:       form.LastName,
+				Name:       form.Name,
 				Password:   form.Password,
 				Step2Code:  "",
 			}
@@ -193,9 +192,9 @@ func Step2(ctx fiber.Ctx) error {
 		))
 	}
 	// Process Step-2
-	userID := StringProcessor.GenerateUserID()
-	refreshID := StringProcessor.GenerateRefreshID()
-	if !AccountProcessor.RecordNewUser(userID, SignUpData) {
+	userID := generator.UserID()
+	refreshID := generator.RefreshID()
+	if !AccountProcessor.RecordNewUser(userID, SignUpData.Password, SignUpData.Mail, SignUpData.Name) {
 		return ctx.Status(fiber.StatusOK).JSON(ResponseProcessor.CombineResponses(
 			ResponseModels.Unknown,
 			ResponseModels.DefaultAuth,
@@ -209,10 +208,9 @@ func Step2(ctx fiber.Ctx) error {
 			refreshID,
 			UserModels.All.Viewer,
 			SignUpData.RememberMe,
-			SignUpData.Mail,
 			"email-register",
 		)
-		ResponseProcessor.AttachCookies(ctx, ResponseProcessor.GenerateCookies(token))
+		ResponseProcessor.AttachAuthCookies(ctx, ResponseProcessor.GenerateAuthCookies(token))
 		return ctx.Status(fiber.StatusOK).JSON(ResponseProcessor.CombineResponses(
 			ResponseModels.SignedUp,
 			ResponseModels.AuthT{

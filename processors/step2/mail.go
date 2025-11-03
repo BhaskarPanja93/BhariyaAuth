@@ -3,7 +3,7 @@ package step2
 import (
 	Important "BhariyaAuth/constants/config"
 	Secrets "BhariyaAuth/constants/secrets"
-	StringProcessor "BhariyaAuth/processors/string"
+	Generators "BhariyaAuth/processors/generator"
 	Stores "BhariyaAuth/stores"
 	"context"
 	"fmt"
@@ -70,11 +70,11 @@ func sendInternal(mail string, otp string, trial uint8) bool {
 func SendMailOTP(mail string) (string, time.Duration) {
 	canSend, alreadySentCount, currentDelay := CheckCanSendOTP(mail)
 	if canSend {
-		otp := StringProcessor.GenerateSafeString(4)
+		otp := Generators.SafeString(4)
 		if success := sendInternal(mail, otp, 0); !success {
 			return "", currentDelay
 		}
-		verification := StringProcessor.GenerateSafeString(10)
+		verification := Generators.UnsafeString(10)
 		key := fmt.Sprintf("%s:%s", Important.RedisServerOTPVerification, verification)
 		Stores.RedisClient.Set(Stores.Ctx, key, otp, 5*time.Minute)
 		currentDelay = RecordSendOTP(mail, alreadySentCount+1)
