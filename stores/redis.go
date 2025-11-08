@@ -59,9 +59,7 @@ func ConnectRedis() {
 		_, err = client.Ping(Ctx).Result()
 		if err != nil {
 			fmt.Println("Redis connection failed", err.Error())
-			err = client.Close()
-			if err != nil {
-			}
+			_ = client.Close()
 			useSocket = !useSocket
 			time.Sleep(2 * time.Second)
 			continue

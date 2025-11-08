@@ -12,7 +12,5 @@ func AttachRoutes(authApp fiber.Router) {
 	StatusRouter := authApp.Group("/status")
 
 	StatusRouter.Get("/metrics", monitor.New(monitor.Config{Title: "Bhariya Auth Metrics", Refresh: 1 * time.Second}))
-	StatusRouter.All("/ping", func(ctx fiber.Ctx) error {
-		return nil
-	})
+	StatusRouter.All("/ping", func(ctx fiber.Ctx) error { return nil })
 }

@@ -1,15 +1,17 @@
 package step2
 
 import (
-	Important "BhariyaAuth/constants/config"
+	Config "BhariyaAuth/constants/config"
 	Secrets "BhariyaAuth/constants/secrets"
 	Generators "BhariyaAuth/processors/generator"
+	Logger "BhariyaAuth/processors/logs"
 	Stores "BhariyaAuth/stores"
 	"context"
 	"fmt"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/gofiber/fiber/v3"
 	graph "github.com/microsoftgraph/msgraph-sdk-go"
 	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
 	graphusers "github.com/microsoftgraph/msgraph-sdk-go/users"
@@ -60,6 +62,7 @@ func sendInternal(mail string, otp string, trial uint8) bool {
 
 	err := graphClient.Users().ByUserId(Secrets.MicrosoftMailId).SendMail().Post(context.Background(), requestBody, nil)
 	if err != nil {
+		Logger.AccidentalFailure(fmt.Sprintf("OTP send failed: %s", err.Error()))
 		time.Sleep(time.Second)
 		_RefreshCredentials()
 		return sendInternal(mail, otp, trial+1)
@@ -67,17 +70,18 @@ func sendInternal(mail string, otp string, trial uint8) bool {
 	return true
 }
 
-func SendMailOTP(mail string) (string, time.Duration) {
-	canSend, alreadySentCount, currentDelay := CheckCanSendOTP(mail)
+func SendMailOTP(ctx fiber.Ctx, mail string) (string, time.Duration) {
+	rateLimitKey := fmt.Sprintf("%s:%s", ctx.IP(), mail)
+	canSend, alreadySentCount, currentDelay := CheckCanSendOTP(rateLimitKey)
 	if canSend {
 		otp := Generators.SafeString(4)
 		if success := sendInternal(mail, otp, 0); !success {
 			return "", currentDelay
 		}
 		verification := Generators.UnsafeString(10)
-		key := fmt.Sprintf("%s:%s", Important.RedisServerOTPVerification, verification)
+		key := fmt.Sprintf("%s:%s", Config.RedisServerOTPVerification, verification)
 		Stores.RedisClient.Set(Stores.Ctx, key, otp, 5*time.Minute)
-		currentDelay = RecordSendOTP(mail, alreadySentCount+1)
+		currentDelay = RecordSendOTP(rateLimitKey, alreadySentCount+1)
 		return verification, currentDelay
 	} else {
 		return "", currentDelay
@@ -85,7 +89,7 @@ func SendMailOTP(mail string) (string, time.Duration) {
 }
 
 func ValidateMailOTP(verification, otp string) bool {
-	key := fmt.Sprintf("%s:%s", Important.RedisServerOTPVerification, verification)
+	key := fmt.Sprintf("%s:%s", Config.RedisServerOTPVerification, verification)
 	value, _ := Stores.RedisClient.Get(Stores.Ctx, key).Result()
 	if value == otp && otp != "" {
 		Stores.RedisClient.Del(Stores.Ctx, key)

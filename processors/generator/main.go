@@ -1,6 +1,7 @@
 package generator
 
 import (
+	Logger "BhariyaAuth/processors/logs"
 	CryptoRand "crypto/rand"
 	"fmt"
 	"math/big"
@@ -30,6 +31,7 @@ func SafeString(nBytes uint16) string {
 	for i := range b {
 		num, err := CryptoRand.Int(CryptoRand.Reader, big.NewInt(int64(len(_letters))))
 		if err != nil {
+			Logger.AccidentalFailure(fmt.Sprintf("SafeString failed: %s", err.Error()))
 			return SafeString(nBytes)
 		}
 		b[i] = _letters[num.Int64()]
@@ -40,6 +42,7 @@ func SafeString(nBytes uint16) string {
 func UserID() uint32 {
 	b := make([]byte, 3)
 	if _, err := CryptoRand.Read(b); err != nil {
+		Logger.AccidentalFailure(fmt.Sprintf("UserID failed: %s", err.Error()))
 		return UserID()
 	}
 	var val uint32
@@ -48,12 +51,16 @@ func UserID() uint32 {
 		shift := uint((2 - i) * 8)
 		val |= uint32(b[i]) << shift
 	}
+	if val == 0 {
+		return UserID()
+	}
 	return val
 }
 
 func RefreshID() uint16 {
 	b := make([]byte, 2)
 	if _, err := CryptoRand.Read(b); err != nil {
+		Logger.AccidentalFailure(fmt.Sprintf("RefreshID failed: %s", err.Error()))
 		return RefreshID()
 	}
 	var val uint16
@@ -61,6 +68,9 @@ func RefreshID() uint16 {
 	for i = 0; i < 2; i++ {
 		shift := uint((1 - i) * 8)
 		val |= uint16(b[i]) << shift
+	}
+	if val == 0 {
+		return RefreshID()
 	}
 	return val
 }

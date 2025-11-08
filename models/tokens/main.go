@@ -1,7 +1,7 @@
 package tokens
 
 import (
-	UsersModel "BhariyaAuth/models/users"
+	UsersTypes "BhariyaAuth/models/users"
 	"time"
 )
 
@@ -23,6 +23,12 @@ type SignUpT struct {
 	Step2Code  string `json:"2_code"`
 }
 
+type PasswordResetT struct {
+	TokenType string `json:"tt"`
+	UserID    uint32 `json:"uid"`
+	Step2Code string `json:"2_code"`
+}
+
 type SSOStateT struct {
 	Provider      string    `json:"pro"`
 	Expiry        time.Time `json:"exp"`
@@ -34,8 +40,7 @@ type SSOStateT struct {
 type AccessTokenT struct {
 	UserID         uint32       `json:"uid"`
 	RefreshID      uint16       `json:"rid"`
-	RefreshIndex   uint16       `json:"rin"`
-	UserType       UsersModel.T `json:"typ"`
+	UserType       UsersTypes.T `json:"typ"`
 	AccessCreated  time.Time    `json:"aat"`
 	RefreshCreated time.Time    `json:"lat"`
 	RememberMe     bool         `json:"rem"`
@@ -47,7 +52,7 @@ type RefreshTokenT struct {
 	RefreshIndex   uint16       `json:"rin"`
 	RefreshCreated time.Time    `json:"lat"`
 	RefreshUpdated time.Time    `json:"rat"`
-	UserType       UsersModel.T `json:"typ"`
+	UserType       UsersTypes.T `json:"typ"`
 	CSRF           string       `json:"csr"`
 	RememberMe     bool         `json:"rem"`
 	IdentifierType string       `json:"siu"`
@@ -60,4 +65,16 @@ type NewTokenT struct {
 	RefreshID    uint16
 	RefreshIndex uint16
 	RememberMe   bool
+}
+
+type AccountDetailsRequest struct {
+	ServerID string `json:"sid"`
+	UserID   uint32 `json:"uid"`
+}
+type AccountDetailsResponse struct {
+	UserID   uint32    `json:"uid"`
+	Type     string    `json:"type"`
+	Email    string    `json:"email"`
+	Name     string    `json:"name"`
+	Creation time.Time `json:"creation"`
 }

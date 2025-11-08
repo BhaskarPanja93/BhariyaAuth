@@ -1,0 +1,13 @@
+SURVEY:
+are the route rate limits too harsh??
+
+
+REMEMBER:
+is 5KB enough for body size?
+add a mutex lock for frontend api, so everything is processed in sequence
+
+
+200: success or user error requires manual retry
+422: frontend error requires manual retry
+429: rate limited, client sided auto-retry after server defined delay
+500: server error, client sided auto-retry after client defined delay

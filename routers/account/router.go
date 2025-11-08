@@ -1,13 +1,15 @@
 package account
 
 import (
+	Middlewares "BhariyaAuth/middlewares"
+	"time"
+
 	"github.com/gofiber/fiber/v3"
 )
 
 func AttachRoutes(authApp fiber.Router) {
 	AccountRouter := authApp.Group("/account")
 
-	AccountRouter.Post("/refresh", ProcessRefresh)
 	AccountRouter.Post("/logout", ProcessLogout)
-	AccountRouter.All("/me", Me)
+	AccountRouter.Post("/refresh", Middlewares.RouteRateLimiter(60, time.Minute, 3*time.Minute, 10*time.Minute), ProcessRefresh)
 }

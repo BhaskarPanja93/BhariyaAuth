@@ -2,17 +2,19 @@ package main
 
 import (
 	Middlewares "BhariyaAuth/middlewares"
+	AccountProcessor "BhariyaAuth/processors/account"
 	AccountRouters "BhariyaAuth/routers/account"
 	LoginRouters "BhariyaAuth/routers/login"
+	PasswordResetRouters "BhariyaAuth/routers/passwordreset"
 	RegisterRouters "BhariyaAuth/routers/register"
 	SSORouters "BhariyaAuth/routers/sso"
 	StatusRouters "BhariyaAuth/routers/status"
 	Stores "BhariyaAuth/stores"
-
 	"flag"
 	"fmt"
 	"net"
 	"os"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/recover"
@@ -22,7 +24,7 @@ func ReceiveCLIFlags(MainApp *fiber.App) {
 	unixSocket := flag.String("bind", "", "Unix socket path (optional)")
 	flag.Parse()
 	if *unixSocket == "" {
-		println("No unix socket path provided. Fallback to port 3000.")
+		fmt.Println("No unix socket path provided. Fallback to port 3000.")
 		StartOnPort(MainApp)
 	} else {
 		StartOnSocket(MainApp, unixSocket)
@@ -73,10 +75,20 @@ func StartOnPort(MainApp *fiber.App) {
 }
 
 func main() {
-	Stores.ConnectRedis()
 	Stores.ConnectMySQL()
+	Stores.ConnectRedis()
+	go AccountProcessor.ServeAccountDetails()
 
-	MainApp := fiber.New(fiber.Config{TrustProxyConfig: fiber.TrustProxyConfig{Loopback: true}})
+	MainApp := fiber.New(fiber.Config{
+		AppName:          "BhariyaAuth",
+		ProxyHeader:      fiber.HeaderXForwardedFor,
+		ReadBufferSize:   8 * 1024,
+		WriteBufferSize:  8 * 1024,
+		ReadTimeout:      30 * time.Second,
+		WriteTimeout:     30 * time.Second,
+		BodyLimit:        5 * 1024,
+		TrustProxyConfig: fiber.TrustProxyConfig{Loopback: true},
+	})
 
 	MainApp.Use(Middlewares.ProfilingMiddleware())
 	MainApp.Use(recover.New())
@@ -84,6 +96,7 @@ func main() {
 	AuthApp := MainApp.Group("/auth")
 
 	AccountRouters.AttachRoutes(AuthApp)
+	PasswordResetRouters.AttachRoutes(AuthApp)
 	StatusRouters.AttachRoutes(AuthApp)
 	RegisterRouters.AttachRoutes(AuthApp)
 	LoginRouters.AttachRoutes(AuthApp)

@@ -53,9 +53,7 @@ func ConnectMySQL() {
 		err = MySQLClient.Ping()
 		if err != nil {
 			fmt.Println("Cannot ping MySQL:", err.Error())
-			err = MySQLClient.Close()
-			if err != nil {
-			}
+			_ = MySQLClient.Close()
 			MySQLClient = nil
 			useSocket = !useSocket
 			time.Sleep(2 * time.Second)
@@ -66,7 +64,7 @@ func ConnectMySQL() {
 
 	MySQLClient.SetMaxOpenConns(10)
 	MySQLClient.SetMaxIdleConns(2000)
-	MySQLClient.SetConnMaxLifetime(5 * time.Minute)
+	MySQLClient.SetConnMaxLifetime(15 * time.Minute)
 
 	fmt.Println("MySQL connection established successfully")
 }

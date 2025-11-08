@@ -21,11 +21,6 @@ type CombinedT struct {
 }
 
 var (
-	Pong = GeneralT{
-		Short:   "PONG",
-		Long:    "Pong!",
-		Allowed: true,
-	}
 	RefreshSucceeded = GeneralT{
 		Short:   "REFRESH_SUCCEEDED",
 		Long:    "Token refreshed",
@@ -51,6 +46,11 @@ var (
 		Long:    "Sign Up Successful",
 		Allowed: true,
 	}
+	PasswordResetIDVerified = GeneralT{
+		Short:   "FORGOT_ID_VERIFIED",
+		Long:    "Forgot ID Verified",
+		Allowed: true,
+	}
 	SignedOut = GeneralT{
 		Short:   "LOGGED_OUT",
 		Long:    "Sign Out Successful",
@@ -59,6 +59,11 @@ var (
 	PasswordUpdated = GeneralT{
 		Short:   "PASSWORD_UPDATED",
 		Long:    "Password updated",
+		Allowed: true,
+	}
+	PasswordNotUpdated = GeneralT{
+		Short:   "PASSWORD_NOT_UPDATED",
+		Long:    "Password not updated",
 		Allowed: true,
 	}
 	InvalidCredentials = GeneralT{
@@ -91,6 +96,11 @@ var (
 		Long:    "Email doesn't have an account",
 		Allowed: false,
 	}
+	AccountDoesntExist = GeneralT{
+		Short:   "ACCOUNT_DOESNT_EXIST",
+		Long:    "Account not found",
+		Allowed: false,
+	}
 	PasswordNotRegistered = GeneralT{
 		Short:   "PASSWORD_NOT_REGISTERED",
 		Long:    "Password not registered. Try SSO login.",
@@ -121,16 +131,17 @@ var (
 		Long:    "OTP send failed. Try again after some time.",
 		Allowed: false,
 	}
-	OtpSent = GeneralT{
-		Short:   "OTP_SENT",
-		Long:    "OTP sent. Enter the OTP.",
-		Allowed: false,
-	}
 	Unknown = GeneralT{
 		Short:   "UNKNOWN",
 		Long:    "Some error occurred",
 		Allowed: false,
 	}
+	RateLimited = GeneralT{
+		Short:   "RATE_LIMITED",
+		Long:    "Rate limited",
+		Allowed: false,
+	}
+
 	DefaultAuth = AuthT{
 		Allowed: true,
 		Change:  false,

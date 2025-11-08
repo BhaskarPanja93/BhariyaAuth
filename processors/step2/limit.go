@@ -1,22 +1,22 @@
 package step2
 
 import (
-	Important "BhariyaAuth/constants/config"
+	Config "BhariyaAuth/constants/config"
 	Stores "BhariyaAuth/stores"
 	"fmt"
 	"time"
 )
 
 func _ResendDelayCalculator(value int64) time.Duration {
-	return time.Duration(value) * 30 * time.Second
+	return 10 * time.Second * time.Duration(value)
 }
 
 func _TTLCalculator(value int64) time.Duration {
-	return time.Duration(value) * 5 * time.Minute
+	return time.Minute * time.Duration(value)
 }
 
 func _KeyCrafter(identifier string) string {
-	return fmt.Sprintf("%s:%s", Important.RedisOTPRateLimit, identifier)
+	return fmt.Sprintf("%s:%s", Config.RedisOTPRateLimit, identifier)
 }
 
 func CheckCanSendOTP(identifier string) (bool, int64, time.Duration) {
@@ -42,7 +42,6 @@ func CheckCanSendOTP(identifier string) (bool, int64, time.Duration) {
 	if canSend {
 		timeRemaining = 0
 	}
-
 	return canSend, value, timeRemaining
 }
 

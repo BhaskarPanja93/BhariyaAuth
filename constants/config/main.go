@@ -15,13 +15,13 @@ var (
 var (
 	CSRFInHeader         = "CSRF"
 	AccessTokenInHeader  = "Authorization"
-	CSRFInCookie         = fmt.Sprintf("%s_csrf", ServerFor)
-	RefreshTokenInCookie = fmt.Sprintf("%s_refresh", ServerFor)
-	SSOStateInCookie     = fmt.Sprintf("%s_sso_state", ServerFor)
+	ServerName           = fmt.Sprintf("%s_%s", ServerFor, ServerRole)
+	CSRFInCookie         = fmt.Sprintf("%s_csrf", ServerName)
+	RefreshTokenInCookie = fmt.Sprintf("%s_refresh", ServerName)
+	SSOStateInCookie     = fmt.Sprintf("%s_sso_state", ServerName)
 
-	AccessTokenFreshnessExpireDelta = time.Minute * 5
-	AccessTokenExpireDelta          = time.Minute * 15
-	RefreshTokenExpireDelta         = time.Hour * 24 * 7
+	RefreshTokenExpireDelta = time.Hour * 24 * 7
+	SSOCookieExpireDelta    = time.Minute * 10
 
 	RedisServerBase            = fmt.Sprintf("%s:%s", ServerFor, ServerRole)
 	RedisServerOTPVerification = fmt.Sprintf("%s:verify", RedisServerBase)
@@ -29,10 +29,6 @@ var (
 	RedisServerRateLimits = fmt.Sprintf("%s:limit", RedisServerBase)
 	RedisOTPRateLimit     = fmt.Sprintf("%s:otp", RedisServerRateLimits)
 
-	RedisSharedBlacklist       = fmt.Sprintf("%s:ban", RedisServerBase)
-	RedisUserIDBlacklist       = fmt.Sprintf("%s:user", RedisSharedBlacklist)
-	RedisRefreshTokenBlacklist = fmt.Sprintf("%s:refresh", RedisSharedBlacklist)
-
-	RedisZohoMailAccessToken = fmt.Sprintf("%s:token:zoho", ServerFor)
-	RedisNewAccountChannel   = fmt.Sprintf("%s:new_account", ServerFor)
+	AccountDetailsRequestChannel  = "auth:account:request"
+	AccountDetailsResponseChannel = "auth:account:response"
 )
