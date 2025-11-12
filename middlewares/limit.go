@@ -3,7 +3,6 @@ package middlewares
 import (
 	ResponseModels "BhariyaAuth/models/responses"
 	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
-	ResponseProcessor "BhariyaAuth/processors/response"
 	"fmt"
 	"sync"
 	"time"
@@ -48,7 +47,7 @@ func RouteRateLimiter(limit uint16, period time.Duration, autoVacuumInterval, ma
 			mutex.Lock()
 			if e, ok := clients[key]; ok && now.Before(e.end) {
 				entry = e
-				entry.count += RateLimitProcessor.CheckValue(ctx)
+				entry.count += RateLimitProcessor.Get(ctx)
 			} else {
 				clients[key] = &window{count: 1, end: now.Add(period)}
 			}
@@ -59,19 +58,17 @@ func RouteRateLimiter(limit uint16, period time.Duration, autoVacuumInterval, ma
 		if entry.count < limit*100 {
 			err := ctx.Next()
 			mutex.Lock()
-			entry.count += RateLimitProcessor.CheckValue(ctx)
+			entry.count += RateLimitProcessor.Get(ctx)
 			mutex.Unlock()
 			return err
 		}
 
 		retryAfter := int(entry.end.Sub(now).Seconds()) + 1
 		return ctx.Status(fiber.StatusTooManyRequests).JSON(
-			ResponseProcessor.CombineResponses(
-				ResponseModels.RateLimited,
-				ResponseModels.DefaultAuth,
-				[]string{fmt.Sprintf("Rate limited, retrying automatically after %d seconds", retryAfter)},
-				nil,
-				map[string]interface{}{"retry-after": retryAfter},
-			))
+			ResponseModels.APIResponseT{
+				Success:       false,
+				Notifications: []string{fmt.Sprintf("Too many requests, retrying automatically after %d seconds", retryAfter)},
+				RetryAfter:    retryAfter,
+			})
 	}
 }

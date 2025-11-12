@@ -31,7 +31,7 @@ func SafeString(nBytes uint16) string {
 	for i := range b {
 		num, err := CryptoRand.Int(CryptoRand.Reader, big.NewInt(int64(len(_letters))))
 		if err != nil {
-			Logger.AccidentalFailure(fmt.Sprintf("SafeString failed: %s", err.Error()))
+			Logger.AccidentalFailure(fmt.Sprintf("[SafeString] failed for length [%d] error: %s", nBytes, err.Error()))
 			return SafeString(nBytes)
 		}
 		b[i] = _letters[num.Int64()]

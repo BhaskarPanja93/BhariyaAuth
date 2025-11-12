@@ -20,6 +20,7 @@ var (
 	RefreshTokenInCookie = fmt.Sprintf("%s_refresh", ServerName)
 	SSOStateInCookie     = fmt.Sprintf("%s_sso_state", ServerName)
 
+	AccessTokenExpireDelta  = time.Minute * 10
 	RefreshTokenExpireDelta = time.Hour * 24 * 7
 	SSOCookieExpireDelta    = time.Minute * 10
 

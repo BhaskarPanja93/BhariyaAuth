@@ -10,11 +10,11 @@ import (
 
 func ProfilingMiddleware() fiber.Handler {
 	return func(ctx fiber.Ctx) error {
-		start := time.Now()
+		start := time.Now().UTC()
 		err := ctx.Next()
 		dur := time.Since(start)
 		if dur.Seconds() > 2 {
-			Logger.AccidentalFailure(fmt.Sprintf("[Profiling] Server took %v (>2) seconds for request", dur))
+			Logger.AccidentalFailure(fmt.Sprintf("[Profiling] Server took %v (>2) seconds for request completion", dur))
 		}
 		ctx.Set("Requested-Started", fmt.Sprintf("%v", start))
 		ctx.Set("Time-Taken", fmt.Sprintf("%v", dur))

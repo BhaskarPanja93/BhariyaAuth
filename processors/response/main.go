@@ -2,58 +2,41 @@ package response
 
 import (
 	Config "BhariyaAuth/constants/config"
-	ResponseModels "BhariyaAuth/models/responses"
 	TokenModels "BhariyaAuth/models/tokens"
 	"fmt"
 
 	"github.com/gofiber/fiber/v3"
 )
 
-func CombineResponses(
-	reply ResponseModels.GeneralT,
-	auth ResponseModels.AuthT,
-	notifications []string,
-	secret map[string]interface{},
-	extra map[string]interface{},
-) ResponseModels.CombinedT {
-	return ResponseModels.CombinedT{
-		Reply:         reply,
-		Notifications: notifications,
-		Auth:          auth,
-		Secret:        secret,
-		Extra:         extra,
-	}
-}
-
-func SSOSuccessResponse(ctx fiber.Ctx, token string, state string, origin string) error {
+func SSOSuccessPopup(ctx fiber.Ctx, token string, origin string) error {
 	return ctx.Type("html").SendString(fmt.Sprintf(`
 <html>
 <head>
 <script>
-function onAuthSuccess(value) {
+function onAuthSuccess() {
     window._authSuccess = true;
-    window.opener?.postMessage({ type: 'SSO_SUCCESS', token: 'value', state: '%s'}, '%s');
+    window.opener?.postMessage({ type: 'SUCCESS', token: '%s'}, '%s');
     window.close();
 }
 window.addEventListener('beforeunload', () => {
     if (!window._authSuccess) {
-        window.opener?.postMessage({ type: 'SSO_CLOSED', state: '%s'}, '%s');
+        window.opener?.postMessage({ type: 'CLOSED'}, '%s');
     }
 });
 </script>
 </head>
-<body onload="onAuthSuccess('%s')">
+<body onload="onAuthSuccess()">
 <h2>That was easy!</h2>
 </body>
 </html>
-`, state, origin, state, origin, token))
+`, token, origin, origin))
 }
 
-func SSOFailureResponse(ctx fiber.Ctx, reason string) error {
+func SSOFailurePopup(ctx fiber.Ctx, reason string) error {
 	return ctx.Type("html").SendString(fmt.Sprintf("<html><body><h2>%s</h2></body></html>", reason))
 }
 
-func AttachAuthCookies(ctx fiber.Ctx, token TokenModels.NewTokenT) {
+func AttachAuthCookies(ctx fiber.Ctx, token TokenModels.NewTokenCombinedT) {
 	Refresh := fiber.Cookie{
 		Name:     Config.RefreshTokenInCookie,
 		Value:    token.RefreshToken,
@@ -71,7 +54,7 @@ func AttachAuthCookies(ctx fiber.Ctx, token TokenModels.NewTokenT) {
 		SameSite: fiber.CookieSameSiteNoneMode,
 	}
 	if token.RememberMe {
-		Csrf.MaxAge = int(Config.RefreshTokenExpireDelta.Seconds())
+		Refresh.MaxAge = int(Config.RefreshTokenExpireDelta.Seconds())
 		Csrf.MaxAge = int(Config.RefreshTokenExpireDelta.Seconds())
 	}
 	ctx.Cookie(&Refresh)
@@ -91,10 +74,10 @@ func AttachSSOCookie(ctx fiber.Ctx, value string) {
 }
 
 func DetachAuthCookies(ctx fiber.Ctx) {
-	ctx.Cookie(&fiber.Cookie{Name: Config.RefreshTokenInCookie, Value: ""})
-	ctx.Cookie(&fiber.Cookie{Name: Config.CSRFInCookie, Value: ""})
+	ctx.Cookie(&fiber.Cookie{Name: Config.RefreshTokenInCookie, Value: "", MaxAge: 1})
+	ctx.Cookie(&fiber.Cookie{Name: Config.CSRFInCookie, Value: "", MaxAge: 1})
 }
 
 func DetachSSOCookies(ctx fiber.Ctx) {
-	ctx.Cookie(&fiber.Cookie{Name: Config.SSOStateInCookie, Value: ""})
+	ctx.Cookie(&fiber.Cookie{Name: Config.SSOStateInCookie, Value: "", MaxAge: 1})
 }

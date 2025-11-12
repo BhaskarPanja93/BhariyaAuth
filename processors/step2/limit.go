@@ -7,20 +7,20 @@ import (
 	"time"
 )
 
-func _ResendDelayCalculator(value int64) time.Duration {
+func calculateResendDelay(value int64) time.Duration {
 	return 10 * time.Second * time.Duration(value)
 }
 
-func _TTLCalculator(value int64) time.Duration {
+func calculateTTL(value int64) time.Duration {
 	return time.Minute * time.Duration(value)
 }
 
-func _KeyCrafter(identifier string) string {
+func craftKey(identifier string) string {
 	return fmt.Sprintf("%s:%s", Config.RedisOTPRateLimit, identifier)
 }
 
 func CheckCanSendOTP(identifier string) (bool, int64, time.Duration) {
-	key := _KeyCrafter(identifier)
+	key := craftKey(identifier)
 	var timeRemaining time.Duration
 
 	value, err := Stores.RedisClient.Get(Stores.Ctx, key).Int64()
@@ -33,9 +33,9 @@ func CheckCanSendOTP(identifier string) (bool, int64, time.Duration) {
 		return true, value, 0
 	}
 
-	totalTTL := _TTLCalculator(value)
+	totalTTL := calculateTTL(value)
 	elapsed := totalTTL - ttl
-	resendDelay := _ResendDelayCalculator(value)
+	resendDelay := calculateResendDelay(value)
 	timeRemaining = resendDelay - elapsed
 
 	canSend := timeRemaining <= 0
@@ -46,8 +46,8 @@ func CheckCanSendOTP(identifier string) (bool, int64, time.Duration) {
 }
 
 func RecordSendOTP(identifier string, value int64) time.Duration {
-	key := _KeyCrafter(identifier)
-	resendDuration := _ResendDelayCalculator(value)
-	Stores.RedisClient.Set(Stores.Ctx, key, value, _TTLCalculator(value))
+	key := craftKey(identifier)
+	resendDuration := calculateResendDelay(value)
+	Stores.RedisClient.Set(Stores.Ctx, key, value, calculateTTL(value))
 	return resendDuration
 }

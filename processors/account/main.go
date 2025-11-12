@@ -2,9 +2,10 @@ package account
 
 import (
 	Config "BhariyaAuth/constants/config"
-	TokenModels "BhariyaAuth/models/tokens"
+	ResponseModels "BhariyaAuth/models/responses"
 	UserTypes "BhariyaAuth/models/users"
 	Logger "BhariyaAuth/processors/logs"
+	StringProcessor "BhariyaAuth/processors/string"
 	Stores "BhariyaAuth/stores"
 	"fmt"
 	"time"
@@ -12,15 +13,6 @@ import (
 	"github.com/goccy/go-json"
 	"golang.org/x/crypto/bcrypt"
 )
-
-func IDExists(userID uint32) bool {
-	var exists bool
-	err := Stores.MySQLClient.QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE uid = ?)`, userID).Scan(&exists)
-	if err != nil {
-		return false
-	}
-	return exists
-}
 
 func GetIDFromMail(mail string) (uint32, bool) {
 	var userID uint32
@@ -31,43 +23,26 @@ func GetIDFromMail(mail string) (uint32, bool) {
 	return userID, true
 }
 
-func GetUserType(userID uint32) string {
+func GetUserType(userID uint32) UserTypes.T {
 	var userType string
-	err := Stores.MySQLClient.QueryRow(`SELECT type FROM users WHERE uid = ?`, userID).Scan(&userType)
+	err := Stores.MySQLClient.QueryRow(`SELECT type FROM users WHERE uid = ? LIMIT 1`, userID).Scan(&userType)
 	if err != nil {
-		return ""
+		return UserTypes.All.Unknown
 	}
-	return userType
+	return UserTypes.Find(userType)
 }
 
-func BlacklistUser(userID uint32) {
-	CloseAllSessions(userID)
-	_, err := Stores.MySQLClient.Exec("UPDATE users SET blocked = ? WHERE uid = ?", true, userID)
+func BlacklistUser(userID uint32) bool {
+	DeleteAllSessions(userID)
+	_, err := Stores.MySQLClient.Exec("UPDATE users SET blocked = ? WHERE uid = ? LIMIT 1", true, userID)
 	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("Blacklisting user failed: %s", err.Error()))
-		BlacklistUser(userID)
-		return
+		Logger.AccidentalFailure(fmt.Sprintf("[BlacklistUser] failed [UID-%d] reason: %s", userID, err.Error()))
+		return false
 	}
-	rows, err := Stores.MySQLClient.Query("SELECT refresh FROM activities WHERE uid = ? AND blocked = ?", userID, false)
-	if err != nil {
-		BlacklistUser(userID)
-		return
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var refreshID uint16
-		if err = rows.Scan(&refreshID); err != nil {
-			return
-		}
-	}
-	_, err = Stores.MySQLClient.Exec("UPDATE activities SET blocked = ? WHERE uid = ? AND blocked = ?", true, userID, false)
-	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("Blacklisting refresh failed: %s", err.Error()))
-		return
-	}
+	return true
 }
 
-func UserIsBlacklisted(userID uint32) bool {
+func CheckUserIsBlacklisted(userID uint32) bool {
 	var blocked bool
 	err := Stores.MySQLClient.QueryRow("SELECT blocked FROM users WHERE uid = ? LIMIT 1", userID).Scan(&blocked)
 	if err != nil {
@@ -76,34 +51,34 @@ func UserIsBlacklisted(userID uint32) bool {
 	return blocked
 }
 
-func CloseAllSessions(userID uint32) {
+func DeleteAllSessions(userID uint32) bool {
 	_, err := Stores.MySQLClient.Exec("DELETE FROM activities WHERE uid = ?", userID)
 	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("CloseAllSessions failed: %s", err.Error()))
-		CloseAllSessions(userID)
-		return
+		Logger.AccidentalFailure(fmt.Sprintf("[DeleteAllSessions] failed [UID-%d] reason: %s", userID, err.Error()))
+		return false
 	}
+	return true
 }
 
-func CloseSession(userID uint32, refreshID uint16) {
-	_, err := Stores.MySQLClient.Exec("DELETE FROM activities WHERE uid = ? AND refresh = ?", userID, refreshID)
+func DeleteSession(userID uint32, refreshID uint16) {
+	_, err := Stores.MySQLClient.Exec("DELETE FROM activities WHERE uid = ? AND refresh = ? LIMIT 1", userID, refreshID)
 	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("CloseSession failed: %s", err.Error()))
-		CloseSession(userID, refreshID)
+		Logger.AccidentalFailure(fmt.Sprintf("[DeleteSession] failed [UID-%d-RID-%d] reason: %s", userID, refreshID, err.Error()))
+		DeleteSession(userID, refreshID)
 		return
 	}
 }
 
-func SessionExists(userID uint32, refreshID uint16) bool {
+func CheckSessionExists(userID uint32, refreshID uint16) bool {
 	var blocked bool
-	err := Stores.MySQLClient.QueryRow("SELECT blocked FROM activities WHERE uid = ? AND refresh = ?", userID, refreshID).Scan(&blocked)
+	err := Stores.MySQLClient.QueryRow("SELECT EXISTS(SELECT 1 FROM activities WHERE uid = ? AND refresh = ?)", userID, refreshID).Scan(&blocked)
 	if err != nil {
-		return true
+		return false
 	}
 	return blocked
 }
 
-func UserHasPassword(userID uint32) bool {
+func CheckUserHasPassword(userID uint32) bool {
 	var hasPassword bool
 	err := Stores.MySQLClient.QueryRow(`SELECT password IS NOT NULL AND password <> '' FROM users WHERE uid = ? LIMIT 1`, userID).Scan(&hasPassword)
 	if err != nil {
@@ -112,44 +87,25 @@ func UserHasPassword(userID uint32) bool {
 	return hasPassword
 }
 
-func PasswordIsStrong(password string) bool {
-	n := len(password)
-	if n < 7 || n > 20 {
-		return false
-	}
-	var hasUpper, hasLower, hasDigit bool
-	for i := 0; i < n; i++ {
-		c := password[i]
-		switch {
-		case c >= 'A' && c <= 'Z':
-			hasUpper = true
-		case c >= 'a' && c <= 'z':
-			hasLower = true
-		case c >= '0' && c <= '9':
-			hasDigit = true
-		}
-		if hasUpper && hasLower && hasDigit {
-			return true
-		}
-	}
-	return hasUpper && hasLower && hasDigit
-}
-
 func UpdatePassword(userID uint32, password string) bool {
-	if PasswordIsStrong(password) {
-		_, err := Stores.MySQLClient.Exec(`UPDATE users SET password = ? WHERE uid = ? LIMIT 1`, _HashPassword(password), userID)
-		if err != nil {
-			Logger.AccidentalFailure(fmt.Sprintf("UpdatePassword failed: %s", err.Error()))
+	if StringProcessor.PasswordIsStrong(password) {
+		hash, ok := hashPassword(password)
+		if !ok {
 			return false
 		}
-		CloseAllSessions(userID)
+		_, err := Stores.MySQLClient.Exec(`UPDATE users SET password = ? WHERE uid = ? LIMIT 1`, hash, userID)
+		if err != nil {
+			Logger.AccidentalFailure(fmt.Sprintf("[UpdatePassword] failed for [UID-%d] reason: %s", userID, err.Error()))
+			return false
+		}
+		DeleteAllSessions(userID)
 		return true
 	}
 	return false
 }
 
-func PasswordMatches(userID uint32, password string) bool {
-	if PasswordIsStrong(password) {
+func CheckPasswordMatches(userID uint32, password string) bool {
+	if StringProcessor.PasswordIsStrong(password) {
 		var hash string
 		err := Stores.MySQLClient.QueryRow(`SELECT password FROM users WHERE uid = ? LIMIT 1`, userID).Scan(&hash)
 		if err == nil {
@@ -157,26 +113,31 @@ func PasswordMatches(userID uint32, password string) bool {
 				return true
 			}
 		} else {
-			Logger.AccidentalFailure(fmt.Sprintf("Fetch password hash failed: %s", err.Error()))
+			Logger.AccidentalFailure(fmt.Sprintf("[CheckPasswordMatches] failed for [UID-%d] reason: %s", userID, err.Error()))
 		}
 	}
 	return false
 }
 
-func _HashPassword(password string) string {
+func hashPassword(password string) (string, bool) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("Hash Password failed: %s", err.Error()))
-		return _HashPassword(password)
+		Logger.AccidentalFailure(fmt.Sprintf("[HashPassword] error: %s", err.Error()))
+		return "", false
 	}
-	return string(hash)
+	return string(hash), true
 }
 
 func RecordNewUser(userID uint32, password string, mail string, name string) bool {
 	var hash string
+	var ok bool
 	if password != "" {
-		hash = _HashPassword(password)
+		hash, ok = hashPassword(password)
+		if !ok {
+			return false
+		}
 	}
+	now := time.Now().UTC()
 	_, err := Stores.MySQLClient.Exec(
 		"INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?)",
 		userID,
@@ -185,29 +146,29 @@ func RecordNewUser(userID uint32, password string, mail string, name string) boo
 		name,
 		false,
 		hash,
-		time.Now(),
+		now,
 	)
 	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("RecordNewUser failed [%d-%s]: %s", userID, mail, err.Error()))
+		Logger.AccidentalFailure(fmt.Sprintf("[RecordNewUser] failed for [UID-%d-MAIL-%s] reason: %s", userID, mail, err.Error()))
 		return false
 	}
 	return true
 }
 
-func RecordReturningUser(refreshID uint16, userID uint32, rememberMe bool) bool {
+func RecordReturningUser(ua string, refreshID uint16, userID uint32, rememberMe bool) bool {
+	now := time.Now().UTC()
 	_, err := Stores.MySQLClient.Exec(
-		"INSERT INTO activities VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO activities VALUES (?, ?, ?, ?, ?, ?, ?)",
 		userID,
 		refreshID,
 		1,
-		"",
-		false,
 		rememberMe,
-		time.Now(),
-		time.Now(),
+		now,
+		now,
+		ua,
 	)
 	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("RecordReturningUser failed [%d-%d]: %s", userID, refreshID, err.Error()))
+		Logger.AccidentalFailure(fmt.Sprintf("[RecordReturningUser] failed for [UID-%d-RID-%d] reason: %s", userID, refreshID, err.Error()))
 		return false
 	}
 	return true
@@ -216,16 +177,16 @@ func RecordReturningUser(refreshID uint16, userID uint32, rememberMe bool) bool 
 func ServeAccountDetails() {
 	channel := Stores.RedisClient.Subscribe(Stores.Ctx, Config.AccountDetailsRequestChannel).Channel()
 	for message := range channel {
-		var request TokenModels.AccountDetailsRequest
+		var request ResponseModels.AccountDetailsRequestT
 		if err := json.Unmarshal([]byte(message.Payload), &request); err != nil {
-			Logger.AccidentalFailure(fmt.Sprintf("ServeAccountDetails Unmarshal failed %s: %s", message, err.Error()))
+			Logger.AccidentalFailure(fmt.Sprintf("[ServeAccountDetails] Unmarshal failed %s reason: %s", message, err.Error()))
 			continue
 		}
-		var response TokenModels.AccountDetailsResponse
+		var response ResponseModels.AccountDetailsResponseT
 		err := Stores.MySQLClient.QueryRow("SELECT uid, type, email, name, creation FROM users WHERE uid = ? LIMIT 1", request.UserID).
 			Scan(&response.UserID, &response.Type, &response.Email, &response.Name, &response.Creation)
 		if err != nil {
-			Logger.AccidentalFailure(fmt.Sprintf("ServeAccountDetails Parse from DB failed: %s", err.Error()))
+			Logger.AccidentalFailure(fmt.Sprintf("[ServeAccountDetails] Parse from DB failed for [UID-%d-SID-%s]: %s", request.UserID, request.ServerID, err.Error()))
 			continue
 		}
 		Stores.RedisClient.Publish(Stores.Ctx, fmt.Sprintf("%s:%s", Config.AccountDetailsResponseChannel, request.ServerID), response)

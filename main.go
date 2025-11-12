@@ -7,6 +7,7 @@ import (
 	LoginRouters "BhariyaAuth/routers/login"
 	PasswordResetRouters "BhariyaAuth/routers/passwordreset"
 	RegisterRouters "BhariyaAuth/routers/register"
+	SessionRouters "BhariyaAuth/routers/sessions"
 	SSORouters "BhariyaAuth/routers/sso"
 	StatusRouters "BhariyaAuth/routers/status"
 	Stores "BhariyaAuth/stores"
@@ -86,7 +87,7 @@ func main() {
 		WriteBufferSize:  8 * 1024,
 		ReadTimeout:      30 * time.Second,
 		WriteTimeout:     30 * time.Second,
-		BodyLimit:        5 * 1024,
+		BodyLimit:        10 * 1024,
 		TrustProxyConfig: fiber.TrustProxyConfig{Loopback: true},
 	})
 
@@ -101,6 +102,7 @@ func main() {
 	RegisterRouters.AttachRoutes(AuthApp)
 	LoginRouters.AttachRoutes(AuthApp)
 	SSORouters.AttachRoutes(AuthApp)
+	SessionRouters.AttachRouters(AuthApp)
 
 	ReceiveCLIFlags(MainApp)
 }

@@ -30,51 +30,36 @@ type PasswordResetT struct {
 }
 
 type SSOStateT struct {
-	Provider      string    `json:"pro"`
-	Expiry        time.Time `json:"exp"`
-	FrontendState string    `json:"fro"`
-	Origin        string    `json:"ori"`
-	RememberMe    bool      `json:"rem"`
+	Provider   string    `json:"pro"`
+	Expiry     time.Time `json:"exp"`
+	Origin     string    `json:"ori"`
+	RememberMe bool      `json:"rem"`
 }
 
 type AccessTokenT struct {
-	UserID         uint32       `json:"uid"`
-	RefreshID      uint16       `json:"rid"`
-	UserType       UsersTypes.T `json:"typ"`
-	AccessCreated  time.Time    `json:"aat"`
-	RefreshCreated time.Time    `json:"lat"`
-	RememberMe     bool         `json:"rem"`
+	UserID       uint32       `json:"uid"`
+	RefreshID    uint16       `json:"rid"`
+	UserType     UsersTypes.T `json:"typ"`
+	AccessExpiry time.Time    `json:"axe"`
+	RememberMe   bool         `json:"rem"`
 }
 
 type RefreshTokenT struct {
 	UserID         uint32       `json:"uid"`
 	RefreshID      uint16       `json:"rid"`
 	RefreshIndex   uint16       `json:"rin"`
-	RefreshCreated time.Time    `json:"lat"`
-	RefreshUpdated time.Time    `json:"rat"`
+	RefreshCreated time.Time    `json:"rca"`
+	RefreshUpdated time.Time    `json:"rua"`
+	RefreshExpiry  time.Time    `json:"rxa"`
 	UserType       UsersTypes.T `json:"typ"`
 	CSRF           string       `json:"csr"`
 	RememberMe     bool         `json:"rem"`
 	IdentifierType string       `json:"siu"`
 }
 
-type NewTokenT struct {
+type NewTokenCombinedT struct {
 	AccessToken  string
 	RefreshToken string
 	CSRF         string
-	RefreshID    uint16
-	RefreshIndex uint16
 	RememberMe   bool
-}
-
-type AccountDetailsRequest struct {
-	ServerID string `json:"sid"`
-	UserID   uint32 `json:"uid"`
-}
-type AccountDetailsResponse struct {
-	UserID   uint32    `json:"uid"`
-	Type     string    `json:"type"`
-	Email    string    `json:"email"`
-	Name     string    `json:"name"`
-	Creation time.Time `json:"creation"`
 }

@@ -3,11 +3,19 @@ are the route rate limits too harsh??
 
 
 REMEMBER:
-is 5KB enough for body size?
+is x KB enough for body size?
 add a mutex lock for frontend api, so everything is processed in sequence
+cleanup verification codes from redis if used
+send mail for password change and other crucial tasks
+
+SUGGESTION:
+add a limit to number of devices where an account can login....
+[Not possible] because if someone has too many lost sessions, they cant log back in at all,
+[SOLUTION] Every new login remove the oldest session when limit hits
 
 
-200: success or user error requires manual retry
-422: frontend error requires manual retry
-429: rate limited, client sided auto-retry after server defined delay
-500: server error, client sided auto-retry after client defined delay
+422: STOP
+200: STOP
+401: RE-AUTH + RETRY
+429: DELAY + RETRY
+500: LIMITED DELAYED RETRY
