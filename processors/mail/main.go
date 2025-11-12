@@ -82,6 +82,12 @@ func NewAccount(mail string, trial uint8) bool {
 
 func PasswordChange(mail string, trial uint8) bool {
 	subject := "Password Changed"
-	content := "Your account password has been changed."
+	content := "Your account password has been changed. Contact support if you think this is a mistake."
+	return sendMail(mail, subject, content, trial)
+}
+
+func AccountBlacklisted(mail string, trial uint8) bool {
+	subject := "Blacklisted"
+	content := "Your account has been flagged. All future actions will be blocked. Contact support ASAP if you think this is a mistake."
 	return sendMail(mail, subject, content, trial)
 }

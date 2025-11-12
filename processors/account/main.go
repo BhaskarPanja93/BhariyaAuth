@@ -37,9 +37,16 @@ func BlacklistUser(userID uint32) bool {
 	DeleteAllSessions(userID)
 	_, err := Stores.MySQLClient.Exec("UPDATE users SET blocked = ? WHERE uid = ? LIMIT 1", true, userID)
 	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("[BlacklistUser] failed [UID-%d] reason: %s", userID, err.Error()))
+		Logger.AccidentalFailure(fmt.Sprintf("[BlacklistUser] failed blocking [UID-%d] reason: %s", userID, err.Error()))
 		return false
 	}
+	var mail string
+	err = Stores.MySQLClient.QueryRow("SELECT email FROM users WHERE uid = ? LIMIT 1", userID).Scan(&mail)
+	if err != nil {
+		Logger.AccidentalFailure(fmt.Sprintf("[BlacklistUser] failed to fetch mail [UID-%d] reason: %s", userID, err.Error()))
+		return false
+	}
+	MailNotifier.AccountBlacklisted(mail, 0)
 	return true
 }
 
