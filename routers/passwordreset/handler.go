@@ -5,6 +5,7 @@ import (
 	TokenModels "BhariyaAuth/models/tokens"
 	AccountProcessor "BhariyaAuth/processors/account"
 	Logger "BhariyaAuth/processors/logs"
+	MailNotifier "BhariyaAuth/processors/mail"
 	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
 	Step2Processor "BhariyaAuth/processors/step2"
 	StringProcessor "BhariyaAuth/processors/string"
@@ -54,7 +55,7 @@ func Step2(ctx fiber.Ctx) error {
 		RateLimitProcessor.Set(ctx)
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
-	if !Step2Processor.ValidateMailOTP(ResetData.Step2Code, form.Verification) {
+	if !Step2Processor.ValidateOTP(ResetData.Step2Code, form.Verification) {
 		Logger.IntentionalFailure(fmt.Sprintf("[Reset2] Incorrect OTP for [UID-%d]", ResetData.UserID))
 		RateLimitProcessor.Set(ctx)
 		return ctx.Status(fiber.StatusOK).JSON(
@@ -80,6 +81,7 @@ func Step2(ctx fiber.Ctx) error {
 			})
 	}
 	Logger.Success(fmt.Sprintf("[Reset2] Password changed for [UID-%d]", ResetData.UserID))
+	MailNotifier.PasswordChange(ResetData.Mail, 0)
 	return ctx.Status(fiber.StatusOK).JSON(
 		ResponseModels.APIResponseT{
 			Success:       true,
@@ -114,7 +116,7 @@ func Step1(ctx fiber.Ctx) error {
 		UserID:    userID,
 		Step2Code: "",
 	}
-	verification, retry := Step2Processor.SendMailOTP(ctx, form.MailAddress)
+	verification, retry := Step2Processor.SendOTP(ctx, form.MailAddress)
 	if verification == "" {
 		return ctx.Status(fiber.StatusOK).JSON(
 			ResponseModels.APIResponseT{

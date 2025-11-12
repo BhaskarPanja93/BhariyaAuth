@@ -5,6 +5,7 @@ import (
 	ResponseModels "BhariyaAuth/models/responses"
 	UserTypes "BhariyaAuth/models/users"
 	Logger "BhariyaAuth/processors/logs"
+	MailNotifier "BhariyaAuth/processors/mail"
 	StringProcessor "BhariyaAuth/processors/string"
 	Stores "BhariyaAuth/stores"
 	"fmt"
@@ -138,39 +139,38 @@ func RecordNewUser(userID uint32, password string, mail string, name string) boo
 		}
 	}
 	now := time.Now().UTC()
-	_, err := Stores.MySQLClient.Exec(
-		"INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?)",
-		userID,
-		UserTypes.All.Viewer.Short,
-		mail,
-		name,
-		false,
-		hash,
-		now,
-	)
+	_, err := Stores.MySQLClient.Exec("INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?)",
+		userID, UserTypes.All.Viewer.Short, mail, name, false, hash, now)
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("[RecordNewUser] failed for [UID-%d-MAIL-%s] reason: %s", userID, mail, err.Error()))
 		return false
 	}
+	MailNotifier.NewAccount(mail, 0)
 	return true
 }
 
-func RecordReturningUser(ua string, refreshID uint16, userID uint32, rememberMe bool) bool {
+func RecordReturningUser(mail string, ua string, refreshID uint16, userID uint32, rememberMe bool) bool {
 	now := time.Now().UTC()
-	_, err := Stores.MySQLClient.Exec(
-		"INSERT INTO activities VALUES (?, ?, ?, ?, ?, ?, ?)",
-		userID,
-		refreshID,
-		1,
-		rememberMe,
-		now,
-		now,
-		ua,
-	)
+	var count int
+	err := Stores.MySQLClient.QueryRow("SELECT COUNT(*) FROM activities WHERE uid = ?", userID).Scan(&count)
 	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("[RecordReturningUser] failed for [UID-%d-RID-%d] reason: %s", userID, refreshID, err.Error()))
+		Logger.AccidentalFailure(fmt.Sprintf("[RecordReturningUser] count query failed for [UID-%d]: %s", userID, err.Error()))
 		return false
 	}
+	if count >= Config.MaxUserSessions {
+		_, err = Stores.MySQLClient.Exec(`DELETE FROM activities WHERE uid = ? ORDER BY updated LIMIT 1`, userID)
+		if err != nil {
+			Logger.AccidentalFailure(fmt.Sprintf("[RecordReturningUser] failed deleting oldest session for [UID-%d]: %s", userID, err.Error()))
+			return false
+		}
+	}
+	_, err = Stores.MySQLClient.Exec(`INSERT INTO activities (uid, refresh, count, remembered, creation, updated, ua)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`, userID, refreshID, 1, rememberMe, now, now, ua)
+	if err != nil {
+		Logger.AccidentalFailure(fmt.Sprintf("[RecordReturningUser] insert failed for [UID-%d-RID-%d]: %s", userID, refreshID, err.Error()))
+		return false
+	}
+	MailNotifier.NewLogin(mail, 0)
 	return true
 }
 

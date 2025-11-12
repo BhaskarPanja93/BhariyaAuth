@@ -5,14 +5,9 @@ are the route rate limits too harsh??
 REMEMBER:
 is x KB enough for body size?
 add a mutex lock for frontend api, so everything is processed in sequence
-cleanup verification codes from redis if used
-send mail for password change and other crucial tasks
 
-SUGGESTION:
-add a limit to number of devices where an account can login....
-[Not possible] because if someone has too many lost sessions, they cant log back in at all,
-[SOLUTION] Every new login remove the oldest session when limit hits
-
+SUGGESTIONS:
+move OTP verification to in memory too?
 
 422: STOP
 200: STOP

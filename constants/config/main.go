@@ -27,9 +27,8 @@ var (
 	RedisServerBase            = fmt.Sprintf("%s:%s", ServerFor, ServerRole)
 	RedisServerOTPVerification = fmt.Sprintf("%s:verify", RedisServerBase)
 
-	RedisServerRateLimits = fmt.Sprintf("%s:limit", RedisServerBase)
-	RedisOTPRateLimit     = fmt.Sprintf("%s:otp", RedisServerRateLimits)
-
 	AccountDetailsRequestChannel  = "auth:account:request"
 	AccountDetailsResponseChannel = "auth:account:response"
+
+	MaxUserSessions = 10
 )

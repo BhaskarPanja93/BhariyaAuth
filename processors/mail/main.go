@@ -26,14 +26,10 @@ func init() {
 func refreshCredentials() {
 	graphClient, _ = graph.NewGraphServiceClientWithCredentials(cred, []string{"https://graph.microsoft.com/.default"})
 }
-
-func SendOTP(mail string, otp string, trial uint8) bool {
+func sendMail(mail, subject, content string, trial uint8) bool {
 	if trial > 2 {
 		return false
 	}
-
-	subject := "BhariyaAuth OTP"
-	content := fmt.Sprintf("Your OTP (valid for 5 Minutes) for BhariyaAuth is: <b>%s</b>", otp)
 
 	body := graphmodels.NewItemBody()
 	contentType := graphmodels.HTML_BODYTYPE
@@ -58,20 +54,34 @@ func SendOTP(mail string, otp string, trial uint8) bool {
 
 	err := graphClient.Users().ByUserId(Secrets.MicrosoftMailId).SendMail().Post(context.Background(), requestBody, nil)
 	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("[Step2Mail] sendInternal failed for [MAIL%s]: %s", mail, err.Error()))
+		Logger.AccidentalFailure(fmt.Sprintf("[Mail] SendMail failed for [MAIL-%s]: %s", mail, err.Error()))
 		time.Sleep(time.Second)
 		refreshCredentials()
-		return SendOTP(mail, otp, trial+1)
+		return sendMail(mail, subject, content, trial+1)
 	}
 	return true
 }
 
-func SendText(mail string, text string, trial uint8) bool {
-
-	return false
+func OTP(mail, otp string, trial uint8) bool {
+	subject := "BhariyaAuth OTP"
+	content := fmt.Sprintf("Your OTP (valid for 5 Minutes) for BhariyaAuth is: <b>%s</b>", otp)
+	return sendMail(mail, subject, content, trial)
 }
 
-func SendHTML(mail string, html string, trial uint8) bool {
+func NewLogin(mail string, trial uint8) bool {
+	subject := "New login"
+	content := "A new device has logged in to your account."
+	return sendMail(mail, subject, content, trial)
+}
 
-	return false
+func NewAccount(mail string, trial uint8) bool {
+	subject := "Welcome"
+	content := "Your account for BhariyaAuth has been created. You will be using this account credentials for logging in to all our services."
+	return sendMail(mail, subject, content, trial)
+}
+
+func PasswordChange(mail string, trial uint8) bool {
+	subject := "Password Changed"
+	content := "Your account password has been changed."
+	return sendMail(mail, subject, content, trial)
 }

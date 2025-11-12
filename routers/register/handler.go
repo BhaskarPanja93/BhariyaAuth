@@ -73,7 +73,7 @@ func Step2(ctx fiber.Ctx) error {
 				Notifications: []string{"Account exists with the email"},
 			})
 	}
-	if !Step2Processor.ValidateMailOTP(SignUpData.Step2Code, form.Verification) {
+	if !Step2Processor.ValidateOTP(SignUpData.Step2Code, form.Verification) {
 		Logger.IntentionalFailure(fmt.Sprintf("[Register2] Incorrect OTP for [MAIL-%s]", SignUpData.Mail))
 		RateLimitProcessor.Set(ctx)
 		return ctx.Status(fiber.StatusOK).JSON(
@@ -92,7 +92,7 @@ func Step2(ctx fiber.Ctx) error {
 				Notifications: []string{"Failed to register (DB-write issue)... Retrying"},
 			})
 	}
-	if !AccountProcessor.RecordReturningUser(ctx.Get("User-Agent"), refreshID, userID, SignUpData.RememberMe) {
+	if !AccountProcessor.RecordReturningUser(SignUpData.Mail, ctx.Get("User-Agent"), refreshID, userID, SignUpData.RememberMe) {
 		Logger.AccidentalFailure(fmt.Sprintf("[Register2] Record Returning failed for [UID-%d]", userID))
 		return ctx.Status(fiber.StatusOK).JSON(
 			ResponseModels.APIResponseT{
@@ -162,7 +162,7 @@ func Step1(ctx fiber.Ctx) error {
 		Name:       form.Name,
 		Password:   form.Password,
 	}
-	verification, retry := Step2Processor.SendMailOTP(ctx, form.MailAddress)
+	verification, retry := Step2Processor.SendOTP(ctx, form.MailAddress)
 	if verification == "" {
 		return ctx.Status(fiber.StatusOK).JSON(
 			ResponseModels.APIResponseT{

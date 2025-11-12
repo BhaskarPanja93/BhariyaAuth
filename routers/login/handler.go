@@ -68,7 +68,7 @@ func Step2(ctx fiber.Ctx) error {
 				Notifications: []string{"Incorrect Password"},
 			})
 	}
-	if SignInData.Step2Process == "otp" && !Step2Processor.ValidateMailOTP(SignInData.Step2Code, form.Verification) {
+	if SignInData.Step2Process == "otp" && !Step2Processor.ValidateOTP(SignInData.Step2Code, form.Verification) {
 		Logger.IntentionalFailure(fmt.Sprintf("[Login2] Incorrect OTP for [UID-%d]", SignInData.UserID))
 		RateLimitProcessor.Set(ctx)
 		return ctx.Status(fiber.StatusOK).JSON(
@@ -86,7 +86,7 @@ func Step2(ctx fiber.Ctx) error {
 			})
 	}
 	refreshID := Generators.RefreshID()
-	if !AccountProcessor.RecordReturningUser(ctx.Get("User-Agent"), refreshID, SignInData.UserID, SignInData.RememberMe) {
+	if !AccountProcessor.RecordReturningUser(SignInData.Mail, ctx.Get("User-Agent"), refreshID, SignInData.UserID, SignInData.RememberMe) {
 		Logger.AccidentalFailure(fmt.Sprintf("[Login2] Record Returning failed for [UID-%d]", SignInData.UserID))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(
 			ResponseModels.APIResponseT{
@@ -149,7 +149,7 @@ func Step1(ctx fiber.Ctx) error {
 		Mail:         form.MailAddress,
 	}
 	if process == "otp" {
-		verification, retry := Step2Processor.SendMailOTP(ctx, form.MailAddress)
+		verification, retry := Step2Processor.SendOTP(ctx, form.MailAddress)
 		if verification == "" {
 			return ctx.Status(fiber.StatusOK).JSON(
 				ResponseModels.APIResponseT{
