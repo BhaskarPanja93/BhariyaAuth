@@ -92,7 +92,7 @@ func SendOTP(ctx fiber.Ctx, mail string) (string, time.Duration) {
 	canSend, alreadySentCount, currentDelay := CheckCanSendOTP(rateLimitKey)
 	if canSend {
 		otp := Generators.SafeString(4)
-		if success := MailNotifier.OTP(mail, otp, 0); !success {
+		if success := MailNotifier.OTP(mail, otp, 2); !success {
 			return "", currentDelay
 		}
 		verification := Generators.UnsafeString(10)

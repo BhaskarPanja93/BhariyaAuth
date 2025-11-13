@@ -26,8 +26,8 @@ func init() {
 func refreshCredentials() {
 	graphClient, _ = graph.NewGraphServiceClientWithCredentials(cred, []string{"https://graph.microsoft.com/.default"})
 }
-func sendMail(mail, subject, content string, trial uint8) bool {
-	if trial > 2 {
+func sendMail(mail, subject, content string, attempts uint8) bool {
+	if attempts <= 0 {
 		return false
 	}
 
@@ -57,37 +57,37 @@ func sendMail(mail, subject, content string, trial uint8) bool {
 		Logger.AccidentalFailure(fmt.Sprintf("[Mail] SendMail failed for [MAIL-%s]: %s", mail, err.Error()))
 		time.Sleep(time.Second)
 		refreshCredentials()
-		return sendMail(mail, subject, content, trial+1)
+		return sendMail(mail, subject, content, attempts-1)
 	}
 	return true
 }
 
-func OTP(mail, otp string, trial uint8) bool {
+func OTP(mail, otp string, attempts uint8) bool {
 	subject := "BhariyaAuth OTP"
 	content := fmt.Sprintf("Your OTP (valid for 5 Minutes) for BhariyaAuth is: <b>%s</b>", otp)
-	return sendMail(mail, subject, content, trial)
+	return sendMail(mail, subject, content, attempts)
 }
 
-func NewLogin(mail string, trial uint8) bool {
+func NewLogin(mail string, attempts uint8) bool {
 	subject := "New login"
 	content := "A new device has logged in to your account."
-	return sendMail(mail, subject, content, trial)
+	return sendMail(mail, subject, content, attempts)
 }
 
-func NewAccount(mail string, trial uint8) bool {
+func NewAccount(mail string, attempts uint8) bool {
 	subject := "Welcome"
 	content := "Your account for BhariyaAuth has been created. You will be using this account credentials for logging in to all our services."
-	return sendMail(mail, subject, content, trial)
+	return sendMail(mail, subject, content, attempts)
 }
 
-func PasswordChange(mail string, trial uint8) bool {
+func PasswordChange(mail string, attempts uint8) bool {
 	subject := "Password Changed"
 	content := "Your account password has been changed. Contact support if you think this is a mistake."
-	return sendMail(mail, subject, content, trial)
+	return sendMail(mail, subject, content, attempts)
 }
 
-func AccountBlacklisted(mail string, trial uint8) bool {
+func AccountBlacklisted(mail string, attempts uint8) bool {
 	subject := "Blacklisted"
 	content := "Your account has been flagged. All future actions will be blocked. Contact support ASAP if you think this is a mistake."
-	return sendMail(mail, subject, content, trial)
+	return sendMail(mail, subject, content, attempts)
 }
