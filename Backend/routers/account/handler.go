@@ -94,6 +94,7 @@ func ProcessLogout(ctx fiber.Ctx) error {
 		RateLimitProcessor.Set(ctx)
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
+	ResponseProcessor.DetachMFACookies(ctx)
 	ResponseProcessor.DetachAuthCookies(ctx)
 	return ctx.Status(fiber.StatusOK).JSON(
 		ResponseModels.APIResponseT{

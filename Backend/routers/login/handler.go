@@ -109,6 +109,7 @@ func Step2(ctx fiber.Ctx) error {
 				Notifications: []string{"Failed to acquire session (Encryptor issue)... Retrying"},
 			})
 	}
+	ResponseProcessor.DetachMFACookies(ctx)
 	ResponseProcessor.AttachAuthCookies(ctx, token)
 	if SignInData.Step2Process == "otp" {
 		var mfatoken string

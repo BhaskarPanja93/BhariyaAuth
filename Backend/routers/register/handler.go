@@ -140,6 +140,7 @@ func Step2(ctx fiber.Ctx) error {
 				Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
 			})
 	}
+	ResponseProcessor.DetachMFACookies(ctx)
 	ResponseProcessor.AttachMFACookie(ctx, mfatoken)
 	Logger.Success(fmt.Sprintf("[Register2] Created: [UID-%d-RID-%d-MAIL-%s]", userID, refreshID, SignUpData.Mail))
 	return ctx.Status(fiber.StatusOK).JSON(
