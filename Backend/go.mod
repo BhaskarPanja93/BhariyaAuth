@@ -7,12 +7,12 @@ require (
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/goccy/go-json v0.10.5
 	github.com/gofiber/contrib/monitor v0.1.2
-	github.com/gofiber/fiber/v3 v3.0.0-rc.2
+	github.com/gofiber/fiber/v3 v3.0.0-rc.3
 	github.com/markbates/goth v1.82.0
 	github.com/medama-io/go-useragent v1.2.2
-	github.com/microsoftgraph/msgraph-sdk-go v1.89.0
-	github.com/redis/go-redis/v9 v9.16.0
-	golang.org/x/crypto v0.44.0
+	github.com/microsoftgraph/msgraph-sdk-go v1.90.0
+	github.com/redis/go-redis/v9 v9.17.0
+	golang.org/x/crypto v0.45.0
 )
 
 require (

@@ -24,8 +24,6 @@ type Step1FormT struct {
 	Name        string `form:"name"`
 	Password    string `form:"password"`
 	RememberMe  bool   `form:"remember_me"`
-	State       string `form:"state"`
-	Origin      string `form:"origin"`
 }
 
 type Step2FormT struct {
