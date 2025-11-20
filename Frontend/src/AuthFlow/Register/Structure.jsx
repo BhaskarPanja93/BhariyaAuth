@@ -2,21 +2,21 @@ import {useState} from 'react'
 import {Link} from "react-router-dom";
 
 import EmailInput from '../Common/EmailInput'
-import Step2Toggle from './Step2Toggle'
-import OTPInput from '../Common/OTPInput'
 import PasswordInput from '../Common/PasswordInput'
 import RememberCheckbox from '../Common/RememberCheckbox'
 import SubmitButton from '../Common/SubmitButton'
 import SocialButtons from '../Common/SocialButtons'
 import Divider from '../Common/Divider'
+import NameInput from './NameInput'
 
-export default function LoginPage(){
+export default function RegisterPage(){
     const [disabled, setDisabled] = useState(false)
     const [useOtp, setUseOtp] = useState(false)
     const [remember, setRemember] = useState(false)
     const [email, setEmail] = useState("")
     const [verification, setVerification] = useState("")
-
+    const [confirmation, setConfirmation] = useState("")
+    const [name, setName] = useState("")
 
     return (
         <div className="min-h-screen flex items-center justify-center">
@@ -26,38 +26,27 @@ export default function LoginPage(){
                     border: '1px solid rgba(255,255,255,0.02)'
                 }}>
                     <div className="flex flex-col items-center gap-4 mb-4">
-                        <h2 className="text-xl font-semibold text-white">Sign In</h2>
-                        <p className="text-sm text-gray-400">Access your account</p>
+                        <h2 className="text-xl font-semibold text-white">Sign Up</h2>
+                        <p className="text-sm text-gray-400">Create an account</p>
                     </div>
                     <form className="space-y-4">
+                        <NameInput value={name} onValueChange={setName} disabled={disabled}/>
                         <EmailInput value={email} onValueChange={setEmail} disabled={disabled}/>
-                        <div className="flex items-center justify-between text-xs text-gray-400">
-                            <Step2Toggle useOtp={useOtp} setUseOtp={setUseOtp} disabled={disabled}/>
-                            <div className="flex items-center gap-3">
-                                {useOtp ?
-                                    (<button type="button" className="text-xs text-indigo-400 hover:underline">Resend
-                                        OTP</button>) :
-                                    (<button type="button" className="text-xs text-indigo-400 hover:underline">Forgot
-                                        Password</button>)
-                                }
-                            </div>
-                        </div>
-                        {useOtp ?
-                            (<OTPInput value={verification} onValueChange={setVerification} disabled={disabled}/>) :
-                            (<PasswordInput value={verification} onValueChange={setVerification} disabled={disabled}/>)
-                        }
+
+                        <PasswordInput disabled={disabled} value={verification} onValueChange={setVerification}
+                                       confirm={confirmation} onConfirmChange={setConfirmation} needsConfirm={true}/>
+
                         <RememberCheckbox checked={remember} onCheckedChange={setRemember} disabled={disabled}/>
-                        <SubmitButton text={"SIGN IN"} disabled={disabled}/>
+                        <SubmitButton text={"Verify Email"} disabled={disabled}/>
                         <Divider/>
                         <SocialButtons disabled={disabled}/>
                         <p className="text-center text-sm text-gray-500 mt-4">
-                            New here? <Link to="/register" className="text-indigo-400 hover:underline">Create an
-                            account</Link>
+                            Already have an account? <Link to="/login" className="text-indigo-400 hover:underline">Sign
+                            In</Link>
                         </p>
                     </form>
                 </div>
             </div>
         </div>
-
             )
             }
