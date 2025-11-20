@@ -5,6 +5,7 @@ import (
 	AccountProcessor "BhariyaAuth/processors/account"
 	AccountRouters "BhariyaAuth/routers/account"
 	LoginRouters "BhariyaAuth/routers/login"
+	MFARouters "BhariyaAuth/routers/mfa"
 	PasswordResetRouters "BhariyaAuth/routers/passwordreset"
 	RegisterRouters "BhariyaAuth/routers/register"
 	SessionRouters "BhariyaAuth/routers/sessions"
@@ -102,7 +103,8 @@ func main() {
 	RegisterRouters.AttachRoutes(AuthApp)
 	LoginRouters.AttachRoutes(AuthApp)
 	SSORouters.AttachRoutes(AuthApp)
-	SessionRouters.AttachRouters(AuthApp)
+	SessionRouters.AttachRoutes(AuthApp)
+	MFARouters.AttachRoutes(AuthApp)
 
 	ReceiveCLIFlags(MainApp)
 }

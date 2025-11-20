@@ -36,6 +36,14 @@ type SSOStateT struct {
 	RememberMe bool      `json:"rem"`
 }
 
+type MFATokenT struct {
+	TokenType string    `json:"tt"`
+	Step2Code string    `json:"2_code"`
+	UserID    uint32    `json:"uid"`
+	Creation  time.Time `json:"cre"`
+	Verified  bool      `json:"ver"`
+}
+
 type AccessTokenT struct {
 	UserID       uint32       `json:"uid"`
 	RefreshID    uint16       `json:"rid"`

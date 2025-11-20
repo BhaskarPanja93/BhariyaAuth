@@ -73,6 +73,17 @@ func AttachSSOCookie(ctx fiber.Ctx, value string) {
 	})
 }
 
+func AttachMFACookie(ctx fiber.Ctx, value string) {
+	ctx.Cookie(&fiber.Cookie{
+		Name:     Config.MFATokenInCookie,
+		Value:    value,
+		Domain:   Config.CookieDomain,
+		Secure:   false,
+		HTTPOnly: true,
+		SameSite: fiber.CookieSameSiteNoneMode,
+	})
+}
+
 func DetachAuthCookies(ctx fiber.Ctx) {
 	ctx.Cookie(&fiber.Cookie{Name: Config.RefreshTokenInCookie, Value: "", MaxAge: 1})
 	ctx.Cookie(&fiber.Cookie{Name: Config.CSRFInCookie, Value: "", MaxAge: 1})
@@ -80,4 +91,8 @@ func DetachAuthCookies(ctx fiber.Ctx) {
 
 func DetachSSOCookies(ctx fiber.Ctx) {
 	ctx.Cookie(&fiber.Cookie{Name: Config.SSOStateInCookie, Value: "", MaxAge: 1})
+}
+
+func DetachMFACookies(ctx fiber.Ctx) {
+	ctx.Cookie(&fiber.Cookie{Name: Config.MFATokenInCookie, Value: "", MaxAge: 1})
 }

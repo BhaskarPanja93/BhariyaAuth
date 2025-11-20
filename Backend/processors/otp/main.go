@@ -1,4 +1,4 @@
-package step2
+package otp
 
 import (
 	Config "BhariyaAuth/constants/config"
@@ -51,7 +51,7 @@ func calculateTTL(value int64) time.Duration {
 	return time.Minute * time.Duration(value)
 }
 
-func CheckCanSendOTP(identifier string) (bool, int64, time.Duration) {
+func CheckCanSend(identifier string) (bool, int64, time.Duration) {
 	otpStore.Lock()
 	entry, exists := otpStore.data[identifier]
 	otpStore.Unlock()
@@ -76,7 +76,7 @@ func CheckCanSendOTP(identifier string) (bool, int64, time.Duration) {
 	return canSend, value, timeRemaining
 }
 
-func RecordSendOTP(identifier string, value int64) time.Duration {
+func RecordSent(identifier string, value int64) time.Duration {
 	now := time.Now()
 	otpStore.Lock()
 	otpStore.data[identifier] = otpEntry{
@@ -87,9 +87,9 @@ func RecordSendOTP(identifier string, value int64) time.Duration {
 	return calculateResendDelay(value)
 }
 
-func SendOTP(ctx fiber.Ctx, mail string) (string, time.Duration) {
+func Send(ctx fiber.Ctx, mail string) (string, time.Duration) {
 	rateLimitKey := fmt.Sprintf("%s:%s", ctx.IP(), mail)
-	canSend, alreadySentCount, currentDelay := CheckCanSendOTP(rateLimitKey)
+	canSend, alreadySentCount, currentDelay := CheckCanSend(rateLimitKey)
 	if canSend {
 		otp := Generators.SafeString(4)
 		if success := MailNotifier.OTP(mail, otp, 2); !success {
@@ -98,14 +98,14 @@ func SendOTP(ctx fiber.Ctx, mail string) (string, time.Duration) {
 		verification := Generators.UnsafeString(10)
 		key := fmt.Sprintf("%s:%s", Config.RedisServerOTPVerification, verification)
 		Stores.RedisClient.Set(Stores.Ctx, key, otp, 5*time.Minute)
-		currentDelay = RecordSendOTP(rateLimitKey, alreadySentCount+1)
+		currentDelay = RecordSent(rateLimitKey, alreadySentCount+1)
 		return verification, currentDelay
 	} else {
 		return "", currentDelay
 	}
 }
 
-func ValidateOTP(verification, otp string) bool {
+func Validate(verification, otp string) bool {
 	key := fmt.Sprintf("%s:%s", Config.RedisServerOTPVerification, verification)
 	value, _ := Stores.RedisClient.Get(Stores.Ctx, key).Result()
 	if value == otp && otp != "" {

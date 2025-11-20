@@ -24,6 +24,15 @@ func GetIDFromMail(mail string) (uint32, bool) {
 	return userID, true
 }
 
+func GetMailFromID(userID uint32) (string, bool) {
+	var mail string
+	err := Stores.MySQLClient.QueryRow(`SELECT email FROM users WHERE uid = ? LIMIT 1`, userID).Scan(&mail)
+	if err != nil {
+		return "", false
+	}
+	return mail, true
+}
+
 func GetUserType(userID uint32) UserTypes.T {
 	var userType string
 	err := Stores.MySQLClient.QueryRow(`SELECT type FROM users WHERE uid = ? LIMIT 1`, userID).Scan(&userType)

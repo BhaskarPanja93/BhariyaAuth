@@ -3,15 +3,15 @@ package login
 import (
 	ResponseModels "BhariyaAuth/models/responses"
 	TokenModels "BhariyaAuth/models/tokens"
+	AccountProcessor "BhariyaAuth/processors/account"
 	Generators "BhariyaAuth/processors/generator"
 	Logger "BhariyaAuth/processors/logs"
+	OTPProcessor "BhariyaAuth/processors/otp"
 	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
-
-	AccountProcessor "BhariyaAuth/processors/account"
 	ResponseProcessor "BhariyaAuth/processors/response"
-	Step2Processor "BhariyaAuth/processors/step2"
 	StringProcessor "BhariyaAuth/processors/string"
 	TokenProcessor "BhariyaAuth/processors/token"
+	"time"
 
 	"fmt"
 
@@ -68,7 +68,7 @@ func Step2(ctx fiber.Ctx) error {
 				Notifications: []string{"Incorrect Password"},
 			})
 	}
-	if SignInData.Step2Process == "otp" && !Step2Processor.ValidateOTP(SignInData.Step2Code, form.Verification) {
+	if SignInData.Step2Process == "otp" && !OTPProcessor.Validate(SignInData.Step2Code, form.Verification) {
 		Logger.IntentionalFailure(fmt.Sprintf("[Login2] Incorrect OTP for [UID-%d]", SignInData.UserID))
 		RateLimitProcessor.Set(ctx)
 		return ctx.Status(fiber.StatusOK).JSON(
@@ -110,6 +110,34 @@ func Step2(ctx fiber.Ctx) error {
 			})
 	}
 	ResponseProcessor.AttachAuthCookies(ctx, token)
+	if SignInData.Step2Process == "otp" {
+		var mfatoken string
+		MFAToken := TokenModels.MFATokenT{
+			Step2Code: SignInData.Step2Code,
+			UserID:    SignInData.UserID,
+			Creation:  time.Now().UTC(),
+			Verified:  true,
+		}
+		data, err = json.Marshal(MFAToken)
+		if err != nil {
+			Logger.AccidentalFailure(fmt.Sprintf("[Login2MFA] Marshal Failed for [UID-%d] reason: %s", SignInData.UserID, err.Error()))
+			return ctx.Status(fiber.StatusInternalServerError).JSON(
+				ResponseModels.APIResponseT{
+					Success:       false,
+					Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
+				})
+		}
+		mfatoken, ok = StringProcessor.Encrypt(data)
+		if !ok {
+			Logger.AccidentalFailure(fmt.Sprintf("[Login2MFA] Encrypt Failed for [UID-%d]", SignInData.UserID))
+			return ctx.Status(fiber.StatusInternalServerError).JSON(
+				ResponseModels.APIResponseT{
+					Success:       false,
+					Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
+				})
+		}
+		ResponseProcessor.AttachMFACookie(ctx, mfatoken)
+	}
 	Logger.Success(fmt.Sprintf("[Login2] Logged in: [UID-%d]", SignInData.UserID))
 	return ctx.Status(fiber.StatusOK).JSON(
 		ResponseModels.APIResponseT{
@@ -149,7 +177,7 @@ func Step1(ctx fiber.Ctx) error {
 		Mail:         form.MailAddress,
 	}
 	if process == "otp" {
-		verification, retry := Step2Processor.SendOTP(ctx, form.MailAddress)
+		verification, retry := OTPProcessor.Send(ctx, form.MailAddress)
 		if verification == "" {
 			return ctx.Status(fiber.StatusOK).JSON(
 				ResponseModels.APIResponseT{
