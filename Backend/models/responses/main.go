@@ -18,6 +18,8 @@ type AccountDetailsResponseT struct {
 type APIResponseT struct {
 	Success       bool     `json:"success"`
 	Reply         any      `json:"reply"`
+	ModifyAuth    bool     `json:"modify-auth"`
+	NewToken      string   `json:"new-token"`
 	Notifications []string `json:"notifications"`
 	RetryAfter    int      `json:"retry-after"`
 }

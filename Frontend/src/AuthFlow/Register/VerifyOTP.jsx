@@ -1,14 +1,7 @@
-import {useState} from 'react'
-import {Link} from "react-router-dom";
-
-
 import OTPInput from '../Common/OTPInput'
 import SubmitButton from "../Common/SubmitButton.jsx";
 
-export default function VerifyOTP(){
-    const [disabled, setDisabled] = useState(false)
-    const [verification, setVerification] = useState("")
-
+export default function VerifyOTP({ disabled, verification, setVerification }){
     return (
         <div className="min-h-screen flex items-center justify-center">
             <div className="w-full max-w-sm">
@@ -20,7 +13,7 @@ export default function VerifyOTP(){
                         <h2 className="text-xl font-semibold text-white">Account Verification</h2>
                         <p className="text-sm text-gray-400">Enter OTP Code</p>
                     </div>
-                    <form className="space-y-4">
+                    <div className="space-y-4">
 
                         <OTPInput value={verification} onValueChange={setVerification} disabled={disabled}/>
 
@@ -33,7 +26,7 @@ export default function VerifyOTP(){
 
                         <SubmitButton text={"Verify OTP"} disabled={disabled}/>
 
-                    </form>
+                    </div>
                 </div>
             </div>
         </div>

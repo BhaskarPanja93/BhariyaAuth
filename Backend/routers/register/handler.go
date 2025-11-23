@@ -146,7 +146,9 @@ func Step2(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(
 		ResponseModels.APIResponseT{
 			Success:       true,
-			Reply:         token.AccessToken,
+			Reply:         true,
+			ModifyAuth:    true,
+			NewToken:      token.AccessToken,
 			Notifications: []string{"Registered and logged in Successfully"},
 		})
 }

@@ -5,9 +5,10 @@ import EmailInput from '../Common/EmailInput'
 import PasswordInput from '../Common/PasswordInput'
 import RememberCheckbox from '../Common/RememberCheckbox'
 import SubmitButton from '../Common/SubmitButton'
-import SocialButtons from '../Common/SocialButtons'
+import SSOButtons from '../Common/SSOButtons.jsx'
 import Divider from '../Common/Divider'
 import NameInput from './NameInput'
+import OTPInput from "../Common/OTPInput.jsx";
 
 export default function RegisterPage(){
     const [disabled, setDisabled] = useState(false)
@@ -29,22 +30,22 @@ export default function RegisterPage(){
                         <h2 className="text-xl font-semibold text-white">Sign Up</h2>
                         <p className="text-sm text-gray-400">Create an account</p>
                     </div>
-                    <form className="space-y-4">
+                    <div className="space-y-4">
                         <NameInput value={name} onValueChange={setName} disabled={disabled}/>
                         <EmailInput value={email} onValueChange={setEmail} disabled={disabled}/>
 
                         <PasswordInput disabled={disabled} value={verification} onValueChange={setVerification}
                                        confirm={confirmation} onConfirmChange={setConfirmation} needsConfirm={true}/>
-
+                        <OTPInput value={verification} onValueChange={setVerification} disabled={disabled}/>
                         <RememberCheckbox checked={remember} onCheckedChange={setRemember} disabled={disabled}/>
                         <SubmitButton text={"Verify Email"} disabled={disabled}/>
                         <Divider/>
-                        <SocialButtons disabled={disabled}/>
+                        <SSOButtons disabled={disabled}/>
                         <p className="text-center text-sm text-gray-500 mt-4">
                             Already have an account? <Link to="/login" className="text-indigo-400 hover:underline">Sign
                             In</Link>
                         </p>
-                    </form>
+                    </div>
                 </div>
             </div>
         </div>
