@@ -37,5 +37,6 @@ type SingleUserActivityT struct {
 
 type UserActivityResponseT struct {
 	UserID     string                `json:"user_id"`
+	DeviceID   string                `json:"device_id"`
 	Activities []SingleUserActivityT `json:"activities"`
 }

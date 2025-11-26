@@ -128,6 +128,9 @@ func Fetch(ctx fiber.Ctx) error {
 		a.OS = string(ua.OS())
 		a.Device = string(ua.Device())
 		a.Browser = string(ua.Browser())
+		if RefreshID == access.RefreshID {
+			response.DeviceID = a.ID
+		}
 		response.Activities = append(response.Activities, a)
 		success++
 	}

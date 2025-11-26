@@ -127,7 +127,7 @@ func Step2(ctx fiber.Ctx) error {
 		}
 		ResponseProcessor.AttachAuthCookies(ctx, token)
 		Logger.Success(fmt.Sprintf("[SSO2] Registered: [UID-%d-RID-%d-MAIL-%s]", userID, refreshID, user.Email))
-		return ResponseProcessor.SSOSuccessPopup(ctx, token.AccessToken, state.Origin)
+		return ResponseProcessor.SSOSuccessPopup(ctx, token.AccessToken)
 	} else {
 		if AccountProcessor.CheckUserIsBlacklisted(userID) {
 			Logger.IntentionalFailure(fmt.Sprintf("[SSO2] Blacklisted account [UID-%d]", userID))
@@ -150,7 +150,7 @@ func Step2(ctx fiber.Ctx) error {
 		}
 		ResponseProcessor.AttachAuthCookies(ctx, token)
 		Logger.Success(fmt.Sprintf("[SSO2] LoggedIn: [UID-%d-RID-%d-MAIL-%s]", userID, refreshID, user.Email))
-		return ResponseProcessor.SSOSuccessPopup(ctx, token.AccessToken, state.Origin)
+		return ResponseProcessor.SSOSuccessPopup(ctx, token.AccessToken)
 	}
 }
 
@@ -164,7 +164,6 @@ func Step1(ctx fiber.Ctx) error {
 	state := TokenModels.SSOStateT{
 		Provider:   processor,
 		Expiry:     now.Add(Config.SSOCookieExpireDelta),
-		Origin:     ctx.Query("origin", ""),
 		RememberMe: ctx.Query("remember_me", "no") == "yes",
 	}
 	stateMarshal, err := json.Marshal(state)

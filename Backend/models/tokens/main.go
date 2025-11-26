@@ -32,7 +32,6 @@ type PasswordResetT struct {
 type SSOStateT struct {
 	Provider   string    `json:"pro"`
 	Expiry     time.Time `json:"exp"`
-	Origin     string    `json:"ori"`
 	RememberMe bool      `json:"rem"`
 }
 

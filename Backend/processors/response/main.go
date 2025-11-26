@@ -8,19 +8,19 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-func SSOSuccessPopup(ctx fiber.Ctx, token string, origin string) error {
+func SSOSuccessPopup(ctx fiber.Ctx, token string) error {
 	return ctx.Type("html").SendString(fmt.Sprintf(`
 <html>
 <head>
 <script>
 function onAuthSuccess() {
     window._authSuccess = true;
-    window.opener?.postMessage({ type: 'SUCCESS', token: '%s'}, '%s');
+    window.opener?.postMessage({ success: true, token: '%s'}, window.location.origin);
     window.close();
 }
 window.addEventListener('beforeunload', () => {
     if (!window._authSuccess) {
-        window.opener?.postMessage({ type: 'CLOSED'}, '%s');
+        window.opener?.postMessage({ success: false }, window.location.origin);
     }
 });
 </script>
@@ -29,7 +29,7 @@ window.addEventListener('beforeunload', () => {
 <h2>That was easy!</h2>
 </body>
 </html>
-`, token, origin, origin))
+`, token))
 }
 
 func SSOFailurePopup(ctx fiber.Ctx, reason string) error {

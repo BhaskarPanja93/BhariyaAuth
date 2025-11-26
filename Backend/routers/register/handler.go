@@ -24,7 +24,7 @@ type Step1FormT struct {
 	MailAddress string `form:"mail_address"`
 	Name        string `form:"name"`
 	Password    string `form:"password"`
-	RememberMe  bool   `form:"remember_me"`
+	RememberMe  string `form:"remember_me"`
 }
 
 type Step2FormT struct {
@@ -186,7 +186,7 @@ func Step1(ctx fiber.Ctx) error {
 	SignUpData := TokenModels.SignUpT{
 		TokenType:  tokenType,
 		Mail:       form.MailAddress,
-		RememberMe: form.RememberMe,
+		RememberMe: form.RememberMe == "yes",
 		Name:       form.Name,
 		Password:   form.Password,
 	}
