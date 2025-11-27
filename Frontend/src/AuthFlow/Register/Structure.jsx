@@ -1,4 +1,4 @@
-import {useState} from 'react'
+import {useRef, useState} from 'react'
 import {Link} from "react-router-dom";
 
 import EmailInput from '../Common/EmailInput'
@@ -9,15 +9,66 @@ import SSOButtons from '../Common/SSOButtons.jsx'
 import Divider from '../Common/Divider'
 import NameInput from './NameInput'
 import OTPInput from "../Common/OTPInput.jsx";
+import {BackendURL} from "../../Values/Constants.js";
+import {FetchConnectionManager} from "../../Contexts/Connection.jsx";
 
 export default function RegisterPage(){
-    const [disabled, setDisabled] = useState(false)
-    const [useOtp, setUseOtp] = useState(false)
+    const [uiDisabled, setUiDisabled] = useState(false)
+    const [currentStep, setCurrentStep] = useState(1)
     const [remember, setRemember] = useState(false)
     const [email, setEmail] = useState("")
-    const [verification, setVerification] = useState("")
-    const [confirmation, setConfirmation] = useState("")
+    const [password, setPassword] = useState("")
+    const [passwordConfirmation, setPasswordConfirmation] = useState("")
+    const [otp, setOTP] = useState("");
     const [name, setName] = useState("")
+
+    const {publicAPI, privateAPI, OpenAuthPopup, Logout} = FetchConnectionManager()
+    let currentToken = "";
+
+    const Step1 = async () => {
+        setUiDisabled(true);
+        const form = new FormData();
+        form.append("mail_address", email);
+        form.append("name", name);
+        form.append("password", password);
+        form.append("remember_me", remember ? "yes" : "no");
+        privateAPI.post(BackendURL + "/register/step1", form, {
+        })
+            .then((response) => {
+                if (response.data.success) {
+                    console.log(response)
+                    currentToken = response.data["reply"];
+                    console.log(currentToken)
+                    setCurrentStep(2)
+                }
+            })
+            .catch((error) => {
+                console.log(error);
+            })
+            .finally(() => {
+                setUiDisabled(false);
+            });
+    };
+
+    const Step2 = async () => {
+        setUiDisabled(true);
+        const form = new FormData();
+        form.append("token", currentToken);
+        form.append("verification", otp);
+        privateAPI.post(BackendURL + "/register/step2", form, {
+        })
+            .then((response) => {
+                if (response.data.success) {
+
+                }
+            })
+            .catch((error) => {
+                console.log(error);
+            })
+            .finally(() => {
+                setUiDisabled(false);
+            });
+    };
 
     return (
         <div className="min-h-screen flex items-center justify-center">
@@ -31,19 +82,20 @@ export default function RegisterPage(){
                         <p className="text-sm text-gray-400">Create an account</p>
                     </div>
                     <div className="space-y-4">
-                        <NameInput value={name} onValueChange={setName} disabled={disabled}/>
-                        <EmailInput value={email} onValueChange={setEmail} disabled={disabled}/>
-
-                        <PasswordInput disabled={disabled} value={verification} onValueChange={setVerification}
-                                       confirm={confirmation} onConfirmChange={setConfirmation} needsConfirm={true}/>
-                        <OTPInput value={verification} onValueChange={setVerification} disabled={disabled}/>
-                        <RememberCheckbox checked={remember} onCheckedChange={setRemember} disabled={disabled}/>
-                        <SubmitButton text={"Verify Email"} disabled={disabled}/>
+                        <NameInput value={name} onValueChange={setName} disabled={currentStep !== 1 || uiDisabled}/>
+                        <EmailInput value={email} onValueChange={setEmail} disabled={currentStep !== 1 || uiDisabled}/>
+                        <PasswordInput disabled={currentStep !== 1 || uiDisabled} value={password} onValueChange={setPassword}
+                                       confirm={passwordConfirmation} onConfirmChange={setPasswordConfirmation} needsConfirm={true}/>
+                        <RememberCheckbox checked={remember} onCheckedChange={setRemember} disabled={currentStep !== 1 || uiDisabled}/>
                         <Divider/>
-                        <SSOButtons disabled={disabled}/>
+                        {currentStep === 2 && <OTPInput value={otp} onValueChange={setOTP} disabled={uiDisabled}/>}
+                        <SubmitButton text={currentStep===1?"CONTINUE WITH OTP":"VERIFY OTP"} onClick={currentStep===1?Step1:Step2} disabled={uiDisabled}/>
+                        <SSOButtons disabled={uiDisabled}/>
                         <p className="text-center text-sm text-gray-500 mt-4">
-                            Already have an account? <Link to="/login" className="text-indigo-400 hover:underline">Sign
-                            In</Link>
+                            Already have an account?
+                            <Link to="/login" className="text-indigo-400 hover:underline">
+                                SignIn
+                            </Link>
                         </p>
                     </div>
                 </div>

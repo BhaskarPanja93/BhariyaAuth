@@ -91,11 +91,11 @@ func Send(ctx fiber.Ctx, mail string) (string, time.Duration) {
 	rateLimitKey := fmt.Sprintf("%s:%s", ctx.IP(), mail)
 	canSend, alreadySentCount, currentDelay := CheckCanSend(rateLimitKey)
 	if canSend {
-		otp := Generators.SafeString(4)
+		otp := Generators.SafeNumber(6)
 		if success := MailNotifier.OTP(mail, otp, 2); !success {
 			return "", currentDelay
 		}
-		verification := Generators.UnsafeString(10)
+		verification := Generators.SafeString(10)
 		key := fmt.Sprintf("%s:%s", Config.RedisServerOTPVerification, verification)
 		Stores.RedisClient.Set(Stores.Ctx, key, otp, 5*time.Minute)
 		currentDelay = RecordSent(rateLimitKey, alreadySentCount+1)

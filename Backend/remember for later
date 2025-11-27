@@ -9,9 +9,10 @@ add a mutex lock for frontend api, so everything is processed in sequence
 SUGGESTIONS:
 move OTP verification to in memory too?
 
-422: STOP
-200: STOP
-401: RE-AUTH + RETRY
-403: ATTACH MFA + RETRY
-429: DELAY + RETRY
-500: LIMITED DELAYED RETRY
+200: (ok, soft reject or accept)
+401: (reject, user not authenticated)
+403: (reject, user needs mfa completed)
+422: (reject, incomplete body, frontend code error)
+429: (reject, rate limited)
+500: (server internal error)
+502/504: (server unavailable)

@@ -1,4 +1,8 @@
-const BackendURL = "https://bhariya-hidden.ddns.net/auth"
+export const BackendDomain = "https://bhariya-hidden.ddns.net"
+export const FrontendDomain = "https://bhariya.ddns.net"
 
-const CSRFPath = "bhariya_auth_csrf"
-const MFAPath = "bhariya_auth_mfa"
+export const BackendURL = BackendDomain + "/auth";
+export const FrontendURL = FrontendDomain + "/auth";
+
+export const CSRFCookiePath = "bhariya_auth_csrf"
+export const MFACookiePath = "bhariya_auth_mfa"

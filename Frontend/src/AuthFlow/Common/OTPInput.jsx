@@ -1,4 +1,3 @@
-// src/AuthFlow/Common/OTPInput.jsx
 import React, { useRef, useState, useEffect } from "react";
 
 

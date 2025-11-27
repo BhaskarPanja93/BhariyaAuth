@@ -1,13 +1,16 @@
 import React, {createContext, useContext} from 'react';
-import axios, {AxiosHeaders} from "axios";
+import axios from "axios";
 import Cookies from "js-cookie";
 import {Sleep} from "../Utils/Sleep.js";
 import {FetchNotificationManager} from "./Notification.jsx";
+import {BackendURL, CSRFCookiePath, FrontendDomain, FrontendURL, MFACookiePath} from "../Values/Constants.js";
 
 /**
  * @typedef {Object} ConnectionContextType
  * @property {import("axios").AxiosInstance} publicAPI
  * @property {import("axios").AxiosInstance} privateAPI
+ * @property {(URL: string) => Promise} OpenAuthPopup
+ * @property {() => Promise} Logout
  */
 
 /** @type {import('react').Context<ConnectionContextType | null>} */
@@ -15,35 +18,103 @@ const ConnectionContext = createContext(null);
 export const ConnectionProvider = ({children}) => {
     let AccessToken = ""
     const {SendNotification} = FetchNotificationManager();
-    const GatewayErrors = {}
-    const ServerInternalErrors = {}
 
+    const GatewayErrors = {}
     const GetGatewayErrors = (host) => {
         return GatewayErrors[host] || 0
     }
-    const GetServerInternalErrors = (host) => {
-        return ServerInternalErrors[host] || 0
-    }
     const ResetGatewayErrors = (host) => {
         GatewayErrors[host] = 0
-    }
-    const ResetServerInternalErrors = (host) => {
-        ServerInternalErrors[host] = 0
     }
     const IncrementGatewayErrors = (host) => {
         if (GatewayErrors[host] != null) GatewayErrors[host]++
         else GatewayErrors[host] = 1
     }
-    const IncrementServerInternalErrors = (host) => {
-        if (ServerInternalErrors[host] != null) ServerInternalErrors[host]++
-        else ServerInternalErrors[host] = 1
+
+    let currentAuthPopups = {};
+    const OpenAuthPopup = (URL) => {
+        if (currentAuthPopups[URL]) return currentAuthPopups[URL];
+        currentAuthPopups[URL] = new Promise((resolve, _) => {
+            const popup = window.open(URL, "_blank", "width=500,height=600");
+            if (!popup) {
+                SendNotification("Please allow popups to proceed..")
+                return resolve(false);
+            }
+            let finished = false;
+            function onMessage(event) {
+                if (event.source === popup && event.origin === FrontendDomain) {
+                    finished = true;
+                    window.removeEventListener("message", onMessage);
+                    popup.close();
+                    if (event.data && event.data && event.data.success) {
+                        if (event.data["token"]) {
+                            AccessToken = event.data["token"]
+                            if (window.opener) {
+                                window.opener.postMessage({ success: true, token: AccessToken}, window.location.origin);
+                                window.close();
+                            }
+                            return resolve(true);
+                        }
+                    }
+                }
+            }
+            window.addEventListener("message", onMessage);
+            const timer = setInterval(() => {
+                if (popup.closed) {
+                    clearInterval(timer);
+                    if (!finished) {
+                        window.removeEventListener("message", onMessage);
+                        if (window.opener) {
+                            window.opener.postMessage({ success: false }, window.location.origin);
+                            window.close();
+                        }
+                        resolve(false);
+                    }
+                }
+            }, 300);
+        });
+        return currentAuthPopups[URL];
+    }
+
+    let currentMFAPopup = null;
+    const OpenMFAPopup = () => {
+        if (currentMFAPopup) return currentMFAPopup;
+        currentMFAPopup = new Promise((resolve, _) => {
+            const popup = window.open(FrontendURL+"/mfa", "_blank", "width=500,height=600");
+            if (!popup) {
+                SendNotification("Please allow popups to proceed..")
+                return resolve(false);
+            }
+            let finished = false;
+            function onMessage(event) {
+                if (event.source === popup && event.origin === FrontendURL) {
+                    finished = true;
+                    window.removeEventListener("message", onMessage);
+                    popup.close();
+                    if (event.data && event.data && event.data.success) {
+                        return resolve(true);
+                    }
+                }
+            }
+            window.addEventListener("message", onMessage);
+            const timer = setInterval(() => {
+                if (popup.closed) {
+                    clearInterval(timer);
+                    if (!finished) {
+                        window.removeEventListener("message", onMessage);
+                        resolve(false);
+                    }
+                }
+            }, 300);
+        });
+        return currentMFAPopup;
     }
 
     const RetryRequest = async (connection, config) => {
         try {
             return await connection(config);
         } catch (error) {
-            return Promise.reject(error);
+            return Promise.reject();
         }
     };
 
@@ -65,17 +136,36 @@ export const ConnectionProvider = ({children}) => {
         return currentPings[host];
     }
 
+    let currentLogout = null;
+    const Logout = async () => {
+        if (currentLogout) return await currentLogout
+        const currentCSRF = Cookies.get(CSRFCookiePath)
+        if (!currentCSRF) return Promise.resolve(false)
+        currentLogout = new Promise((resolve, _) => {
+            axios.post(BackendURL + "/account/logout", {
+                requiresCSRF: true,
+                forLogout: true,
+            }).then(()=>{
+                resolve(true)
+            }).catch(() => {
+                resolve(false)
+            }).finally(() => {
+                currentLogout = null;
+            });
+        });
+        return currentLogout;
+    }
+
     let currentRefresh = null;
-    const RefreshToken = (skipLogin) => { // Create and return a new promise that resolves when the token is refreshed or fails resolving to a boolean.
-        if (currentRefresh) return currentRefresh
-        const currentCSRF = Cookies.get(CSRFPath)
-        if (!currentCSRF) return Promise.reject()
+    const RefreshToken = async (skipLogin) => { // Create and return a new promise that resolves when the token is refreshed or fails resolving to a boolean.
+        if (currentRefresh) return await currentRefresh
+        const currentCSRF = Cookies.get(CSRFCookiePath)
+        if (!currentCSRF) return Promise.resolve(false)
         currentRefresh = new Promise((resolve, _) => {
             axios.get(BackendURL + "/account/refresh", {
                 requiresCSRF: true,
                 forTokenRefresh: true,
-                skipLogin: skipLogin,
-                headers: new AxiosHeaders({ CSRF: currentCSRF })
+                skipLogin: skipLogin
             }).then(()=>{
                 SendNotification("Access refreshed..")
                 resolve(true)
@@ -94,15 +184,9 @@ export const ConnectionProvider = ({children}) => {
         config.host = url.host;
         config.pathname = url.pathname;
 
-        if (isNaN(config.gatewayErrorCount)) config.gatewayErrorCount = 0
-        if (isNaN(config.serverInternalErrorCount)) config.serverInternalErrorCount = 0
-        if (isNaN(config.serverInternalErrorRetryLimit)) config.serverInternalErrorRetryLimit = 3
-
         // repeat requests speed limiter
         const gatewayFailures = GetGatewayErrors(config.host)
-        const serverInternalFailures = GetServerInternalErrors(config.pathname)
         if (gatewayFailures > 0) await Sleep(Math.min(1000 * gatewayFailures, 3000))
-        if (serverInternalFailures > 0) await Sleep(Math.min(1000 * serverInternalFailures, 3000))
 
         // for server gateway failures, wait for the server to be back online, except serverActiveCheck requests
         if (!config.forServerConnectionCheck) {
@@ -112,8 +196,14 @@ export const ConnectionProvider = ({children}) => {
             }
             // Attach access token to request if it exists
             if (AccessToken !== "") config.headers["Authorization"] = AccessToken;
-            if (config.requiresCSRF) config.headers["CSRF"] = Cookies.get(CSRFPath);
-            if (config.requiresMFA) config.headers["MFA"] = Cookies.get(MFAPath);
+            if (config.requiresCSRF) {
+                config.headers["CSRF"] = Cookies.get(CSRFCookiePath);
+                if (!config.headers["CSRF"]) return Promise.reject(config)
+            }
+            if (config.requiresMFA) {
+                config.headers["MFA"] = Cookies.get(MFACookiePath);
+                if (!config.headers["MFA"]) return Promise.reject(config)
+            }
         }
         return config
     }
@@ -138,31 +228,98 @@ export const ConnectionProvider = ({children}) => {
                     AccessToken = data["new-token"]
                 }
             }
+            return Promise.resolve({success: data.success, reply: data.reply})
         }
-        return Promise.resolve(response) // TODO: check if it needs only response or Promise.resolve(response)
     }
 
     const ResponseRejectedInterceptor = async (response) => {
         const config = response.config;
         const data = response.data;
         const status = response.status;
-        if (data["notifications"]) data["notifications"].forEach((notification) => SendNotification(notification))
+        if (data && data["notifications"]) data["notifications"].forEach((notification) => SendNotification(notification))
 
-        if (status === 401) {  }
-        else if (status === 403) {  }
-        else if (status === 422) {  }
-        else if (status === 429) {  }
-        else if (status === 500) {  }
-        else {  }
+        // Not authenticated
+        if (status === 401) {
+            if (config.forTokenRefresh) {
+                if (!config.skipLogin) {
+                    if (OpenAuthPopup(FrontendURL+"/login"))
+                        return Promise.resolve({success: data.success, reply: data.reply})
+                    else
+                        return Promise.reject()
+                }
+            } else {
+                if (await RefreshToken(true)) {
+                    return await RetryRequest(privateAPI, config)
+                } else if (!config.skipLogin) {
+                    if (OpenAuthPopup(FrontendURL+"/login"))
+                        return await RetryRequest(privateAPI, config)
+                    else
+                        return Promise.reject()
+                }
+            }
+        }
+
+        // Incomplete authentication (MFA)
+        else if (status === 403) {
+            if (!config.requiresMFA) {
+                config.requiresMFA = true;
+                return await RetryRequest(privateAPI, config)
+            } else {
+                if (await OpenMFAPopup())
+                    return await RetryRequest(privateAPI, config)
+                else
+                    return Promise.reject()
+            }
+        }
+
+        // Incomplete form/parameters
+        else if (status === 422) {
+            SendNotification("Frontend has errors, please report this to admin.")
+            return Promise.reject()
+        }
+
+        // Rate limited
+        else if (status === 429) {
+            let retryAfter = data["retry-after"]
+            if (!retryAfter || isNaN(retryAfter)) retryAfter = 1
+            await Sleep(retryAfter * 1000)
+            return await RetryRequest(privateAPI, config)
+        }
+
+        // Server internal error
+        else if (status === 500) {
+            if (isNaN(config.serverInternalErrorCount)) {
+                config.serverInternalErrorCount = 1
+            } else {
+                config.serverInternalErrorCount += 1
+            }
+            if (config.serverInternalErrorCount < 3) {
+                await Sleep(config.serverInternalErrorCount * 1000)
+                return await RetryRequest(privateAPI, config)
+            }
+            return Promise.reject()
+        }
+
+        // Server unreachable
+        else if (status === 502 || status === 504) {
+            IncrementGatewayErrors(config.host)
+            config.gatewayErrorCount += 1
+            return await RetryRequest(privateAPI, config)
+        }
+
+        // Anything else
+        else {
+            await Sleep(1000)
+            return await RetryRequest(privateAPI, config)
+        }
     }
-
 
     const publicAPI = axios.create();
     const privateAPI = axios.create({withCredentials: true});
     privateAPI.interceptors.request.use(RequestFulfilledInterceptor, RequestRejectedInterceptor)
     privateAPI.interceptors.response.use(ResponseFulfilledInterceptor, ResponseRejectedInterceptor)
 
-    return (<ConnectionContext.Provider value={{publicAPI, privateAPI}}>
+    return (<ConnectionContext.Provider value={{publicAPI, privateAPI, OpenAuthPopup, Logout}}>
         {children}
     </ConnectionContext.Provider>);
 };

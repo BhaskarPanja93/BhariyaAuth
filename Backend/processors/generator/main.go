@@ -5,22 +5,10 @@ import (
 	CryptoRand "crypto/rand"
 	"fmt"
 	"math/big"
-	MathRand "math/rand"
 )
 
 const _letters = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
-func UnsafeString(nBytes uint16) string {
-	if nBytes <= 0 {
-		fmt.Println("nBytes must be greater than 0")
-		return UnsafeString(1)
-	}
-	b := make([]byte, nBytes)
-	for i := range b {
-		b[i] = _letters[MathRand.Intn(len(_letters))]
-	}
-	return string(b)
-}
+const _numbers = "0123456789"
 
 func SafeString(nBytes uint16) string {
 	if nBytes <= 0 {
@@ -35,6 +23,23 @@ func SafeString(nBytes uint16) string {
 			return SafeString(nBytes)
 		}
 		b[i] = _letters[num.Int64()]
+	}
+	return string(b)
+}
+
+func SafeNumber(nBytes uint16) string {
+	if nBytes <= 0 {
+		fmt.Println("nBytes must be greater than 0")
+		return SafeNumber(1)
+	}
+	b := make([]byte, nBytes)
+	for i := range b {
+		num, err := CryptoRand.Int(CryptoRand.Reader, big.NewInt(int64(len(_numbers))))
+		if err != nil {
+			Logger.AccidentalFailure(fmt.Sprintf("[SafeNumber] failed for length [%d] error: %s", nBytes, err.Error()))
+			return SafeNumber(nBytes)
+		}
+		b[i] = _numbers[num.Int64()]
 	}
 	return string(b)
 }

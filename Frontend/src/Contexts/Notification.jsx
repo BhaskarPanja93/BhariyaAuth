@@ -1,23 +1,20 @@
 import React, {createContext, useContext, useEffect, useState} from "react";
+import { v4 as uuid } from "uuid";
 
 /**
  * @typedef {Object} NotificationContextType
  * @property {(message: string) => void} SendNotification
  */
 
-/**
- * @type {import('react').Context<NotificationContextType | null>}
- */
-
+/**@type {import('react').Context<NotificationContextType | null>} */
 const NotificationContext = createContext(null)
 
 export const NotificationProvider = ({children}) => {
-    let nextId = 1;
     const [notifications, setNotifications] = useState([]);
 
     const SendNotification = (message) => {
         setNotifications(prev => {
-            let updated = [...prev, {id: nextId++, message: message}];
+            let updated = [...prev, {id: uuid(), message: message}];
             if (updated.length > 10) {
                 updated = updated.slice(updated.length - 10);
             }

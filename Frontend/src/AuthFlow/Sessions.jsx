@@ -1,4 +1,3 @@
-// src/AuthFlow/Sessions/Sessions.jsx
 import React, { useState } from "react";
 
 function DeviceIcon({ type }) {
