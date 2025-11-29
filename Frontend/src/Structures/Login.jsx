@@ -1,21 +1,22 @@
 import {useRef, useState} from 'react'
 import {Link, useNavigate} from "react-router-dom";
-import {BackendURL} from '../../Values/Constants.js'
-import EmailInput from '../Common/EmailInput'
-import Step2Toggle from './Step2Toggle'
-import OTPInput from '../Common/OTPInput'
-import PasswordInput from '../Common/PasswordInput'
-import RememberCheckbox from '../Common/RememberCheckbox'
-import SubmitButton from '../Common/SubmitButton'
-import SSOButtons from '../Common/SSOButtons.jsx'
-import {FetchConnectionManager} from "../../Contexts/Connection.jsx";
-import {EmailIsValid, OTPIsValid, PasswordIsStrong} from "../../Utils/Strings.js";
-import Divider from "../Common/Divider.jsx";
-import {FetchNotificationManager} from "../../Contexts/Notification.jsx";
+import {BackendURL} from '../Values/Constants.js'
+import EmailInput from '../Elements/EmailInput.jsx'
+import Step2Toggle from '../Elements/Step2Toggle.jsx'
+import OTPInput from '../Elements/OTPInput.jsx'
+import PasswordInput from '../Elements/PasswordInput.jsx'
+import RememberCheckbox from '../Elements/RememberCheckbox.jsx'
+import SubmitButton from '../Elements/SubmitButton.jsx'
+import SSOButtons from '../Elements/SSOButtons.jsx'
+import {FetchConnectionManager} from "../Contexts/Connection.jsx";
+import {EmailIsValid, OTPIsValid, PasswordIsStrong} from "../Utils/Strings.js";
+import Divider from "../Elements/Divider.jsx";
+import {FetchNotificationManager} from "../Contexts/Notification.jsx";
 
-export default function LoginStructure() {
+export default function Login() {
     const navigate = useNavigate()
     const {SendNotification} = FetchNotificationManager();
+    const {privateAPI} = FetchConnectionManager()
 
     const [uiDisabled, setUiDisabled] = useState(false)
     const [currentStep, setCurrentStep] = useState(1)
@@ -24,10 +25,9 @@ export default function LoginStructure() {
     const [email, setEmail] = useState("")
     const [verification, setVerification] = useState()
 
-    const {privateAPI} = FetchConnectionManager()
     const tokens = useRef({})
 
-    const Step1 = async (tryOTP) => {
+    const Step1 = (tryOTP) => {
         if (!EmailIsValid(email)) return SendNotification("Email is invalid");
         if (!tokens.current[email]) tokens.current[email] = {}
 
@@ -48,12 +48,13 @@ export default function LoginStructure() {
                     setCurrentStep(2)
                 }
             })
+            .catch((error)=>{console.log("Login Step1 stopped because:", error)})
             .finally(() => {
                 setUiDisabled(false);
             });
     };
 
-    const Step2 = async () => {
+    const Step2 = () => {
         if (!tokens.current[email] || !tokens.current[email][useOtp]) return SendNotification("Step 1 incomplete. Please enter email again");
         if (!useOtp) {
             if (!PasswordIsStrong(verification)) return SendNotification("Incorrect Password");
@@ -71,6 +72,7 @@ export default function LoginStructure() {
                     navigate("/sessions");
                 }
             })
+            .catch((error)=>{console.log("Login Step2 stopped because:", error)})
             .finally(() => {
                 setUiDisabled(false);
             });

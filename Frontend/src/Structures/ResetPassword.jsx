@@ -1,6 +1,6 @@
 import {useState} from 'react'
-import SubmitButton from "./Common/SubmitButton.jsx";
-import PasswordInput from "./Common/PasswordInput.jsx";
+import SubmitButton from "../Elements/SubmitButton.jsx";
+import PasswordInput from "../Elements/PasswordInput.jsx";
 
 export default function ResetPassword({disabled}) {
     const [verification, setVerification] = useState("")

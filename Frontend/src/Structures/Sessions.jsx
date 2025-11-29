@@ -54,7 +54,7 @@ function formatDate(dt) {
  * - dummy data included below (REMOVE when wiring API)
  * - Current device card + Other devices grid (responsive 1 / 2 columns)
  */
-export default function SessionsStructure() {
+export default function Sessions() {
     const [sessions, setSessions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [busyIds, setBusyIds] = useState(new Set());

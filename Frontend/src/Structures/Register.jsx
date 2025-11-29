@@ -1,21 +1,22 @@
 import {useRef, useState} from 'react'
 import {Link, useNavigate} from "react-router-dom";
-import EmailInput from '../Common/EmailInput'
-import PasswordInput from '../Common/PasswordInput'
-import RememberCheckbox from '../Common/RememberCheckbox'
-import SubmitButton from '../Common/SubmitButton'
-import SSOButtons from '../Common/SSOButtons.jsx'
-import Divider from '../Common/Divider'
-import NameInput from './NameInput'
-import OTPInput from "../Common/OTPInput.jsx";
-import {BackendURL} from "../../Values/Constants.js";
-import {FetchConnectionManager} from "../../Contexts/Connection.jsx";
-import {FetchNotificationManager} from "../../Contexts/Notification.jsx";
-import {EmailIsValid, PasswordIsStrong} from "../../Utils/Strings.js";
+import EmailInput from '../Elements/EmailInput.jsx'
+import PasswordInput from '../Elements/PasswordInput.jsx'
+import RememberCheckbox from '../Elements/RememberCheckbox.jsx'
+import SubmitButton from '../Elements/SubmitButton.jsx'
+import SSOButtons from '../Elements/SSOButtons.jsx'
+import Divider from '../Elements/Divider.jsx'
+import NameInput from '../Elements/NameInput.jsx'
+import OTPInput from "../Elements/OTPInput.jsx";
+import {BackendURL} from "../Values/Constants.js";
+import {FetchConnectionManager} from "../Contexts/Connection.jsx";
+import {FetchNotificationManager} from "../Contexts/Notification.jsx";
+import {EmailIsValid, NameIsValid, PasswordIsStrong} from "../Utils/Strings.js";
 
 export default function RegisterPage() {
     const navigate = useNavigate();
     const {SendNotification} = FetchNotificationManager();
+    const {privateAPI} = FetchConnectionManager()
 
     const [uiDisabled, setUiDisabled] = useState(false)
     const [currentStep, setCurrentStep] = useState(1)
@@ -26,11 +27,10 @@ export default function RegisterPage() {
     const [otp, setOTP] = useState("");
     const [name, setName] = useState("")
 
-    const {privateAPI} = FetchConnectionManager()
     const currentToken = useRef("")
 
-    const Step1 = async () => {
-        if (name === "") return SendNotification("Name is invalid")
+    const Step1 = () => {
+        if (!NameIsValid(name)) return SendNotification("Name is invalid")
         if (!EmailIsValid(email)) return SendNotification("Email is invalid")
         if (!PasswordIsStrong(password)) return SendNotification("Password is too weak")
         if (password !== passwordConfirmation) return SendNotification("Passwords don't match")
@@ -49,12 +49,13 @@ export default function RegisterPage() {
                     setCurrentStep(2)
                 }
             })
+            .catch((error)=>{console.log("Register Step1 stopped because:", error)})
             .finally(() => {
                 setUiDisabled(false);
             });
     };
 
-    const Step2 = async () => {
+    const Step2 = () => {
         if (!currentToken.current) return SendNotification("Step 1 incomplete. Please enter email again");
 
         setUiDisabled(true);
@@ -67,6 +68,7 @@ export default function RegisterPage() {
                     navigate("/sessions")
                 }
             })
+            .catch((error)=>{console.log("Register Step2 stopped because:", error)})
             .finally(() => {
                 setUiDisabled(false);
             });

@@ -34,7 +34,7 @@ export const ConnectionProvider = ({children}) => {
     const currentAuthPopups = useRef({});
     const OpenAuthPopup = (URL) => {
         if (currentAuthPopups.current[URL]) return currentAuthPopups.current[URL];
-        currentAuthPopups.current[URL] = new Promise((resolve, _) => {
+        currentAuthPopups.current[URL] = new Promise(async (resolve, _) => {
             const popup = window.open(URL, "_blank", "width=500,height=600");
             if (!popup) {
                 SendNotification("Please allow popups to proceed..")
@@ -43,14 +43,14 @@ export const ConnectionProvider = ({children}) => {
             let finished = false;
             function onMessage(event) {
                 if (event.source === popup && event.origin === FrontendDomain) {
-                    finished = true;
                     window.removeEventListener("message", onMessage);
                     popup.close();
                     if (event.data && event.data && event.data.success) {
                         if (event.data["token"]) {
+                            finished = true;
                             AccessToken.current = event.data["token"]
                             if (window.opener) {
-                                window.opener.postMessage({ success: true, token: AccessToken.current}, window.location.origin);
+                                window.opener.postMessage({success: true, token: AccessToken.current}, window.location.origin);
                                 window.close();
                             }
                             return resolve(true);
@@ -59,19 +59,16 @@ export const ConnectionProvider = ({children}) => {
                 }
             }
             window.addEventListener("message", onMessage);
-            const timer = setInterval(() => {
-                if (popup.closed) {
-                    clearInterval(timer);
-                    if (!finished) {
-                        window.removeEventListener("message", onMessage);
-                        if (window.opener) {
-                            window.opener.postMessage({ success: false }, window.location.origin);
-                            window.close();
-                        }
-                        resolve(false);
-                    }
+            while (!popup.closed) await Sleep(500)
+            currentAuthPopups.current[URL] = null;
+            if (!finished) {
+                window.removeEventListener("message", onMessage);
+                if (window.opener) {
+                    window.opener.postMessage({success: false}, window.location.origin);
+                    window.close();
                 }
-            }, 300);
+                return resolve(false);
+            }
         });
         return currentAuthPopups.current[URL];
     }
@@ -79,8 +76,8 @@ export const ConnectionProvider = ({children}) => {
     const currentMFAPopup = useRef(null);
     const OpenMFAPopup = () => {
         if (currentMFAPopup.current) return currentMFAPopup.current;
-        currentMFAPopup.current = new Promise((resolve, _) => {
-            const popup = window.open(FrontendURL+"/mfa", "_blank", "width=500,height=600");
+        currentMFAPopup.current = new Promise(async (resolve, _) => {
+            const popup = window.open(FrontendURL + "/mfa", "_blank", "width=500,height=600");
             if (!popup) {
                 SendNotification("Please allow popups to proceed..")
                 return resolve(false);
@@ -88,35 +85,32 @@ export const ConnectionProvider = ({children}) => {
             let finished = false;
             function onMessage(event) {
                 if (event.source === popup && event.origin === FrontendURL) {
-                    finished = true;
                     window.removeEventListener("message", onMessage);
                     popup.close();
                     if (event.data && event.data && event.data.success) {
+                        finished = true;
+                        if (window.opener) {
+                            window.opener.postMessage({success: true}, window.location.origin);
+                            window.close();
+                        }
                         return resolve(true);
                     }
                 }
             }
             window.addEventListener("message", onMessage);
-            const timer = setInterval(() => {
-                if (popup.closed) {
-                    clearInterval(timer);
-                    if (!finished) {
-                        window.removeEventListener("message", onMessage);
-                        resolve(false);
-                    }
+            while (!popup.closed) await Sleep(500)
+            currentMFAPopup.current[URL] = null;
+            if (!finished) {
+                window.removeEventListener("message", onMessage);
+                if (window.opener) {
+                    window.opener.postMessage({success: false}, window.location.origin);
+                    window.close();
                 }
-            }, 300);
+                return resolve(false);
+            }
         });
         return currentMFAPopup.current;
     }
-
-    const RetryRequest = async (connection, config) => {
-        try {
-            return await connection(config);
-        } catch (error) {
-            return Promise.reject();
-        }
-    };
 
     const currentPings = useRef({});
     const IsServerOnline = (host) => {
@@ -179,22 +173,25 @@ export const ConnectionProvider = ({children}) => {
         return currentRefresh.current;
     }
 
+    const RetryRequest = async (connection, config) => {
+        try {
+            return await connection(config);
+        } catch (error) {
+            return Promise.reject(error);
+        }
+    };
+
     const RequestFulfilledInterceptor = async (config) => {
         const url = new URL(config.url, config.baseURL)
         config.host = url.host;
         config.pathname = url.pathname;
-
-        // repeat requests speed limiter
         const gatewayFailures = GetGatewayErrors(config.host)
         if (gatewayFailures > 0) await Sleep(Math.min(1000 * gatewayFailures, 3000))
-
-        // for server gateway failures, wait for the server to be back online, except serverActiveCheck requests
         if (!config.forServerConnectionCheck) {
             while (gatewayFailures > 0) {
                 SendNotification("Unable to reach server, waiting for reconnection..")
                 await IsServerOnline(config.host)
             }
-            // Attach access token to request if it exists
             if (AccessToken.current !== "") config.headers["Authorization"] = AccessToken.current;
             if (config.requiresCSRF) {
                 config.headers["CSRF"] = Cookies.get(CSRFCookiePath);
@@ -220,12 +217,13 @@ export const ConnectionProvider = ({children}) => {
 
         if (status === 200) {
             ResetGatewayErrors(config.host)
-            if (response.forServerConnectionCheck) {
-                SendNotification("Reconnected to server..")
-            }
             if (response.forTokenRefresh || response.forLogout) {
                 if (data["auth-modified"]) {
                     AccessToken.current = data["new-token"]
+                    if (window.opener) {
+                        window.opener.postMessage({success: true, token: AccessToken.current}, window.location.origin);
+                        window.close();
+                    }
                 }
             }
             return Promise.resolve({success: data.success, reply: data.reply})
@@ -243,24 +241,24 @@ export const ConnectionProvider = ({children}) => {
         if (status === 401) {
             if (config.forTokenRefresh) {
                 if (!config.skipLogin) {
-                    if (OpenAuthPopup(FrontendURL+"/login"))
+                    if (await OpenAuthPopup(FrontendURL+"/login"))
                         return Promise.resolve({success: data.success, reply: data.reply})
                     else
-                        return Promise.reject()
+                        return Promise.reject("Authentication stopped")
                 }
             } else {
                 if (await RefreshToken(true)) {
                     return await RetryRequest(privateAPI, config)
                 } else if (!config.skipLogin) {
-                    if (OpenAuthPopup(FrontendURL+"/login"))
+                    if (await OpenAuthPopup(FrontendURL+"/login"))
                         return await RetryRequest(privateAPI, config)
                     else
-                        return Promise.reject()
+                        return Promise.reject("Authentication stopped")
                 }
             }
         }
 
-        // Incomplete authentication (MFA)
+        // Incomplete authentication (Mfa required)
         else if (status === 403) {
             if (!config.requiresMFA) {
                 config.requiresMFA = true;
@@ -269,14 +267,14 @@ export const ConnectionProvider = ({children}) => {
                 if (await OpenMFAPopup())
                     return await RetryRequest(privateAPI, config)
                 else
-                    return Promise.reject()
+                    return Promise.reject("Mfa stopped")
             }
         }
 
         // Incomplete form/parameters
         else if (status === 422) {
             SendNotification("Frontend has errors, please report this to admin.")
-            return Promise.reject()
+            return Promise.reject("Frontend Errors")
         }
 
         // Rate limited
@@ -298,7 +296,7 @@ export const ConnectionProvider = ({children}) => {
                 await Sleep(config.serverInternalErrorCount * 1000)
                 return await RetryRequest(privateAPI, config)
             }
-            return Promise.reject()
+            return Promise.reject("Server internal error")
         }
 
         // Server unreachable
