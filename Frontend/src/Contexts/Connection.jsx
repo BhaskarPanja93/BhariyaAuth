@@ -1,4 +1,4 @@
-import React, {createContext, useContext} from 'react';
+import React, {createContext, useContext, useRef} from 'react';
 import axios from "axios";
 import Cookies from "js-cookie";
 import {Sleep} from "../Utils/Sleep.js";
@@ -16,25 +16,25 @@ import {BackendURL, CSRFCookiePath, FrontendDomain, FrontendURL, MFACookiePath} 
 /** @type {import('react').Context<ConnectionContextType | null>} */
 const ConnectionContext = createContext(null);
 export const ConnectionProvider = ({children}) => {
-    let AccessToken = ""
     const {SendNotification} = FetchNotificationManager();
+    const AccessToken = useRef("")
 
-    const GatewayErrors = {}
+    const GatewayErrors = useRef({})
     const GetGatewayErrors = (host) => {
-        return GatewayErrors[host] || 0
+        return GatewayErrors.current[host] || 0
     }
     const ResetGatewayErrors = (host) => {
-        GatewayErrors[host] = 0
+        GatewayErrors.current[host] = 0
     }
     const IncrementGatewayErrors = (host) => {
-        if (GatewayErrors[host] != null) GatewayErrors[host]++
-        else GatewayErrors[host] = 1
+        if (GatewayErrors.current[host] != null) GatewayErrors.current[host]++
+        else GatewayErrors.current[host] = 1
     }
 
-    let currentAuthPopups = {};
+    const currentAuthPopups = useRef({});
     const OpenAuthPopup = (URL) => {
-        if (currentAuthPopups[URL]) return currentAuthPopups[URL];
-        currentAuthPopups[URL] = new Promise((resolve, _) => {
+        if (currentAuthPopups.current[URL]) return currentAuthPopups.current[URL];
+        currentAuthPopups.current[URL] = new Promise((resolve, _) => {
             const popup = window.open(URL, "_blank", "width=500,height=600");
             if (!popup) {
                 SendNotification("Please allow popups to proceed..")
@@ -48,9 +48,9 @@ export const ConnectionProvider = ({children}) => {
                     popup.close();
                     if (event.data && event.data && event.data.success) {
                         if (event.data["token"]) {
-                            AccessToken = event.data["token"]
+                            AccessToken.current = event.data["token"]
                             if (window.opener) {
-                                window.opener.postMessage({ success: true, token: AccessToken}, window.location.origin);
+                                window.opener.postMessage({ success: true, token: AccessToken.current}, window.location.origin);
                                 window.close();
                             }
                             return resolve(true);
@@ -73,13 +73,13 @@ export const ConnectionProvider = ({children}) => {
                 }
             }, 300);
         });
-        return currentAuthPopups[URL];
+        return currentAuthPopups.current[URL];
     }
 
-    let currentMFAPopup = null;
+    const currentMFAPopup = useRef(null);
     const OpenMFAPopup = () => {
-        if (currentMFAPopup) return currentMFAPopup;
-        currentMFAPopup = new Promise((resolve, _) => {
+        if (currentMFAPopup.current) return currentMFAPopup.current;
+        currentMFAPopup.current = new Promise((resolve, _) => {
             const popup = window.open(FrontendURL+"/mfa", "_blank", "width=500,height=600");
             if (!popup) {
                 SendNotification("Please allow popups to proceed..")
@@ -107,7 +107,7 @@ export const ConnectionProvider = ({children}) => {
                 }
             }, 300);
         });
-        return currentMFAPopup;
+        return currentMFAPopup.current;
     }
 
     const RetryRequest = async (connection, config) => {
@@ -118,11 +118,11 @@ export const ConnectionProvider = ({children}) => {
         }
     };
 
-    const currentPings = {};
+    const currentPings = useRef({});
     const IsServerOnline = (host) => {
-        if (currentPings[host] != null) return currentPings[host];
+        if (currentPings.current[host] != null) return currentPings.current[host];
         SendNotification("Pinging:" + host)
-        currentPings[host] = new Promise((resolve, _) => {
+        currentPings.current[host] = new Promise((resolve, _) => {
             privateAPI.get(BackendURL+"/status/ping", {
                 forServerConnectionCheck: true
             }).then(() => {
@@ -130,18 +130,18 @@ export const ConnectionProvider = ({children}) => {
             }).catch(() => {
                 resolve(false)
             }).finally(() => {
-                currentPings[host] = null;
+                currentPings.current[host] = null;
             });
         });
-        return currentPings[host];
+        return currentPings.current[host];
     }
 
-    let currentLogout = null;
+    const currentLogout = useRef(null);
     const Logout = async () => {
-        if (currentLogout) return await currentLogout
+        if (currentLogout.current) return await currentLogout.current
         const currentCSRF = Cookies.get(CSRFCookiePath)
         if (!currentCSRF) return Promise.resolve(false)
-        currentLogout = new Promise((resolve, _) => {
+        currentLogout.current = new Promise((resolve, _) => {
             axios.post(BackendURL + "/account/logout", {
                 requiresCSRF: true,
                 forLogout: true,
@@ -150,18 +150,18 @@ export const ConnectionProvider = ({children}) => {
             }).catch(() => {
                 resolve(false)
             }).finally(() => {
-                currentLogout = null;
+                currentLogout.current = null;
             });
         });
-        return currentLogout;
+        return currentLogout.current;
     }
 
-    let currentRefresh = null;
+    const currentRefresh = useRef(null);
     const RefreshToken = async (skipLogin) => { // Create and return a new promise that resolves when the token is refreshed or fails resolving to a boolean.
-        if (currentRefresh) return await currentRefresh
+        if (currentRefresh.current) return await currentRefresh.current
         const currentCSRF = Cookies.get(CSRFCookiePath)
         if (!currentCSRF) return Promise.resolve(false)
-        currentRefresh = new Promise((resolve, _) => {
+        currentRefresh.current = new Promise((resolve, _) => {
             axios.get(BackendURL + "/account/refresh", {
                 requiresCSRF: true,
                 forTokenRefresh: true,
@@ -173,10 +173,10 @@ export const ConnectionProvider = ({children}) => {
                 if (!skipLogin) SendNotification("Unable to authenticate you. Please refresh tab")
                 resolve(false)
             }).finally(() => {
-                currentRefresh = null;
+                currentRefresh.current = null;
             });
         });
-        return currentRefresh;
+        return currentRefresh.current;
     }
 
     const RequestFulfilledInterceptor = async (config) => {
@@ -195,7 +195,7 @@ export const ConnectionProvider = ({children}) => {
                 await IsServerOnline(config.host)
             }
             // Attach access token to request if it exists
-            if (AccessToken !== "") config.headers["Authorization"] = AccessToken;
+            if (AccessToken.current !== "") config.headers["Authorization"] = AccessToken.current;
             if (config.requiresCSRF) {
                 config.headers["CSRF"] = Cookies.get(CSRFCookiePath);
                 if (!config.headers["CSRF"]) return Promise.reject(config)
@@ -225,14 +225,15 @@ export const ConnectionProvider = ({children}) => {
             }
             if (response.forTokenRefresh || response.forLogout) {
                 if (data["auth-modified"]) {
-                    AccessToken = data["new-token"]
+                    AccessToken.current = data["new-token"]
                 }
             }
             return Promise.resolve({success: data.success, reply: data.reply})
         }
     }
 
-    const ResponseRejectedInterceptor = async (response) => {
+    const ResponseRejectedInterceptor = async (error) => {
+        const response = error.response;
         const config = response.config;
         const data = response.data;
         const status = response.status;

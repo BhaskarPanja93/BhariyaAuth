@@ -34,11 +34,9 @@ export default function RegisterPage(){
         form.append("remember_me", remember ? "yes" : "no");
         privateAPI.post(BackendURL + "/register/step1", form, {
         })
-            .then((response) => {
-                if (response.data.success) {
-                    console.log(response)
-                    currentToken = response.data["reply"];
-                    console.log(currentToken)
+            .then((data) => {
+                if (data["success"]) {
+                    currentToken = data["reply"];
                     setCurrentStep(2)
                 }
             })

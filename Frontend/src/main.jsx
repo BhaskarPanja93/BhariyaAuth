@@ -11,7 +11,7 @@ import Sessions from "./AuthFlow/Sessions.jsx";
 import {NotificationProvider} from "./Contexts/Notification.jsx";
 import {ConnectionProvider} from "./Contexts/Connection.jsx";
 
-createRoot(document.getElementById('root')).render(<React.StrictMode>
+createRoot(document.getElementById('root')).render(
     <NotificationProvider>
         <ConnectionProvider>
             <BrowserRouter>
@@ -28,4 +28,4 @@ createRoot(document.getElementById('root')).render(<React.StrictMode>
             </BrowserRouter>
         </ConnectionProvider>
     </NotificationProvider>
-</React.StrictMode>)
+)

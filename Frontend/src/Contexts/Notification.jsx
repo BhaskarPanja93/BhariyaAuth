@@ -1,5 +1,4 @@
-import React, {createContext, useContext, useEffect, useState} from "react";
-import { v4 as uuid } from "uuid";
+import React, {createContext, useContext, useEffect, useRef, useState} from "react";
 
 /**
  * @typedef {Object} NotificationContextType
@@ -11,10 +10,11 @@ const NotificationContext = createContext(null)
 
 export const NotificationProvider = ({children}) => {
     const [notifications, setNotifications] = useState([]);
+    const nextId = useRef(0);
 
     const SendNotification = (message) => {
         setNotifications(prev => {
-            let updated = [...prev, {id: uuid(), message: message}];
+            let updated = [...prev, {id: nextId.current++, message: message}];
             if (updated.length > 10) {
                 updated = updated.slice(updated.length - 10);
             }
