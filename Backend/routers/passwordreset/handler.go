@@ -98,7 +98,7 @@ func Step1(ctx fiber.Ctx) error {
 			return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 		}
 	}
-	if !StringProcessor.IsValidEmail(form.MailAddress) {
+	if !StringProcessor.EmailIsValid(form.MailAddress) {
 		RateLimitProcessor.Set(ctx)
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
@@ -116,7 +116,7 @@ func Step1(ctx fiber.Ctx) error {
 		UserID:    userID,
 		Step2Code: "",
 	}
-	verification, retry := OTPProcessor.Send(ctx, form.MailAddress)
+	verification, retry := OTPProcessor.Send(form.MailAddress, ctx.IP())
 	if verification == "" {
 		return ctx.Status(fiber.StatusOK).JSON(
 			ResponseModels.APIResponseT{

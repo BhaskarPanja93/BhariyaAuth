@@ -11,7 +11,7 @@ require (
 	github.com/markbates/goth v1.82.0
 	github.com/medama-io/go-useragent v1.2.2
 	github.com/microsoftgraph/msgraph-sdk-go v1.90.0
-	github.com/redis/go-redis/v9 v9.17.0
+	github.com/redis/go-redis/v9 v9.17.1
 	golang.org/x/crypto v0.45.0
 )
 

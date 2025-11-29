@@ -62,7 +62,7 @@ func Step2(ctx fiber.Ctx) error {
 			})
 	}
 	if AccountProcessor.CheckUserIsBlacklisted(MFAData.UserID) {
-		Logger.IntentionalFailure(fmt.Sprintf("[MFA2] Blacklisted account [UID-%d] attempted MFA", MFAData.UserID))
+		Logger.IntentionalFailure(fmt.Sprintf("[MFA2] Blacklisted account [UID-%d] attempted Mfa", MFAData.UserID))
 		return ctx.Status(fiber.StatusOK).JSON(
 			ResponseModels.APIResponseT{
 				Success:       false,
@@ -110,7 +110,7 @@ func Step1(ctx fiber.Ctx) error {
 		RateLimitProcessor.Set(ctx)
 		return ctx.SendStatus(fiber.StatusInternalServerError)
 	}
-	verification, retry := OTPProcessor.Send(ctx, mail)
+	verification, retry := OTPProcessor.Send(mail, fmt.Sprintf("%s:verified", ctx.IP()))
 	if verification == "" {
 		return ctx.Status(fiber.StatusOK).JSON(
 			ResponseModels.APIResponseT{
