@@ -97,21 +97,32 @@ export default function LoginStructure() {
                     <RememberCheckbox checked={remember} onCheckedChange={setRemember}
                                       disabled={uiDisabled || currentStep !== 1}/>
 
-                    <div className="flex items-center justify-between text-xs text-gray-400">
-                        <Step2Toggle usingOTP={useOtp} toggleUsingOTP={() => Step1(true)} disabled={uiDisabled}/>
-                        {(currentStep === 2 && tokens.current[email] && tokens.current[email][useOtp]) && (<>
-                                {useOtp ? (<OTPInput value={verification} onValueChange={setVerification}
-                                                     disabled={uiDisabled}/>) : (
-                                    <PasswordInput value={verification} onValueChange={setVerification}
-                                                   disabled={uiDisabled}/>)}
-                            </>)}
+                    <div className="text-xs text-gray-400">
 
-                        <div className="flex items-center gap-3">
-                            {!useOtp && (<Link to="/passwordreset" className="text-xs text-indigo-400 hover:underline">
-                                    Forgot Password?
-                                </Link>)}
+                        <div className="flex items-center justify-between">
+                            <Step2Toggle usingOTP={useOtp} toggleUsingOTP={() => Step1(true)} disabled={uiDisabled} />
+
+                            <div className="flex items-center gap-3">
+                                {!useOtp && (
+                                    <Link to="/passwordreset" className="text-xs text-indigo-400 hover:underline">
+                                        Forgot Password?
+                                    </Link>
+                                )}
+                            </div>
                         </div>
+
+                        {/* OTP / Password appears on its own line below */}
+                        {(currentStep === 2 && tokens.current[email] && tokens.current[email][useOtp]) && (
+                            <div className="mt-3">
+                                {useOtp ? (
+                                    <OTPInput value={verification} onValueChange={setVerification} disabled={uiDisabled} />
+                                ) : (
+                                    <PasswordInput value={verification} onValueChange={setVerification} disabled={uiDisabled} />
+                                )}
+                            </div>
+                        )}
                     </div>
+
                     {currentStep === 1 ? <SubmitButton text={"Continue"} onClick={() => Step1(false)}
                                                        disabled={uiDisabled || currentStep !== 1}/> :
                         <SubmitButton text={"Sign In"} onClick={Step2} disabled={uiDisabled}/>}

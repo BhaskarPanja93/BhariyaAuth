@@ -7,7 +7,7 @@ import LoginStructure from './AuthFlow/Login/LoginStructure.jsx'
 import RegisterPage from './AuthFlow/Register/RegisterStructure.jsx'
 import VerifyOTP from "./AuthFlow/Register/VerifyOTP.jsx";
 import ResetPassword from "./AuthFlow/ResetPassword.jsx";
-import Sessions from "./AuthFlow/Sessions.jsx";
+import SessionsStructure from "./AuthFlow/Sessions/SessionsStructure.jsx";
 import {NotificationProvider} from "./Contexts/Notification.jsx";
 import {ConnectionProvider} from "./Contexts/Connection.jsx";
 
@@ -20,7 +20,7 @@ createRoot(document.getElementById('root')).render(
                     <Route path="/register" element={<RegisterPage/>}/>
                     <Route path="/verifyOTP" element={<VerifyOTP/>}/>
                     <Route path="/forgotPassword" element={<ResetPassword/>}/>
-                    <Route path="/sessions" element={<Sessions/>}/>
+                    <Route path="/sessions" element={<SessionsStructure/>}/>
 
                     <Route path="/" element={<Navigate to="/login" replace/>}/>
                     <Route path="*" element={<div className="p-6">Page not found</div>}/>
