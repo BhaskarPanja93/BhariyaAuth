@@ -1,6 +1,5 @@
 import React, {useEffect, useState} from "react";
 
-/* Simple SVG icons */
 function DeviceIcon({type}) {
     if (type === "mobile") {
         return (<svg width="44" height="44" viewBox="0 0 24 24" fill="none">
@@ -16,30 +15,11 @@ function DeviceIcon({type}) {
         </svg>);
     }
 
-    // ⭐ NEW: Unknown Device Icon
     return (<svg width="44" height="44" viewBox="0 0 24 24" fill="none">
-        <rect
-            x="4"
-            y="4"
-            width="16"
-            height="16"
-            rx="3"
-            stroke="#374151"
-            fill="#0b0f14"
-        />
-        <text
-            x="12"
-            y="16"
-            fontSize="10"
-            textAnchor="middle"
-            fill="#6b7280"
-            fontFamily="Arial, sans-serif"
-        >
-            ?
-        </text>
+        <rect x="4" y="4" width="16" height="16" rx="3" stroke="#374151" fill="#0b0f14"/>
+        <text x="12" y="16" fontSize="10" textAnchor="middle" fill="#6b7280" fontFamily="Arial, sans-serif">?</text>
     </svg>);
 }
-
 
 function formatDate(dt) {
     try {
@@ -49,11 +29,6 @@ function formatDate(dt) {
     }
 }
 
-/**
- * SessionsStructure
- * - dummy data included below (REMOVE when wiring API)
- * - Current device card + Other devices grid (responsive 1 / 2 columns)
- */
 export default function Sessions() {
     const [sessions, setSessions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -215,12 +190,9 @@ export default function Sessions() {
     const current = sessions.find(s => s.isCurrent) || null;
     const others = sessions.filter(s => !s.isCurrent);
 
-    return (/* outer: full viewport with 20px padding (p-5), box-border to include padding,
-           overflow-hidden prevents body-level scroll; card will scroll internally if needed */
+    return (
         <div className="p-5 box-border overflow-hidden">
             <div className="mx-auto max-w-4xl h-70vh px-4">
-
-                {/* card fills available area and can scroll internally (flex column) */}
                 <div
                     className="rounded-2xl p-6 md:p-8 flex flex-col overflow-hidden box-border mx-auto"
                     style={{
@@ -242,7 +214,6 @@ export default function Sessions() {
                     </div>
 
 
-                    {/* header row */}
                     <div className="flex items-center justify-between mb-6">
                         <h1 className="text-lg md:text-xl font-semibold text-white">Your devices where you are signed in</h1>
 
@@ -254,7 +225,7 @@ export default function Sessions() {
                         </button>
                     </div>
 
-                    {/* Main content column */}
+
                     <div className="flex flex-col gap-6">
 
                         {/* Current device card */}
