@@ -6,32 +6,16 @@ import (
 	"github.com/medama-io/go-useragent"
 )
 
+var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+
 func IsValidEmail(email string) bool {
-	var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 	return emailRegex.MatchString(email)
 }
 
+var passwordRegex = regexp.MustCompile(`^(?=.*[A-Z])(?=.*[a-z])(?=.*\d).{7,20}$`)
+
 func PasswordIsStrong(password string) bool {
-	n := len(password)
-	if n < 7 || n > 20 {
-		return false
-	}
-	var hasUpper, hasLower, hasDigit bool
-	for i := 0; i < n; i++ {
-		c := password[i]
-		switch {
-		case c >= 'A' && c <= 'Z':
-			hasUpper = true
-		case c >= 'a' && c <= 'z':
-			hasLower = true
-		case c >= '0' && c <= '9':
-			hasDigit = true
-		}
-		if hasUpper && hasLower && hasDigit {
-			return true
-		}
-	}
-	return hasUpper && hasLower && hasDigit
+	return passwordRegex.MatchString(password)
 }
 
 var UAParser = useragent.NewParser()

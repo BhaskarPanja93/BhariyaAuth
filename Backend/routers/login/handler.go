@@ -194,7 +194,7 @@ func Step1(ctx fiber.Ctx) error {
 			return ctx.Status(fiber.StatusOK).JSON(
 				ResponseModels.APIResponseT{
 					Success:       false,
-					Notifications: []string{"Password has not been set", "Please use OTP/SSO to login"},
+					Notifications: []string{"Password has not been set. Please use OTP/SSO to login"},
 				})
 		}
 		SignInData.Step2Code = ""

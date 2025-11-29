@@ -1,4 +1,4 @@
-import {useState} from 'react'
+import {useRef, useState} from 'react'
 import {Link} from "react-router-dom";
 import {BackendURL} from '../../Values/Constants.js'
 import EmailInput from '../Common/EmailInput'
@@ -9,9 +9,13 @@ import RememberCheckbox from '../Common/RememberCheckbox'
 import SubmitButton from '../Common/SubmitButton'
 import SSOButtons from '../Common/SSOButtons.jsx'
 import {FetchConnectionManager} from "../../Contexts/Connection.jsx";
+import {EmailIsValid, PasswordIsStrong} from "../../Utils/Strings.js";
 import Divider from "../Common/Divider.jsx";
+import {FetchNotificationManager} from "../../Contexts/Notification.jsx";
 
 export default function LoginStructure() {
+    const {SendNotification} = FetchNotificationManager();
+
     const [uiDisabled, setUiDisabled] = useState(false)
     const [currentStep, setCurrentStep] = useState(1)
     const [useOtp, setUseOtp] = useState(false)
@@ -20,17 +24,21 @@ export default function LoginStructure() {
     const [verification, setVerification] = useState("")
 
     const {publicAPI, privateAPI, OpenAuthPopup, Logout} = FetchConnectionManager()
-    const [tokens, setTokens] = useState ({})
+    const tokens = useRef({})
 
     const Step1 = async () => {
-        if (tokens[email] && tokens[email][useOtp]) {
-            setCurrentStep(2)
-            return
-        }
+        if (!EmailIsValid(email))
+            return SendNotification("Email is invalid");
+
+        if (tokens[email] && tokens[email][useOtp])
+            return setCurrentStep(2)
+
         setUiDisabled(true);
+
         const form = new FormData();
         form.append("mail_address", email);
         form.append("remember_me", remember ? "yes" : "no");
+
         privateAPI.post(BackendURL + `/login/step1/${useOtp?"otp":"password"}`, form, {
         })
             .then((data) => {

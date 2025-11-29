@@ -281,7 +281,7 @@ export const ConnectionProvider = ({children}) => {
 
         // Rate limited
         else if (status === 429) {
-            let retryAfter = data["retry-after"]
+            const retryAfter = data["retry-after"]
             if (!retryAfter || isNaN(retryAfter)) retryAfter = 1
             await Sleep(retryAfter * 1000)
             return await RetryRequest(privateAPI, config)
