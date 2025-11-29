@@ -75,30 +75,35 @@ export default function RegisterPage() {
     return (<div className="min-h-screen flex items-center justify-center">
         <div className="w-full max-w-sm">
             <div className="rounded-2xl p-8 shadow-2xl" style={{
-                background: 'linear-gradient(180deg, rgba(12,14,18,0.9), rgba(7,8,10,0.85))',
-                border: '1px solid rgba(255,255,255,0.02)'
+                background: 'linear-gradient(180deg, rgba(12,14,18,0.9), rgba(7,8,10,0.85))', border: '1px solid rgba(255,255,255,0.02)'
             }}>
                 <div className="flex flex-col items-center gap-4 mb-4">
                     <h2 className="text-xl font-semibold text-white">Sign Up</h2>
                     <div className="text-sm text-gray-400">
-                        {currentStep === 1 ? "Create an account" : (<>{email}
-                            <div onClick={() => {
-                                setCurrentStep(1)
-                            }}>Incorrect email?
+                        {currentStep === 1 ? "Create an account" : <>{email}
+                            <div onClick={() => setCurrentStep(1)}>
+                                Incorrect email?
                             </div>
-                        </>)}</div>
+                        </>}
+                    </div>
                 </div>
                 <div className="space-y-4">
-                    <NameInput value={name} onValueChange={setName} disabled={currentStep !== 1 || uiDisabled}/>
-                    <EmailInput value={email} onValueChange={setEmail} disabled={currentStep !== 1 || uiDisabled}/>
-                    {currentStep === 1 && <PasswordInput disabled={currentStep !== 1 || uiDisabled} value={password}
-                                                         onValueChange={setPassword}
-                                                         confirm={passwordConfirmation}
-                                                         onConfirmChange={setPasswordConfirmation}
-                                                         needsConfirm={true}/>}
-                    <RememberCheckbox checked={remember} onCheckedChange={setRemember}
-                                      disabled={currentStep !== 1 || uiDisabled}/>
-                    {currentStep === 2 && <OTPInput value={otp} onValueChange={setOTP} disabled={uiDisabled}/>}
+
+                    {currentStep === 1 && <>
+                        <NameInput value={name} onValueChange={setName} disabled={currentStep !== 1 || uiDisabled}/>
+                        <EmailInput value={email} onValueChange={setEmail} disabled={currentStep !== 1 || uiDisabled}/>
+                        <PasswordInput disabled={currentStep !== 1 || uiDisabled} value={password}
+                                       onValueChange={setPassword}
+                                       confirm={passwordConfirmation}
+                                       onConfirmChange={setPasswordConfirmation}
+                                       needsConfirm={true}/>
+                        <RememberCheckbox checked={remember} onCheckedChange={setRemember} disabled={currentStep !== 1 || uiDisabled}/>
+                    </>}
+                    {currentStep === 2 && <>
+                        <button type="button" onClick={() => Step1(true)} className="flex-end text-xs text-indigo-400 hover:underline">
+                            Resend OTP
+                        </button>
+                        <OTPInput value={otp} onValueChange={setOTP} disabled={uiDisabled}/></>}
                     <SubmitButton text={currentStep === 1 ? "Verify Email" : "VERIFY OTP"}
                                   onClick={currentStep === 1 ? Step1 : Step2} disabled={uiDisabled}/>
                     <Divider/>

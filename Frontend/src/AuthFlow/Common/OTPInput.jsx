@@ -1,13 +1,7 @@
-import React, { useState } from 'react';
-import { InputOtp } from 'primereact/inputotp';
+import {InputOtp} from 'primereact/inputotp';
 
-export default function TemplateDemo() {
-    const [token, setTokens] = useState();
-
-    const customInput = ({events, props}) => <input {...events} {...props} type="text" className="custom-otp-input" />;
-
-    return (
-        <div className="card flex justify-content-center">
+export default function OTPInput({value, onValueChange, disabled}) {
+    return (<div className="card flex justify-content-center">
             <style scoped>
                 {`
                     .custom-otp-input {
@@ -34,12 +28,11 @@ export default function TemplateDemo() {
             </style>
 
             <InputOtp
-                value={token}
-                onChange={(e) => setTokens(e.value)}
-                inputTemplate={customInput}
+                value={value}
+                onChange={(e) => onValueChange(e.value)}
+                inputTemplate={({events, props}) => <input {...events} {...props} type="text" className="custom-otp-input"/>}
                 length={6}
-
+                disabled={disabled}
             />
-        </div>
-    );
+        </div>);
 }
