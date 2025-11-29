@@ -9,7 +9,7 @@ import RememberCheckbox from '../Common/RememberCheckbox'
 import SubmitButton from '../Common/SubmitButton'
 import SSOButtons from '../Common/SSOButtons.jsx'
 import {FetchConnectionManager} from "../../Contexts/Connection.jsx";
-import {EmailIsValid} from "../../Utils/Strings.js";
+import {EmailIsValid, OTPIsValid, PasswordIsStrong} from "../../Utils/Strings.js";
 import Divider from "../Common/Divider.jsx";
 import {FetchNotificationManager} from "../../Contexts/Notification.jsx";
 
@@ -24,12 +24,11 @@ export default function LoginStructure() {
     const [email, setEmail] = useState("")
     const [verification, setVerification] = useState()
 
-    const {publicAPI, privateAPI, OpenAuthPopup, Logout} = FetchConnectionManager()
+    const {privateAPI} = FetchConnectionManager()
     const tokens = useRef({})
 
     const Step1 = async (tryOTP) => {
         if (!EmailIsValid(email)) return SendNotification("Email is invalid");
-
         if (!tokens.current[email]) tokens.current[email] = {}
 
         if (tokens.current[email][tryOTP]) {
@@ -41,7 +40,7 @@ export default function LoginStructure() {
         const form = new FormData();
         form.append("mail_address", email);
         form.append("remember_me", remember ? "yes" : "no");
-        privateAPI.post(BackendURL + `/login/step1/${tryOTP ? "otp" : "password"}`, form, {})
+        privateAPI.post(BackendURL + `/login/step1/${tryOTP ? "otp" : "password"}`, form)
             .then((data) => {
                 if (data["success"]) {
                     tokens.current[email][tryOTP] = data["reply"]
@@ -49,25 +48,31 @@ export default function LoginStructure() {
                     setCurrentStep(2)
                 }
             })
-            .catch()
             .finally(() => {
                 setUiDisabled(false);
             });
     };
 
     const Step2 = async () => {
+        if (!tokens.current[email] || !tokens.current[email][useOtp]) return SendNotification("Step 1 incomplete. Please enter email again");
+        if(!useOtp)
+        {
+            if (!PasswordIsStrong(verification))
+                SendNotification("Incorrect Password");
+        } else {
+            if (!OTPIsValid(verification))
+                SendNotification("Incorrect OTP");
+        }
+
         setUiDisabled(true);
         const form = new FormData();
         form.append("token", tokens.current[email][useOtp]);
         form.append("verification", verification);
-        privateAPI.post(BackendURL + "/login/step2", form, {})
+        privateAPI.post(BackendURL + "/login/step2", form)
             .then((data) => {
                 if (data["success"]) {
                     navigate("/sessions");
                 }
-            })
-            .catch((error) => {
-                console.log(error);
             })
             .finally(() => {
                 setUiDisabled(false);
@@ -100,30 +105,26 @@ export default function LoginStructure() {
                     <div className="text-xs text-gray-400">
 
                         <div className="flex items-center justify-between">
-                            <Step2Toggle usingOTP={useOtp} toggleUsingOTP={() => Step1(true)} disabled={uiDisabled} />
+                            <Step2Toggle usingOTP={useOtp} toggleUsingOTP={() => Step1(true)} disabled={uiDisabled}/>
 
                             <div className="flex items-center gap-3">
                                 {!useOtp && (
                                     <Link to="/passwordreset" className="text-xs text-indigo-400 hover:underline">
                                         Forgot Password?
-                                    </Link>
-                                )}
+                                    </Link>)}
                             </div>
                         </div>
 
-                        {/* OTP / Password appears on its own line below */}
                         {(currentStep === 2 && tokens.current[email] && tokens.current[email][useOtp]) && (
                             <div className="mt-3">
-                                {useOtp ? (
-                                    <OTPInput value={verification} onValueChange={setVerification} disabled={uiDisabled} />
-                                ) : (
-                                    <PasswordInput value={verification} onValueChange={setVerification} disabled={uiDisabled} />
-                                )}
-                            </div>
-                        )}
+                                {useOtp ? (<OTPInput value={verification} onValueChange={setVerification}
+                                                     disabled={uiDisabled}/>) : (
+                                    <PasswordInput value={verification} onValueChange={setVerification}
+                                                   disabled={uiDisabled}/>)}
+                            </div>)}
                     </div>
 
-                    {currentStep === 1 ? <SubmitButton text={"Continue"} onClick={() => Step1(false)}
+                    {currentStep === 1 ? <SubmitButton text={"Continue with Email"} onClick={() => Step1(false)}
                                                        disabled={uiDisabled || currentStep !== 1}/> :
                         <SubmitButton text={"Sign In"} onClick={Step2} disabled={uiDisabled}/>}
                     <Divider/>
