@@ -80,11 +80,14 @@ export default function RegisterPage() {
                 <div className="flex flex-col items-center gap-4 mb-4">
                     <h2 className="text-xl font-semibold text-white">Sign Up</h2>
                     <div className="text-sm text-gray-400">
-                        {currentStep === 1 ? "Create an account" : <>{email}
-                            <div onClick={() => setCurrentStep(1)}>
-                                Incorrect email?
-                            </div>
-                        </>}
+                        {currentStep === 1 ? ("Access your account") : (<div className="flex items-center gap-2">
+                            <span>{email}</span>
+                            <span
+                                onClick={() => setCurrentStep(1)}
+                                className="text-indigo-400 cursor-pointer"
+                            >Not you?
+                                </span>
+                        </div>)}
                     </div>
                 </div>
                 <div className="space-y-4">
@@ -109,7 +112,7 @@ export default function RegisterPage() {
                     <Divider/>
                     <SSOButtons disabled={uiDisabled}/>
                     <p className="text-center text-sm text-gray-500 mt-4">
-                        Already have an account?
+                        Already have an account?&nbsp;
                         <Link to="/login" className="text-indigo-400 hover:underline">
                             SignIn
                         </Link>
