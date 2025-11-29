@@ -1,25 +1,26 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, {useRef, useState, useEffect} from "react";
 
 
-export default function OTPInput({ value = "", onValueChange, disabled }) {
+export default function OTPInput({value = "", onValueChange, disabled}) {
     const inputsRef = useRef([]);
     const skipClearOnFocus = useRef(false); // prevents clearing on programmatic focus
 
     const [buffer, setBuffer] = useState(() => {
         const digits = (value || "").replace(/\D/g, "").slice(0, 6).split("");
-        return Array.from({ length: 6 }, (_, i) => digits[i] || "");
+        return Array.from({length: 6}, (_, i) => digits[i] || "");
     });
 
     useEffect(() => {
         const digits = (value || "").replace(/\D/g, "").slice(0, 6).split("");
         setBuffer((cur) => {
             if (cur.join("") === digits.join("")) return cur;
-            return Array.from({ length: 6 }, (_, i) => digits[i] || "");
+            return Array.from({length: 6}, (_, i) => digits[i] || "");
         });
     }, [value]);
 
     const emit = (buf) => {
         const compact = buf.join("").replace(/\s/g, "");
+        console.log(compact);
         onValueChange && onValueChange(compact);
     };
 
@@ -68,6 +69,23 @@ export default function OTPInput({ value = "", onValueChange, disabled }) {
             });
             return;
         }
+
+
+        if (/^[0-9]$/.test(e.key)) {
+            const cur = inputsRef.current[index]?.value || "";
+            if (cur === e.key) {
+                e.preventDefault();
+                setBuffer((prev) => {
+                    const next = [...prev];
+                    next[index] = e.key;
+                    emit(next);
+                    return next;
+                });
+                if (index < 5) focusAt(index + 1, true);
+                return;
+            }
+        }
+
 
         if (e.key === "ArrowLeft" && index > 0) {
             e.preventDefault();
@@ -128,7 +146,7 @@ export default function OTPInput({ value = "", onValueChange, disabled }) {
 
     return (
         <div className="flex justify-between gap-2 mt-2">
-            {Array.from({ length: 6 }).map((_, i) => (
+            {Array.from({length: 6}).map((_, i) => (
                 <input
                     key={i}
                     type="text"
