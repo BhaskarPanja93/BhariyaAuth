@@ -281,7 +281,7 @@ export const ConnectionProvider = ({children}) => {
 
         // Rate limited
         else if (status === 429) {
-            const retryAfter = data["retry-after"]
+            let retryAfter = data["retry-after"]
             if (!retryAfter || isNaN(retryAfter)) retryAfter = 1
             await Sleep(retryAfter * 1000)
             return await RetryRequest(privateAPI, config)
@@ -303,6 +303,7 @@ export const ConnectionProvider = ({children}) => {
 
         // Server unreachable
         else if (status === 502 || status === 504) {
+            SendNotification("Server unreachable. Retrying..")
             IncrementGatewayErrors(config.host)
             config.gatewayErrorCount += 1
             return await RetryRequest(privateAPI, config)
