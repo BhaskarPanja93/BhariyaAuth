@@ -17,16 +17,16 @@ import (
 )
 
 type Step2FormT struct {
-	UserID    string `json:"user_id"`
-	RevokeAll string `json:"revoke_all"`
-	DeviceID  string `json:"device_id"`
+	UserID    string `form:"user_id"`
+	RevokeAll string `form:"revoke_all"`
+	DeviceID  string `form:"device_id"`
 }
 
 func Revoke(ctx fiber.Ctx) error {
 	now := time.Now().UTC()
-	var form Step2FormT
-	if err := ctx.Bind().JSON(form); err != nil {
-		if err = ctx.Bind().Form(form); err != nil {
+	form := new(Step2FormT)
+	if err := ctx.Bind().Form(form); err != nil {
+		if err = ctx.Bind().Body(form); err != nil {
 			RateLimitProcessor.Set(ctx)
 			return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 		}
@@ -49,12 +49,10 @@ func Revoke(ctx fiber.Ctx) error {
 	if form.RevokeAll == "yes" {
 		AccountProcessor.DeleteAllSessions(access.UserID)
 		Logger.Success(fmt.Sprintf("Sessions RevokeAll succeeded for [%d]", access.UserID))
-		Logger.Success(fmt.Sprintf("Sessions RevokeAll succeeded for [%d]", access.UserID))
-		return ctx.Status(fiber.StatusOK).JSON(
-			ResponseModels.APIResponseT{
-				Success:       true,
-				Notifications: []string{"All sessions have been revoked and will lose access soon"},
-			})
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Success:       true,
+			Notifications: []string{"All sessions have been revoked and will lose access soon"},
+		})
 	}
 	RefreshID, ok := StringProcessor.Decrypt(form.DeviceID)
 	if !ok {
@@ -63,11 +61,10 @@ func Revoke(ctx fiber.Ctx) error {
 	}
 	AccountProcessor.DeleteSession(access.UserID, binary.BigEndian.Uint16(RefreshID))
 	Logger.Success(fmt.Sprintf("Sessions Revoke succeeded for [%d-%d]", access.UserID, RefreshID))
-	return ctx.Status(fiber.StatusOK).JSON(
-		ResponseModels.APIResponseT{
-			Success:       true,
-			Notifications: []string{"Session has been revoked and will lose access soon"},
-		})
+	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+		Success:       true,
+		Notifications: []string{"Session has been revoked and will lose access soon"},
+	})
 }
 
 func Fetch(ctx fiber.Ctx) error {
@@ -83,27 +80,25 @@ func Fetch(ctx fiber.Ctx) error {
 	rows, err := Stores.MySQLClient.Query("SELECT refresh, count, remembered, creation, updated, ua FROM activities WHERE uid = ?", access.UserID)
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("[Sessions] Fetch error for [UID-%d] reason: %s", access.UserID, err.Error()))
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Success:       false,
-				Notifications: []string{"Failed to fetch data (DB-read issue)... Retrying"},
-			})
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Failed to fetch data (DB-read issue)... Retrying"},
+		})
 	}
 	defer rows.Close()
 
 	var response ResponseModels.UserActivityResponseT
 	var ok bool
 
-	userbuf := make([]byte, 3)
+	userbuf := make([]byte, 4)
 	binary.BigEndian.PutUint32(userbuf, access.UserID)
 	response.UserID, ok = StringProcessor.Encrypt(userbuf)
 	if !ok {
 		Logger.AccidentalFailure(fmt.Sprintf("[Sessions] UID Encrypt error for [UID-%d]", access.UserID))
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Success:       false,
-				Notifications: []string{"Failed to fetch data (Encryptor issue)... Retrying"},
-			})
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Failed to fetch data (Encryptor issue)... Retrying"},
+		})
 	}
 	var success, failure uint
 	for rows.Next() {
@@ -135,10 +130,9 @@ func Fetch(ctx fiber.Ctx) error {
 		success++
 	}
 	Logger.Success(fmt.Sprintf("[Sessions] Fetched for [UID-%d]", access.UserID))
-	return ctx.Status(fiber.StatusOK).JSON(
-		ResponseModels.APIResponseT{
-			Success:       true,
-			Reply:         response,
-			Notifications: []string{fmt.Sprintf("Fetched data, successful: %d failed: %d", success, failure)},
-		})
+	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+		Success:       true,
+		Reply:         response,
+		Notifications: []string{fmt.Sprintf("Fetched data, successful: %d failed: %d", success, failure)},
+	})
 }

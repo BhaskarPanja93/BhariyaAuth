@@ -27,8 +27,8 @@ type Step2FormT struct {
 func Step2(ctx fiber.Ctx) error {
 	form := new(Step2FormT)
 	var MFAData TokenModels.MFATokenT
-	if err := ctx.Bind().JSON(form); err != nil {
-		if err = ctx.Bind().Form(form); err != nil {
+	if err := ctx.Bind().Form(form); err != nil {
+		if err = ctx.Bind().Body(form); err != nil {
 			RateLimitProcessor.Set(ctx)
 			return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 		}
@@ -42,11 +42,10 @@ func Step2(ctx fiber.Ctx) error {
 	err := json.Unmarshal(data, &MFAData)
 	if err != nil {
 		Logger.AccidentalFailure("[MFA2] Unmarshal Failed")
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Success:       false,
-				Notifications: []string{"Failed to read token (Encryptor issue)... Retrying"},
-			})
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Failed to read token (Encryptor issue)... Retrying"},
+		})
 	}
 	if MFAData.TokenType != tokenType {
 		RateLimitProcessor.Set(ctx)
@@ -55,48 +54,42 @@ func Step2(ctx fiber.Ctx) error {
 	if !OTPProcessor.Validate(MFAData.Step2Code, form.Verification) {
 		Logger.IntentionalFailure(fmt.Sprintf("[MFA2] Incorrect OTP for [UID-%d]", MFAData.UserID))
 		RateLimitProcessor.Set(ctx)
-		return ctx.Status(fiber.StatusOK).JSON(
-			ResponseModels.APIResponseT{
-				Success:       false,
-				Notifications: []string{"Incorrect OTP"},
-			})
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Incorrect OTP"},
+		})
 	}
 	if AccountProcessor.CheckUserIsBlacklisted(MFAData.UserID) {
 		Logger.IntentionalFailure(fmt.Sprintf("[MFA2] Blacklisted account [UID-%d] attempted Mfa", MFAData.UserID))
-		return ctx.Status(fiber.StatusOK).JSON(
-			ResponseModels.APIResponseT{
-				Success:       false,
-				Notifications: []string{"Your account is disabled, please contact support"},
-			})
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Your account is disabled, please contact support"},
+		})
 	}
 	MFAData.Verified = true
 	MFAData.Creation = time.Now().UTC()
 	data, err = json.Marshal(MFAData)
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("[MFA2] Marshal Failed for [UID-%d] reason: %s", MFAData.UserID, err.Error()))
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Success:       false,
-				Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
-			})
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
+		})
 	}
 	token, ok := StringProcessor.Encrypt(data)
 	if !ok {
 		Logger.AccidentalFailure(fmt.Sprintf("[MFA2] Encrypt Failed for [UID-%d]", MFAData.UserID))
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Success:       false,
-				Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
-			})
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
+		})
 	}
 	ResponseProcessor.AttachMFACookie(ctx, token)
 	Logger.Success(fmt.Sprintf("[MFA2] Successful for [UID-%d]", MFAData.UserID))
-	return ctx.Status(fiber.StatusOK).JSON(
-		ResponseModels.APIResponseT{
-			Success:       true,
-			Reply:         true,
-			Notifications: []string{"Verification complete"},
-		})
+	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+		Success:       true,
+		Notifications: []string{"Verification complete"},
+	})
 }
 
 func Step1(ctx fiber.Ctx) error {
@@ -112,11 +105,10 @@ func Step1(ctx fiber.Ctx) error {
 	}
 	verification, retry := OTPProcessor.Send(mail, fmt.Sprintf("%s:verified", ctx.IP()))
 	if verification == "" {
-		return ctx.Status(fiber.StatusOK).JSON(
-			ResponseModels.APIResponseT{
-				Success:       false,
-				Notifications: []string{fmt.Sprintf("Unable to send OTP, please try again after %.1f seconds", retry.Seconds())},
-			})
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{fmt.Sprintf("Unable to send OTP, please try again after %.1f seconds", retry.Seconds())},
+		})
 	}
 	MFAToken := TokenModels.MFATokenT{
 		TokenType: tokenType,
@@ -128,26 +120,23 @@ func Step1(ctx fiber.Ctx) error {
 	data, err := json.Marshal(MFAToken)
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("[MFA1] Marshal Failed for [UID-%d] reason: %s", refresh.UserID, err.Error()))
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Success:       false,
-				Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
-			})
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
+		})
 	}
 	token, ok := StringProcessor.Encrypt(data)
 	if !ok {
 		Logger.AccidentalFailure(fmt.Sprintf("[MFA1] Encrypt Failed for [UID-%d]", refresh.UserID))
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Success:       false,
-				Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
-			})
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
+		})
 	}
 	Logger.Success(fmt.Sprintf("[MFA1] Token Created for [UID-%d]", refresh.UserID))
-	return ctx.Status(fiber.StatusOK).JSON(
-		ResponseModels.APIResponseT{
-			Success:       true,
-			Reply:         token,
-			Notifications: []string{"Please enter the OTP sent to your mail"},
-		})
+	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+		Success:       true,
+		Reply:         token,
+		Notifications: []string{"Please enter the OTP sent to your mail"},
+	})
 }

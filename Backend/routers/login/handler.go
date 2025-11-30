@@ -34,8 +34,8 @@ const tokenType = "Login"
 func Step2(ctx fiber.Ctx) error {
 	form := new(Step2FormT)
 	var SignInData TokenModels.SignInT
-	if err := ctx.Bind().JSON(form); err != nil {
-		if err = ctx.Bind().Form(form); err != nil {
+	if err := ctx.Bind().Form(form); err != nil {
+		if err = ctx.Bind().Body(form); err != nil {
 			RateLimitProcessor.Set(ctx)
 			return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 		}
@@ -49,11 +49,10 @@ func Step2(ctx fiber.Ctx) error {
 	err := json.Unmarshal(data, &SignInData)
 	if err != nil {
 		Logger.AccidentalFailure("[Login2] Unmarshal Failed")
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Success:       false,
-				Notifications: []string{"Failed to read token (Encryptor issue)... Retrying"},
-			})
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Failed to read token (Encryptor issue)... Retrying"},
+		})
 	}
 	if SignInData.TokenType != tokenType {
 		RateLimitProcessor.Set(ctx)
@@ -62,52 +61,41 @@ func Step2(ctx fiber.Ctx) error {
 	if SignInData.Step2Process == "password" && !AccountProcessor.CheckPasswordMatches(SignInData.UserID, form.Verification) {
 		Logger.IntentionalFailure(fmt.Sprintf("[Login2] Incorrect Password for [UID-%d]", SignInData.UserID))
 		RateLimitProcessor.Set(ctx)
-		return ctx.Status(fiber.StatusOK).JSON(
-			ResponseModels.APIResponseT{
-				Success:       false,
-				Notifications: []string{"Incorrect Password"},
-			})
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Incorrect Password"},
+		})
 	}
 	if SignInData.Step2Process == "otp" && !OTPProcessor.Validate(SignInData.Step2Code, form.Verification) {
 		Logger.IntentionalFailure(fmt.Sprintf("[Login2] Incorrect OTP for [UID-%d]", SignInData.UserID))
 		RateLimitProcessor.Set(ctx)
-		return ctx.Status(fiber.StatusOK).JSON(
-			ResponseModels.APIResponseT{
-				Success:       false,
-				Notifications: []string{"Incorrect OTP"},
-			})
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Incorrect OTP"},
+		})
 	}
 	if AccountProcessor.CheckUserIsBlacklisted(SignInData.UserID) {
 		Logger.IntentionalFailure(fmt.Sprintf("[Login2] Blacklisted account [UID-%d] attempted login", SignInData.UserID))
-		return ctx.Status(fiber.StatusOK).JSON(
-			ResponseModels.APIResponseT{
-				Success:       false,
-				Notifications: []string{"Your account is disabled, please contact support"},
-			})
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Your account is disabled, please contact support"},
+		})
 	}
 	refreshID := Generators.RefreshID()
 	if !AccountProcessor.RecordReturningUser(SignInData.Mail, ctx.Get("User-Agent"), refreshID, SignInData.UserID, SignInData.RememberMe) {
 		Logger.AccidentalFailure(fmt.Sprintf("[Login2] Record Returning failed for [UID-%d]", SignInData.UserID))
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Success:       false,
-				Notifications: []string{"Failed to login (DB-write issue)... Retrying"},
-			})
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Failed to login (DB-write issue)... Retrying"},
+		})
 	}
-	token, ok := TokenProcessor.CreateFreshToken(
-		SignInData.UserID,
-		refreshID,
-		AccountProcessor.GetUserType(SignInData.UserID),
-		SignInData.RememberMe,
-		"email-login",
-	)
+	token, ok := TokenProcessor.CreateFreshToken(SignInData.UserID, refreshID, AccountProcessor.GetUserType(SignInData.UserID), SignInData.RememberMe, "email-login")
 	if !ok {
 		Logger.AccidentalFailure(fmt.Sprintf("[Login2] CreateFreshToken failed for [UID-%d]", SignInData.UserID))
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Success:       false,
-				Notifications: []string{"Failed to acquire session (Encryptor issue)... Retrying"},
-			})
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Failed to acquire session (Encryptor issue)... Retrying"},
+		})
 	}
 	ResponseProcessor.DetachMFACookies(ctx)
 	ResponseProcessor.AttachAuthCookies(ctx, token)
@@ -122,38 +110,34 @@ func Step2(ctx fiber.Ctx) error {
 		data, err = json.Marshal(MFAToken)
 		if err != nil {
 			Logger.AccidentalFailure(fmt.Sprintf("[Login2MFA] Marshal Failed for [UID-%d] reason: %s", SignInData.UserID, err.Error()))
-			return ctx.Status(fiber.StatusInternalServerError).JSON(
-				ResponseModels.APIResponseT{
-					Success:       false,
-					Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
-				})
+			return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+				Success:       false,
+				Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
+			})
 		}
 		mfatoken, ok = StringProcessor.Encrypt(data)
 		if !ok {
 			Logger.AccidentalFailure(fmt.Sprintf("[Login2MFA] Encrypt Failed for [UID-%d]", SignInData.UserID))
-			return ctx.Status(fiber.StatusInternalServerError).JSON(
-				ResponseModels.APIResponseT{
-					Success:       false,
-					Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
-				})
+			return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+				Success:       false,
+				Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
+			})
 		}
 		ResponseProcessor.AttachMFACookie(ctx, mfatoken)
 	}
 	Logger.Success(fmt.Sprintf("[Login2] Logged in: [UID-%d]", SignInData.UserID))
-	return ctx.Status(fiber.StatusOK).JSON(
-		ResponseModels.APIResponseT{
-			Success:       true,
-			Reply:         true,
-			ModifyAuth:    true,
-			NewToken:      token.AccessToken,
-			Notifications: []string{"Logged In Successfully"},
-		})
+	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+		Success:       true,
+		ModifyAuth:    true,
+		NewToken:      token.AccessToken,
+		Notifications: []string{"Logged In Successfully"},
+	})
 }
 
 func Step1(ctx fiber.Ctx) error {
 	form := new(Step1FormT)
-	if err := ctx.Bind().JSON(form); err != nil {
-		if err = ctx.Bind().Form(form); err != nil {
+	if err := ctx.Bind().Form(form); err != nil {
+		if err = ctx.Bind().Body(form); err != nil {
 			RateLimitProcessor.Set(ctx)
 			return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 		}
@@ -165,11 +149,10 @@ func Step1(ctx fiber.Ctx) error {
 	userID, found := AccountProcessor.GetIDFromMail(form.MailAddress)
 	if !found {
 		RateLimitProcessor.Set(ctx)
-		return ctx.Status(fiber.StatusOK).JSON(
-			ResponseModels.APIResponseT{
-				Success:       false,
-				Notifications: []string{"Account doesn't exist with the email"},
-			})
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Account doesn't exist with the email"},
+		})
 	}
 	process := ctx.Params("process")
 	SignInData := TokenModels.SignInT{
@@ -182,20 +165,18 @@ func Step1(ctx fiber.Ctx) error {
 	if process == "otp" {
 		verification, retry := OTPProcessor.Send(form.MailAddress, ctx.IP())
 		if verification == "" {
-			return ctx.Status(fiber.StatusOK).JSON(
-				ResponseModels.APIResponseT{
-					Success:       false,
-					Notifications: []string{fmt.Sprintf("Unable to send OTP, please try again after %.1f seconds", retry.Seconds())},
-				})
+			return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+				Success:       false,
+				Notifications: []string{fmt.Sprintf("Unable to send OTP, please try again after %.1f seconds", retry.Seconds())},
+			})
 		}
 		SignInData.Step2Code = verification
 	} else if process == "password" {
 		if !AccountProcessor.CheckUserHasPassword(userID) {
-			return ctx.Status(fiber.StatusOK).JSON(
-				ResponseModels.APIResponseT{
-					Success:       false,
-					Notifications: []string{"Password has not been set. Please use OTP/SSO to login"},
-				})
+			return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+				Success:       false,
+				Notifications: []string{"Password has not been set. Please use OTP/SSO to login"},
+			})
 		}
 		SignInData.Step2Code = ""
 	} else {
@@ -205,26 +186,23 @@ func Step1(ctx fiber.Ctx) error {
 	data, err := json.Marshal(SignInData)
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("[Login1] Marshal Failed for [UID-%d] reason: %s", userID, err.Error()))
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Success:       false,
-				Notifications: []string{"Failed to acquire token (Parser issue)... Retrying"},
-			})
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Failed to acquire token (Parser issue)... Retrying"},
+		})
 	}
 	token, ok := StringProcessor.Encrypt(data)
 	if !ok {
 		Logger.AccidentalFailure(fmt.Sprintf("[Login1] Encrypt Failed for [UID-%d]", userID))
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Success:       false,
-				Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
-			})
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
+		})
 	}
 	Logger.Success(fmt.Sprintf("[Login1] Token Created for [UID-%d]", userID))
-	return ctx.Status(fiber.StatusOK).JSON(
-		ResponseModels.APIResponseT{
-			Success:       true,
-			Reply:         token,
-			Notifications: []string{fmt.Sprintf("Please enter the %s", process)},
-		})
+	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+		Success:       true,
+		Reply:         token,
+		Notifications: []string{fmt.Sprintf("Please enter the %s", process)},
+	})
 }

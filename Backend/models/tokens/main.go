@@ -25,6 +25,7 @@ type SignUpT struct {
 
 type PasswordResetT struct {
 	TokenType string `json:"tt"`
+	Mail      string `json:"mail"`
 	UserID    uint32 `json:"uid"`
 	Step2Code string `json:"2_code"`
 }

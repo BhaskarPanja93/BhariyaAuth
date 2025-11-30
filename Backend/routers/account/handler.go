@@ -78,7 +78,6 @@ func ProcessRefresh(ctx fiber.Ctx) error {
 	Logger.Success(fmt.Sprintf("[ProcessRefresh] Success for [UID-%d-RID-%d]", refresh.UserID, refresh.RefreshID))
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 		Success:    true,
-		Reply:      true,
 		ModifyAuth: true,
 		NewToken:   token.AccessToken,
 	})
@@ -93,7 +92,6 @@ func ProcessLogout(ctx fiber.Ctx) error {
 	ResponseProcessor.DetachAuthCookies(ctx)
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 		Success:       true,
-		Reply:         true,
 		ModifyAuth:    true,
 		Notifications: []string{"Logged Out Successfully"},
 	})

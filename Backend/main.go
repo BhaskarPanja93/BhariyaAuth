@@ -18,8 +18,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v3"
-	"github.com/gofiber/fiber/v3/middleware/recover"
 )
 
 func ReceiveCLIFlags(MainApp *fiber.App) {
@@ -90,10 +90,11 @@ func main() {
 		WriteTimeout:     30 * time.Second,
 		BodyLimit:        10 * 1024,
 		TrustProxyConfig: fiber.TrustProxyConfig{Loopback: true},
+		JSONEncoder:      json.Marshal,
+		JSONDecoder:      json.Unmarshal,
 	})
 
 	MainApp.Use(Middlewares.ProfilingMiddleware())
-	MainApp.Use(recover.New())
 
 	AuthApp := MainApp.Group("/auth")
 
