@@ -6,7 +6,7 @@ import '../index.css'
 import Login from './Structures/Login.jsx'
 import RegisterPage from './Structures/Register.jsx'
 import Mfa from "./Structures/Mfa.jsx";
-import ResetPassword from "./Structures/ResetPassword.jsx";
+import PasswordReset from "./Structures/PasswordReset.jsx";
 import Sessions from "./Structures/Sessions.jsx";
 import {NotificationProvider} from "./Contexts/Notification.jsx";
 import {ConnectionProvider} from "./Contexts/Connection.jsx";
@@ -19,7 +19,7 @@ createRoot(document.getElementById('root')).render(
                     <Route path="/login" element={<Login/>}/>
                     <Route path="/register" element={<RegisterPage/>}/>
                     <Route path="/mfa" element={<Mfa/>}/>
-                    <Route path="/forgotPassword" element={<ResetPassword/>}/>
+                    <Route path="/passwordreset" element={<PasswordReset/>}/>
                     <Route path="/sessions" element={<Sessions/>}/>
 
                     <Route path="/" element={<Navigate to="/login" replace/>}/>

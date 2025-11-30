@@ -66,10 +66,10 @@ export default function Login() {
         const form = new FormData();
         form.append("token", tokens.current[email][useOtp]);
         form.append("verification", verification);
-        privateAPI.post(BackendURL + "/login/step2", form)
+        privateAPI.post(BackendURL + "/login/step2", form, {forLogin: true})
             .then((data) => {
                 if (data["success"]) {
-                    navigate("/sessions");
+                    //navigate("/sessions");
                 }
             })
             .catch((error)=>{console.log("Login Step2 stopped because:", error)})

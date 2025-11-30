@@ -11,7 +11,7 @@ import OTPInput from "../Elements/OTPInput.jsx";
 import {BackendURL} from "../Values/Constants.js";
 import {FetchConnectionManager} from "../Contexts/Connection.jsx";
 import {FetchNotificationManager} from "../Contexts/Notification.jsx";
-import {EmailIsValid, NameIsValid, PasswordIsStrong} from "../Utils/Strings.js";
+import {EmailIsValid, NameIsValid, OTPIsValid, PasswordIsStrong} from "../Utils/Strings.js";
 
 export default function RegisterPage() {
     const navigate = useNavigate();
@@ -24,7 +24,7 @@ export default function RegisterPage() {
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [passwordConfirmation, setPasswordConfirmation] = useState("")
-    const [otp, setOTP] = useState("");
+    const [verification, setVerification] = useState("");
     const [name, setName] = useState("")
 
     const currentToken = useRef("")
@@ -57,12 +57,13 @@ export default function RegisterPage() {
 
     const Step2 = () => {
         if (!currentToken.current) return SendNotification("Step 1 incomplete. Please enter email again");
+        if (!OTPIsValid(verification)) return SendNotification("Incorrect OTP");
 
         setUiDisabled(true);
         const form = new FormData();
         form.append("token", currentToken.current);
-        form.append("verification", otp);
-        privateAPI.post(BackendURL + "/register/step2", form, {})
+        form.append("verification", verification);
+        privateAPI.post(BackendURL + "/register/step2", form, {forRegister: true})
             .then((data) => {
                 if (data["success"]) {
                     navigate("/sessions")
@@ -108,7 +109,7 @@ export default function RegisterPage() {
                         <button type="button" onClick={() => Step1(true)} className="flex-end text-xs text-indigo-400 hover:underline">
                             Resend OTP
                         </button>
-                        <OTPInput value={otp} onValueChange={setOTP} disabled={uiDisabled}/></>}
+                        <OTPInput value={verification} onValueChange={setVerification} disabled={uiDisabled}/></>}
                     <SubmitButton text={currentStep === 1 ? "Verify Email" : "VERIFY OTP"}
                                   onClick={currentStep === 1 ? Step1 : Step2} disabled={uiDisabled}/>
                     <Divider/>

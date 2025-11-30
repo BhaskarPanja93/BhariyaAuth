@@ -217,14 +217,20 @@ export const ConnectionProvider = ({children}) => {
 
         if (status === 200) {
             ResetGatewayErrors(config.host)
-            if (response.forTokenRefresh || response.forLogout) {
-                if (data["auth-modified"]) {
+            if (config.forTokenRefresh || config.forLogout || config.forLogin || config.forRegister) {
+                if (data["modify-auth"]) {
                     AccessToken.current = data["new-token"]
                     if (window.opener) {
                         window.opener.postMessage({success: true, token: AccessToken.current}, window.location.origin);
                         window.close();
                     }
+                    await Sleep(10000)
                 }
+            }
+
+            if (config.forMFA && window.opener && data["success"]) {
+                window.opener.postMessage({success: true, token: AccessToken.current}, window.location.origin);
+                window.close();
             }
             return Promise.resolve({success: data.success, reply: data.reply})
         }

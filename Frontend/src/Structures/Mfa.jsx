@@ -42,10 +42,10 @@ export default function Mfa() {
         const form = new FormData();
         form.append("token", currentToken.current);
         form.append("verification", verification);
-        privateAPI.post(BackendURL + "/mfa/step2", form)
+        privateAPI.post(BackendURL + "/mfa/step2", form, {forMFA: true})
             .then((data) => {
                 if (data["success"]) {
-                    navigate("/sessions");
+                    //navigate("/sessions");
                 }
             })
             .catch((error)=>{console.log("Mfa Step2 stopped because:", error)})
