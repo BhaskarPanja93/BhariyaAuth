@@ -74,11 +74,9 @@ export default function PasswordReset({disabled}) {
                         </h2>
                     </div>
                     <div className="space-y-4">
+                        <EmailInput value={email} onValueChange={setEmail} disabled={uiDisabled || currentStep !== 1} hidden={currentStep === 2}/>
                         {currentStep === 1 ?
-                            <>
-                                <EmailInput value={email} onValueChange={setEmail} disabled={uiDisabled || currentStep !== 1}/>
-                                <SubmitButton text={"Send OTP"} onClick={Step1} disabled={disabled || currentStep !== 1}/>
-                            </>
+                            <SubmitButton text={"Send OTP"} onClick={Step1} disabled={disabled || currentStep !== 1}/>
                             :
                             <>
                                 <OTPInput value={verification} onValueChange={setVerification} disabled={uiDisabled || currentStep !== 2}/>
