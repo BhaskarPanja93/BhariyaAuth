@@ -7,7 +7,7 @@ export default function PasswordInput({ value, onValueChange, confirm, onConfirm
             <div className="relative">
 
                 <input name='password' type={visible ? 'text' : 'password'} value={value} onChange={(e) => onValueChange(e.target.value)} disabled={disabled} placeholder='Password'
-                       className="w-full px-4 py-3 rounded-md bg-[#0b0f14] border border-gray-700 text-sm text-white placeholder:opacity-40" />
+                       className="w-full px-4 py-3 rounded-md bg-[#0b0f14] border border-gray-700 text-sm text-white placeholder:opacity-40" autoComplete="current-password" />
 
                 <button type="button" onClick={()=>setVisible(v => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm" aria-label="Toggle password visibility">
                     {visible ? (

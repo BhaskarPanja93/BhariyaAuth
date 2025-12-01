@@ -77,13 +77,21 @@ export default function Sessions() {
                 className="rounded-2xl p-6 md:p-8 flex flex-col overflow-hidden box-border mx-auto"
                 style={{
                     background: "linear-gradient(180deg, rgba(12,14,18,0.9), rgba(7,8,10,0.85))", border: "1px solid rgba(255,255,255,0.02)"
-                }}
-            >
-                <div className="flex items-center gap-10 mb-6 text-md font-medium p-3 rounded-lg border-2 border-gray-800 justify-center">
-                    {[{label: "LoginPage", href: "/auth/login"}, {label: "Register", href: "/auth/register"}, {label: "MFA", href: "/auth/mfa"}, {label: "Change Password", href: "/auth/passwordreset"}].map(item => <a key={item.href} href={item.href} className=" relative text-gray-300 hover:text-white transition after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-[2px] after:bg-indigo-500 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:origin-left">
-                        {item.label}
-                    </a>)}
+                }}>
+                <div className="flex flex-wrap items-center gap-6 md:gap-10 mb-6 text-md font-medium p-3 rounded-lg border-2 border-gray-800 justify-center">
+                    {[{label: "Login", href: "/auth/login"},
+                        {label: "Register", href: "/auth/register"},
+                        {label: "MFA", href: "/auth/mfa"},
+                        {label: "Change Password", href: "/auth/passwordreset"}].map(item => (
+                        <a
+                            key={item.href}
+                            href={item.href}
+                            className="relative text-gray-300 hover:text-white transition after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-[2px] after:bg-indigo-500 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:origin-left">
+                            {item.label}
+                        </a>
+                    ))}
                 </div>
+
                 <div className="flex items-center justify-between mb-6">
                     <h1 className="text-lg md:text-xl font-semibold text-white">Your devices where you are signed in</h1>
 

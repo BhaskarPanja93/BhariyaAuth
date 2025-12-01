@@ -42,7 +42,7 @@ export default function ConnectionProvider ({children}) {
     const OpenLoginPopup = () => {
         if (currentLoginPopup.current) return currentLoginPopup.current;
         currentLoginPopup.current = new Promise(async (resolve, _) => {
-            const popup = window.open(FrontendURL+"/login", "_blank", "width=500,height=600");
+            const popup = window.open(FrontendURL+"/login", "_blank");
             if (!popup) {
                 SendNotification("Please allow popups to proceed with LoginPage")
                 await Sleep(1)
@@ -86,7 +86,7 @@ export default function ConnectionProvider ({children}) {
     const OpenMFAPopup = () => {
         if (currentMFAPopup.current) return currentMFAPopup.current;
         currentMFAPopup.current = new Promise(async (resolve, _) => {
-            const popup = window.open(FrontendURL + "/mfa", "_blank", "width=500,height=600");
+            const popup = window.open(FrontendURL + "/mfa", "_blank");
             if (!popup) {
                 SendNotification("Please allow popups to proceed with MFA")
                 await Sleep(1)
@@ -241,13 +241,6 @@ export default function ConnectionProvider ({children}) {
 
     const ResponseRejectedInterceptor = async (error) => {
         const response = error.response;
-        if (!response)
-        {
-            SendNotification("Unable to connect to the internet")
-            await Sleep(3000)
-            return await RetryRequest(privateAPI, error.config)
-        }
-
         const config = response.config;
         const data = response.data;
         const status = response.status;

@@ -102,8 +102,8 @@ export default function LoginPage() {
 
                 </div>
                 <div className="space-y-4">
+                    <EmailInput value={email} onValueChange={setEmail} disabled={uiDisabled || currentStep !== 1} hidden={currentStep === 2} />
                     {currentStep === 1 && <>
-                        <EmailInput value={email} onValueChange={setEmail} disabled={uiDisabled || currentStep !== 1}/>
                         <RememberCheckbox checked={remember} onCheckedChange={setRemember}
                                           disabled={uiDisabled || currentStep !== 1}/>
                     </>}
@@ -121,6 +121,7 @@ export default function LoginPage() {
                             </div>
                         </div>
                         {(currentStep === 2 && tokens.current[email] && tokens.current[email][useOtp]) &&
+
                             <div className="mt-3">
                                 {useOtp ? <OTPInput value={verification} onValueChange={setVerification}
                                                     disabled={uiDisabled}/> :

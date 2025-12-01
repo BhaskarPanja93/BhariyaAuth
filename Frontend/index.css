@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+body {
+    overflow: hidden;
+}
+
 ::-webkit-scrollbar {
     display: none;
 }
