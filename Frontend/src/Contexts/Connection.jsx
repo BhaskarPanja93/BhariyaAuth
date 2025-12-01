@@ -9,13 +9,14 @@ import {BackendURL, CSRFCookiePath, FrontendDomain, FrontendURL, MFACookiePath} 
  * @typedef {Object} ConnectionContextType
  * @property {import("axios").AxiosInstance} publicAPI
  * @property {import("axios").AxiosInstance} privateAPI
- * @property {(URL: string) => Promise} OpenAuthPopup
+ * @property {(URL: string) => Promise} OpenLoginPopup
+ * @property {() => Promise} RefreshToken
  * @property {() => Promise} Logout
  */
 
 /** @type {import('react').Context<ConnectionContextType | null>} */
 const ConnectionContext = createContext(null);
-export const ConnectionProvider = ({children}) => {
+export default function ConnectionProvider ({children}) {
     const {SendNotification} = FetchNotificationManager();
     const AccessToken = useRef("")
 
@@ -24,31 +25,39 @@ export const ConnectionProvider = ({children}) => {
         return GatewayErrors.current[host] || 0
     }
     const ResetGatewayErrors = (host) => {
+        if (GatewayErrors.current[host] !== 0 && !isNaN(GatewayErrors.current[host]))
+            SendNotification("Server is back online")
         GatewayErrors.current[host] = 0
     }
     const IncrementGatewayErrors = (host) => {
-        if (GatewayErrors.current[host] != null) GatewayErrors.current[host]++
-        else GatewayErrors.current[host] = 1
+        if (isNaN(GatewayErrors.current[host]))
+            GatewayErrors.current[host] = 0
+
+        if (GatewayErrors.current[host] === 0)
+            SendNotification("Server unreachable. Retrying..")
+        GatewayErrors.current[host] = 1
     }
 
-    const currentAuthPopups = useRef({});
-    const OpenAuthPopup = (URL) => {
-        if (currentAuthPopups.current[URL]) return currentAuthPopups.current[URL];
-        currentAuthPopups.current[URL] = new Promise(async (resolve, _) => {
-            const popup = window.open(URL, "_blank", "width=500,height=600");
+    const currentLoginPopup = useRef(null);
+    const OpenLoginPopup = () => {
+        if (currentLoginPopup.current) return currentLoginPopup.current;
+        currentLoginPopup.current = new Promise(async (resolve, _) => {
+            const popup = window.open(FrontendURL+"/login", "_blank", "width=500,height=600");
             if (!popup) {
-                SendNotification("Please allow popups to proceed..")
+                SendNotification("Please allow popups to proceed with LoginPage")
+                await Sleep(1)
+                currentLoginPopup.current = null
                 return resolve(false);
             }
             let finished = false;
             function onMessage(event) {
                 if (event.source === popup && event.origin === FrontendDomain) {
                     window.removeEventListener("message", onMessage);
-                    popup.close();
                     if (event.data && event.data && event.data.success) {
                         if (event.data["token"]) {
                             finished = true;
                             AccessToken.current = event.data["token"]
+                            currentLoginPopup.current = null;
                             if (window.opener) {
                                 window.opener.postMessage({success: true, token: AccessToken.current}, window.location.origin);
                                 window.close();
@@ -59,9 +68,9 @@ export const ConnectionProvider = ({children}) => {
                 }
             }
             window.addEventListener("message", onMessage);
-            while (!popup.closed) await Sleep(500)
-            currentAuthPopups.current[URL] = null;
+            while (!popup.closed) await Sleep(200)
             if (!finished) {
+                currentLoginPopup.current = null;
                 window.removeEventListener("message", onMessage);
                 if (window.opener) {
                     window.opener.postMessage({success: false}, window.location.origin);
@@ -70,7 +79,7 @@ export const ConnectionProvider = ({children}) => {
                 return resolve(false);
             }
         });
-        return currentAuthPopups.current[URL];
+        return currentLoginPopup.current;
     }
 
     const currentMFAPopup = useRef(null);
@@ -79,16 +88,18 @@ export const ConnectionProvider = ({children}) => {
         currentMFAPopup.current = new Promise(async (resolve, _) => {
             const popup = window.open(FrontendURL + "/mfa", "_blank", "width=500,height=600");
             if (!popup) {
-                SendNotification("Please allow popups to proceed..")
+                SendNotification("Please allow popups to proceed with MFA")
+                await Sleep(1)
+                currentMFAPopup.current = null
                 return resolve(false);
             }
             let finished = false;
             function onMessage(event) {
                 if (event.source === popup && event.origin === FrontendURL) {
                     window.removeEventListener("message", onMessage);
-                    popup.close();
                     if (event.data && event.data && event.data.success) {
                         finished = true;
+                        currentMFAPopup.current = null;
                         if (window.opener) {
                             window.opener.postMessage({success: true}, window.location.origin);
                             window.close();
@@ -98,9 +109,9 @@ export const ConnectionProvider = ({children}) => {
                 }
             }
             window.addEventListener("message", onMessage);
-            while (!popup.closed) await Sleep(500)
-            currentMFAPopup.current[URL] = null;
+            while (!popup.closed) await Sleep(200)
             if (!finished) {
+                currentMFAPopup.current = null;
                 window.removeEventListener("message", onMessage);
                 if (window.opener) {
                     window.opener.postMessage({success: false}, window.location.origin);
@@ -115,7 +126,6 @@ export const ConnectionProvider = ({children}) => {
     const currentPings = useRef({});
     const IsServerOnline = (host) => {
         if (currentPings.current[host] != null) return currentPings.current[host];
-        SendNotification("Pinging:" + host)
         currentPings.current[host] = new Promise((resolve, _) => {
             privateAPI.get(BackendURL+"/status/ping", {
                 forServerConnectionCheck: true
@@ -131,14 +141,12 @@ export const ConnectionProvider = ({children}) => {
     }
 
     const currentLogout = useRef(null);
-    const Logout = async () => {
-        if (currentLogout.current) return await currentLogout.current
-        const currentCSRF = Cookies.get(CSRFCookiePath)
-        if (!currentCSRF) return Promise.resolve(false)
+    const Logout = () => {
+        if (currentLogout.current) return currentLogout.current
         currentLogout.current = new Promise((resolve, _) => {
-            axios.post(BackendURL + "/account/logout", {
+            privateAPI.post(BackendURL + "/account/logout", null, {
                 requiresCSRF: true,
-                forLogout: true,
+                forAccessFetch: true,
             }).then(()=>{
                 resolve(true)
             }).catch(() => {
@@ -151,20 +159,17 @@ export const ConnectionProvider = ({children}) => {
     }
 
     const currentRefresh = useRef(null);
-    const RefreshToken = async (skipLogin) => { // Create and return a new promise that resolves when the token is refreshed or fails resolving to a boolean.
-        if (currentRefresh.current) return await currentRefresh.current
-        const currentCSRF = Cookies.get(CSRFCookiePath)
-        if (!currentCSRF) return Promise.resolve(false)
+    const RefreshToken = () => { // Create and return a new promise that resolves when the token is refreshed or fails resolving to a boolean.
+        if (currentRefresh.current) return currentRefresh.current
         currentRefresh.current = new Promise((resolve, _) => {
-            axios.get(BackendURL + "/account/refresh", {
+            privateAPI.post(BackendURL + "/account/refresh", null, {
                 requiresCSRF: true,
                 forTokenRefresh: true,
-                skipLogin: skipLogin
+                forAccessFetch: true,
             }).then(()=>{
                 SendNotification("Access refreshed..")
                 resolve(true)
             }).catch(() => {
-                if (!skipLogin) SendNotification("Unable to authenticate you. Please refresh tab")
                 resolve(false)
             }).finally(() => {
                 currentRefresh.current = null;
@@ -189,18 +194,19 @@ export const ConnectionProvider = ({children}) => {
         if (gatewayFailures > 0) await Sleep(Math.min(1000 * gatewayFailures, 3000))
         if (!config.forServerConnectionCheck) {
             while (gatewayFailures > 0) {
-                SendNotification("Unable to reach server, waiting for reconnection..")
                 await IsServerOnline(config.host)
             }
-            if (AccessToken.current !== "") config.headers["Authorization"] = AccessToken.current;
-            if (config.requiresCSRF) {
-                config.headers["CSRF"] = Cookies.get(CSRFCookiePath);
-                if (!config.headers["CSRF"]) return Promise.reject(config)
-            }
-            if (config.requiresMFA) {
-                config.headers["MFA"] = Cookies.get(MFACookiePath);
-                if (!config.headers["MFA"]) return Promise.reject(config)
-            }
+        }
+        if (AccessToken.current !== "") config.headers["Authorization"] = AccessToken.current;
+        if (config.requiresCSRF) {
+            let csrf = Cookies.get(CSRFCookiePath);
+            if (!csrf) return Promise.reject(config)
+            config.headers["CSRF"] = csrf
+        }
+        if (config.requiresMFA) {
+            let mfa = Cookies.get(MFACookiePath);
+            if (!mfa) return Promise.reject(config)
+            config.headers["MFA"] = mfa
         }
         return config
     }
@@ -213,23 +219,20 @@ export const ConnectionProvider = ({children}) => {
         const config = response.config;
         const data = response.data;
         const status = response.status;
-        if (data["notifications"]) data["notifications"].forEach((notification) => SendNotification(notification))
+        if (data && data["notifications"]) data["notifications"].forEach((notification) => SendNotification(notification))
 
         if (status === 200) {
             ResetGatewayErrors(config.host)
-            if (config.forTokenRefresh || config.forLogout || config.forLogin || config.forRegister) {
-                if (data["modify-auth"]) {
-                    AccessToken.current = data["new-token"]
-                    if (window.opener) {
-                        window.opener.postMessage({success: true, token: AccessToken.current}, window.location.origin);
-                        window.close();
-                    }
-                    await Sleep(10000)
+            if (config.forAccessFetch && data["modify-auth"]) {
+                AccessToken.current = data["new-token"]
+                if (!config.forTokenRefresh && window.opener) {
+                    window.opener.postMessage({success: true, token: AccessToken.current}, window.location.origin);
+                    window.close();
                 }
             }
 
             if (config.forMFA && window.opener && data["success"]) {
-                window.opener.postMessage({success: true, token: AccessToken.current}, window.location.origin);
+                window.opener.postMessage({success: true}, window.location.origin);
                 window.close();
             }
             return Promise.resolve({success: data.success, reply: data.reply})
@@ -238,6 +241,13 @@ export const ConnectionProvider = ({children}) => {
 
     const ResponseRejectedInterceptor = async (error) => {
         const response = error.response;
+        if (!response)
+        {
+            SendNotification("Unable to connect to the internet")
+            await Sleep(3000)
+            return await RetryRequest(privateAPI, error.config)
+        }
+
         const config = response.config;
         const data = response.data;
         const status = response.status;
@@ -245,23 +255,17 @@ export const ConnectionProvider = ({children}) => {
 
         // Not authenticated
         if (status === 401) {
-            if (config.forTokenRefresh) {
-                if (!config.skipLogin) {
-                    if (await OpenAuthPopup(FrontendURL+"/login"))
-                        return Promise.resolve({success: data.success, reply: data.reply})
-                    else
-                        return Promise.reject("Authentication stopped")
-                }
-            } else {
-                if (await RefreshToken(true)) {
+            if (!config.forTokenRefresh) {
+                if (await RefreshToken()) {
                     return await RetryRequest(privateAPI, config)
                 } else if (!config.skipLogin) {
-                    if (await OpenAuthPopup(FrontendURL+"/login"))
+                    if (await OpenLoginPopup())
                         return await RetryRequest(privateAPI, config)
                     else
                         return Promise.reject("Authentication stopped")
                 }
             }
+            return Promise.reject("Not authenticated")
         }
 
         // Incomplete authentication (Mfa required)
@@ -279,7 +283,7 @@ export const ConnectionProvider = ({children}) => {
 
         // Incomplete form/parameters
         else if (status === 422) {
-            SendNotification("Frontend has errors, please report this to admin.")
+            SendNotification("Frontend has errors, please refresh and retry or report this to admin.")
             return Promise.reject("Frontend Errors")
         }
 
@@ -293,23 +297,19 @@ export const ConnectionProvider = ({children}) => {
 
         // Server internal error
         else if (status === 500) {
-            if (isNaN(config.serverInternalErrorCount)) {
-                config.serverInternalErrorCount = 1
-            } else {
-                config.serverInternalErrorCount += 1
-            }
-            if (config.serverInternalErrorCount < 3) {
-                await Sleep(config.serverInternalErrorCount * 1000)
+            if (isNaN(config.serverErrorCount))
+                config.serverErrorCount = 0
+            config.serverErrorCount += 1
+            if (config.serverErrorCount < 3) {
+                await Sleep(config.serverErrorCount * 1000)
                 return await RetryRequest(privateAPI, config)
             }
-            return Promise.reject("Server internal error")
+            return Promise.reject("Server error")
         }
 
         // Server unreachable
         else if (status === 502 || status === 504) {
-            SendNotification("Server unreachable. Retrying..")
             IncrementGatewayErrors(config.host)
-            config.gatewayErrorCount += 1
             return await RetryRequest(privateAPI, config)
         }
 
@@ -325,7 +325,7 @@ export const ConnectionProvider = ({children}) => {
     privateAPI.interceptors.request.use(RequestFulfilledInterceptor, RequestRejectedInterceptor)
     privateAPI.interceptors.response.use(ResponseFulfilledInterceptor, ResponseRejectedInterceptor)
 
-    return (<ConnectionContext.Provider value={{publicAPI, privateAPI, OpenAuthPopup, Logout}}>
+    return (<ConnectionContext.Provider value={{publicAPI, privateAPI, OpenLoginPopup, RefreshToken, Logout}}>
         {children}
     </ConnectionContext.Provider>);
 };

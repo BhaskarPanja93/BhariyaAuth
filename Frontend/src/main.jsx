@@ -1,31 +1,29 @@
-import React from "react";
+import React, {lazy, Suspense} from "react";
 import {BrowserRouter, Navigate, Route, Routes} from 'react-router-dom';
 import {createRoot} from 'react-dom/client'
 import '../index.css'
 
-import Login from './Structures/Login.jsx'
-import RegisterPage from './Structures/Register.jsx'
-import Mfa from "./Structures/Mfa.jsx";
-import PasswordReset from "./Structures/PasswordReset.jsx";
-import Sessions from "./Structures/Sessions.jsx";
-import {NotificationProvider} from "./Contexts/Notification.jsx";
-import {ConnectionProvider} from "./Contexts/Connection.jsx";
+const NotificationProvider = lazy(() => import('./Contexts/Notification'))
+const ConnectionProvider = lazy(() => import('./Contexts/Connection'))
+const LoginStructure = lazy(() => import('./Structures/Login'))
+const RegisterStructure = lazy(() => import('./Structures/Register'))
+const SessionsStructure = lazy(() => import('./Structures/Sessions'))
+const PasswordResetStructure = lazy(() => import('./Structures/PasswordReset'))
+const MfaStructure = lazy(() => import('./Structures/Mfa'))
 
-createRoot(document.getElementById('root')).render(
-    <NotificationProvider>
-        <ConnectionProvider>
-            <BrowserRouter>
+createRoot(document.getElementById('root')).render(<BrowserRouter basename="/auth">
+    <Suspense fallback={null}>
+        <NotificationProvider>
+            <ConnectionProvider>
                 <Routes>
-                    <Route path="/login" element={<Login/>}/>
-                    <Route path="/register" element={<RegisterPage/>}/>
-                    <Route path="/mfa" element={<Mfa/>}/>
-                    <Route path="/passwordreset" element={<PasswordReset/>}/>
-                    <Route path="/sessions" element={<Sessions/>}/>
-
-                    <Route path="/" element={<Navigate to="/login" replace/>}/>
-                    <Route path="*" element={<div className="p-6">Page not found</div>}/>
+                    <Route path="/login" element={<LoginStructure/>}/>
+                    <Route path="/register" element={<RegisterStructure/>}/>
+                    <Route path="/sessions" element={<SessionsStructure/>}/>
+                    <Route path="/mfa" element={<MfaStructure/>}/>
+                    <Route path="/passwordreset" element={<PasswordResetStructure/>}/>
+                    <Route path="*" element={<Navigate to="/sessions" replace/>}/>
                 </Routes>
-            </BrowserRouter>
-        </ConnectionProvider>
-    </NotificationProvider>
-)
+            </ConnectionProvider>
+        </NotificationProvider>
+    </Suspense>
+</BrowserRouter>);

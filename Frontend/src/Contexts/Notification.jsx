@@ -8,7 +8,7 @@ import React, {createContext, useContext, useEffect, useRef, useState} from "rea
 /**@type {import('react').Context<NotificationContextType | null>} */
 const NotificationContext = createContext(null)
 
-export const NotificationProvider = ({children}) => {
+export default function NotificationProvider({children}) {
     const [notifications, setNotifications] = useState([]);
     const nextId = useRef(0);
 

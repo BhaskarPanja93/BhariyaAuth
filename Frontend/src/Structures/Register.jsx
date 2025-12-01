@@ -56,14 +56,14 @@ export default function RegisterPage() {
     };
 
     const Step2 = () => {
-        if (!currentToken.current) return SendNotification("Step 1 incomplete. Please enter email again");
+        if (!currentToken.current) return SendNotification("Step 1 incomplete. Please resend OTP");
         if (!OTPIsValid(verification)) return SendNotification("Incorrect OTP");
 
         setUiDisabled(true);
         const form = new FormData();
         form.append("token", currentToken.current);
         form.append("verification", verification);
-        privateAPI.post(BackendURL + "/register/step2", form, {forRegister: true})
+        privateAPI.post(BackendURL + "/register/step2", form, {forAccessFetch: true})
             .then((data) => {
                 if (data["success"]) {
                     navigate("/sessions")
@@ -106,7 +106,7 @@ export default function RegisterPage() {
                         <RememberCheckbox checked={remember} onCheckedChange={setRemember} disabled={currentStep !== 1 || uiDisabled}/>
                     </>}
                     {currentStep === 2 && <>
-                        <button type="button" onClick={() => Step1(true)} className="flex-end text-xs text-indigo-400 hover:underline">
+                        <button type="button" onClick={Step1} className="flex-end text-xs text-indigo-400 hover:underline">
                             Resend OTP
                         </button>
                         <OTPInput value={verification} onValueChange={setVerification} disabled={uiDisabled}/></>}

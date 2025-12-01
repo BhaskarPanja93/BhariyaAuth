@@ -42,7 +42,7 @@ export default function PasswordReset({disabled}) {
     };
 
     const Step2 = () => {
-        if (!currentToken.current) return SendNotification("Step 1 incomplete. Please enter email again");
+        if (!currentToken.current) return SendNotification("Step 1 incomplete. Please resend OTP");
         if (password !== passwordConfirmation) return SendNotification("Passwords don't match")
         if (!OTPIsValid(verification)) return SendNotification("Incorrect OTP");
 
@@ -54,7 +54,7 @@ export default function PasswordReset({disabled}) {
         privateAPI.post(BackendURL + "/passwordreset/step2", form)
             .then((data) => {
                 if (data["success"]) {
-                    //navigate("/sessions")
+                    navigate("/sessions")
                 }
             })
             .catch((error)=>{console.log("PasswordReset Step2 stopped because:", error)})

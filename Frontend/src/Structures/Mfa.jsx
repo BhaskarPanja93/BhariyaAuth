@@ -45,7 +45,7 @@ export default function Mfa() {
         privateAPI.post(BackendURL + "/mfa/step2", form, {forMFA: true})
             .then((data) => {
                 if (data["success"]) {
-                    //navigate("/sessions");
+                    navigate("/sessions");
                 }
             })
             .catch((error)=>{console.log("Mfa Step2 stopped because:", error)})

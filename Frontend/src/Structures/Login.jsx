@@ -13,7 +13,7 @@ import {EmailIsValid, OTPIsValid, PasswordIsStrong} from "../Utils/Strings.js";
 import Divider from "../Elements/Divider.jsx";
 import {FetchNotificationManager} from "../Contexts/Notification.jsx";
 
-export default function Login() {
+export default function LoginPage() {
     const navigate = useNavigate()
     const {SendNotification} = FetchNotificationManager();
     const {privateAPI} = FetchConnectionManager()
@@ -44,11 +44,11 @@ export default function Login() {
             .then((data) => {
                 if (data["success"]) {
                     tokens.current[email][tryOTP] = data["reply"]
-                    setUseOtp(tryOTP)
                     setCurrentStep(2)
+                    setUseOtp(tryOTP)
                 }
             })
-            .catch((error)=>{console.log("Login Step1 stopped because:", error)})
+            .catch((error)=>{console.log("LoginPage Step1 stopped because:", error)})
             .finally(() => {
                 setUiDisabled(false);
             });
@@ -66,13 +66,13 @@ export default function Login() {
         const form = new FormData();
         form.append("token", tokens.current[email][useOtp]);
         form.append("verification", verification);
-        privateAPI.post(BackendURL + "/login/step2", form, {forLogin: true})
+        privateAPI.post(BackendURL + "/login/step2", form, {forAccessFetch: true})
             .then((data) => {
                 if (data["success"]) {
-                    //navigate("/sessions");
+                    navigate("/sessions");
                 }
             })
-            .catch((error)=>{console.log("Login Step2 stopped because:", error)})
+            .catch((error)=>{console.log("LoginPage Step2 stopped because:", error)})
             .finally(() => {
                 setUiDisabled(false);
             });

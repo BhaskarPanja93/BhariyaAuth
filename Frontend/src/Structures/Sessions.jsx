@@ -8,8 +8,8 @@ export default function Sessions() {
 
     const [loading, setLoading] = useState(false)
     const userID = useRef("");
-    const currentDevice = useRef(null);
-    const otherDevices = useRef([]);
+    const currentSession = useRef(null);
+    const otherSessions = useRef([]);
     const [sessions, setSessions] = useState([]);
 
     function formatDate(dt) {
@@ -27,8 +27,8 @@ export default function Sessions() {
                 if (data["success"]) {
                     userID.current = data["reply"]["user_id"]
                     if (!data["reply"]["activities"]) {
-                        currentDevice.current = null
-                        otherDevices.current = []
+                        currentSession.current = null
+                        otherSessions.current = []
                         return setSessions(null)
                     }
                     const mapped = data["reply"]["activities"].map(a => ({
@@ -39,13 +39,12 @@ export default function Sessions() {
                         if (!x.isCurrent && y.isCurrent) return 1;
                         return new Date(y.lastSeen) - new Date(x.lastSeen);
                     });
-                    currentDevice.current = mapped.find(s => s.isCurrent) || null;
-                    otherDevices.current = mapped.filter(s => !s.isCurrent);
+                    currentSession.current = mapped.find(s => s.isCurrent) || null;
+                    otherSessions.current = mapped.filter(s => !s.isCurrent);
                     setSessions(mapped);
                 }
             })
-            .catch(_ => {
-            })
+            .catch((error) => {console.log("Devices fetched stopped because:", error)})
             .finally(_ => {
                 setLoading(false);
             })
@@ -62,7 +61,7 @@ export default function Sessions() {
                     FetchDevices()
                 }
             })
-            .catch(_ => {
+            .catch((error) => {console.log("Devices revoke stopped because:", error)
             })
             .finally(_ => {
             })
@@ -81,7 +80,7 @@ export default function Sessions() {
                 }}
             >
                 <div className="flex items-center gap-10 mb-6 text-md font-medium p-3 rounded-lg border-2 border-gray-800 justify-center">
-                    {[{label: "Login", href: "/login"}, {label: "Register", href: "/register"}, {label: "MFA", href: "/mfa"}, {label: "Change Password", href: "/change-password"}].map(item => <a key={item.href} href={item.href} className=" relative text-gray-300 hover:text-white transition after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-[2px] after:bg-indigo-500 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:origin-left">
+                    {[{label: "LoginPage", href: "/auth/login"}, {label: "Register", href: "/auth/register"}, {label: "MFA", href: "/auth/mfa"}, {label: "Change Password", href: "/auth/passwordreset"}].map(item => <a key={item.href} href={item.href} className=" relative text-gray-300 hover:text-white transition after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-[2px] after:bg-indigo-500 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:origin-left">
                         {item.label}
                     </a>)}
                 </div>
@@ -95,31 +94,31 @@ export default function Sessions() {
                 <div className="flex flex-col gap-6">
                     <div>
                         <div className="text-sm text-gray-400 mb-2">Current device</div>
-                        {currentDevice.current ? <div
+                        {currentSession.current ? <div
                             className="flex items-center gap-4 p-4 rounded-lg bg-[#0b0f14] border border-gray-800">
                             <div
                                 className="w-14 h-14 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex justify-center items-center">
-                                <DeviceIcons type={currentDevice.current.type}/>
+                                <DeviceIcons type={currentSession.current.type}/>
                             </div>
 
                             <div className="flex-1">
                                 <div className="font-medium text-white">
-                                    {currentDevice.current.device}
+                                    {currentSession.current.device}
                                     <span className="text-xs text-gray-400">
-                                            · {currentDevice.current.os}
+                                            · {currentSession.current.os}
                                         </span>
                                 </div>
                                 <div className="text-xs text-gray-400">
-                                    Browser: {currentDevice.current.browser}
+                                    Browser: {currentSession.current.browser}
                                 </div>
                                 <div className="mt-2 text-xs text-gray-400">
-                                    <div>First seen: {formatDate(currentDevice.current.firstSeen)}</div>
-                                    <div>Last active: {formatDate(currentDevice.current.lastSeen)}</div>
+                                    <div>First seen: {formatDate(currentSession.current.firstSeen)}</div>
+                                    <div>Last active: {formatDate(currentSession.current.lastSeen)}</div>
                                 </div>
                             </div>
 
                             <div className="flex-none">
-                                <button onClick={() => RevokeDevice(false, currentDevice.current.id)} className="px-3 py-2 text-sm rounded-md bg-red-600 hover:bg-red-700 text-white disabled:opacity-60">
+                                <button onClick={() => RevokeDevice(false, currentSession.current.id)} className="px-3 py-2 text-sm rounded-md bg-red-600 hover:bg-red-700 text-white disabled:opacity-60">
                                     Sign out
                                 </button>
                             </div>
@@ -128,35 +127,35 @@ export default function Sessions() {
 
                     <div className="flex items-center justify-between">
                         <h2 className="text-lg font-semibold text-white">Other devices</h2>
-                        <span className="text-sm text-gray-400">{otherDevices.current.length} active</span>
+                        <span className="text-sm text-gray-400">{otherSessions.current.length} active</span>
                     </div>
 
                     <div className=" other-scroll h-[45vh] overflow-y-auto pr-2">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
                             {loading && (<div className="text-sm text-gray-400">Loading devices…</div>)}
-                            {!loading && otherDevices.current.length === 0 && (<div className="text-sm text-gray-400">No other active devices.</div>)}
-                            {!loading && otherDevices.current.map(s => <div key={s.id} className="flex items-center gap-4 p-4 rounded-lg bg-[#0b0f14] border border-gray-800">
+                            {!loading && otherSessions.current.length === 0 && (<div className="text-sm text-gray-400">No other active devices.</div>)}
+                            {!loading && otherSessions.current.map(session => <div key={session.id} className="flex items-center gap-4 p-4 rounded-lg bg-[#0b0f14] border border-gray-800">
                                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex justify-center items-center">
-                                    <DeviceIcons type={s.type}/>
+                                    <DeviceIcons type={session.type}/>
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="text-sm text-white font-medium truncate">
-                                        {s.device}
+                                        {session.device}
                                         <span className="text-xs text-gray-400">
-                                            · {s.os}
+                                            · {session.os}
                                         </span>
                                     </div>
                                     <div className="text-xs text-gray-400">
-                                        Browser: {s.browser}
+                                        Browser: {session.browser}
                                     </div>
                                     <div className="mt-2 text-xs text-gray-400">
-                                        <div>First seen: {formatDate(s.firstSeen)}</div>
-                                        <div>Last active: {formatDate(s.lastSeen)}</div>
+                                        <div>First seen: {formatDate(session.firstSeen)}</div>
+                                        <div>Last active: {formatDate(session.lastSeen)}</div>
                                     </div>
                                 </div>
 
                                 <div className="flex-none">
-                                    <button onClick={() => RevokeDevice(false, s.id)} className="px-3 py-1 text-sm rounded-md bg-red-600 hover:bg-red-700 text-white disabled:opacity-60">
+                                    <button onClick={() => RevokeDevice(false, session.id)} className="px-3 py-1 text-sm rounded-md bg-red-600 hover:bg-red-700 text-white disabled:opacity-60">
                                         Sign out
                                     </button>
                                 </div>
