@@ -9,7 +9,7 @@ import (
 	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
 	ResponseProcessor "BhariyaAuth/processors/response"
 	StringProcessor "BhariyaAuth/processors/string"
-	TokenProcesors "BhariyaAuth/processors/token"
+	TokenProcessor "BhariyaAuth/processors/token"
 	"fmt"
 	"time"
 
@@ -93,10 +93,33 @@ func Step2(ctx fiber.Ctx) error {
 }
 
 func Step1(ctx fiber.Ctx) error {
-	refresh := TokenProcesors.ReadRefreshToken(ctx)
+	now := time.Now().UTC()
+	refresh := TokenProcessor.ReadRefreshToken(ctx)
 	if refresh.UserID == 0 {
 		RateLimitProcessor.Set(ctx)
 		return ctx.SendStatus(fiber.StatusUnauthorized)
+	}
+	if !TokenProcessor.MatchCSRF(ctx, refresh) {
+		RateLimitProcessor.Set(ctx)
+		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
+	}
+	if now.After(refresh.RefreshExpiry) {
+		Logger.IntentionalFailure(fmt.Sprintf("[ProcessRefresh] Expired session [UID-%d-RID-%d]", refresh.UserID, refresh.RefreshID))
+		ResponseProcessor.DetachAuthCookies(ctx)
+		RateLimitProcessor.Set(ctx)
+		return ctx.Status(fiber.StatusUnauthorized).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"This session has expired... Please login again"},
+		})
+	}
+	if !AccountProcessor.CheckSessionExists(refresh.UserID, refresh.RefreshID) {
+		Logger.IntentionalFailure(fmt.Sprintf("[ProcessRefresh] Revoked session [UID-%d-RID-%d]", refresh.UserID, refresh.RefreshID))
+		ResponseProcessor.DetachAuthCookies(ctx)
+		RateLimitProcessor.Set(ctx)
+		return ctx.Status(fiber.StatusUnauthorized).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"This session has been revoked... Please login again"},
+		})
 	}
 	mail, found := AccountProcessor.GetMailFromID(refresh.UserID)
 	if !found {

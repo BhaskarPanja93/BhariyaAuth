@@ -1,0 +1,16 @@
+[Unit]
+Description=Bhariya Auth Live
+After=network.target
+ConditionPathExists=/PROJECTS/BHARIYA-AUTH/back
+
+[Service]
+LimitNOFILE=400000
+Type=simple
+User=bhariya-auth
+Group=bhariya-auth
+Restart=on-failure
+WorkingDirectory=/PROJECTS/BHARIYA-AUTH/
+ExecStart=/PROJECTS/BHARIYA-AUTH/back --bind /PROJECTS/BHARIYA-AUTH/back.sock
+
+[Install]
+WantedBy=multi-user.target

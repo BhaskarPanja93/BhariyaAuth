@@ -40,18 +40,18 @@ func AttachAuthCookies(ctx fiber.Ctx, token TokenModels.NewTokenCombinedT) {
 	Refresh := fiber.Cookie{
 		Name:     Config.RefreshTokenInCookie,
 		Value:    token.RefreshToken,
-		Domain:   Config.CookieDomain,
 		HTTPOnly: true,
 		Secure:   true,
 		SameSite: fiber.CookieSameSiteStrictMode,
+		Domain:   Config.CookieDomain,
 	}
 	Csrf := fiber.Cookie{
 		Name:     Config.CSRFInCookie,
 		Value:    token.CSRF,
-		Domain:   Config.CookieDomain,
 		HTTPOnly: false,
 		Secure:   true,
-		SameSite: fiber.CookieSameSiteNoneMode,
+		SameSite: fiber.CookieSameSiteStrictMode,
+		Domain:   Config.CookieDomain,
 	}
 	if token.RememberMe {
 		Refresh.MaxAge = int(Config.RefreshTokenExpireDelta.Seconds())
@@ -59,6 +59,7 @@ func AttachAuthCookies(ctx fiber.Ctx, token TokenModels.NewTokenCombinedT) {
 	}
 	ctx.Cookie(&Refresh)
 	ctx.Cookie(&Csrf)
+
 }
 
 func AttachSSOCookie(ctx fiber.Ctx, value string) {
@@ -66,33 +67,62 @@ func AttachSSOCookie(ctx fiber.Ctx, value string) {
 		Name:     Config.SSOStateInCookie,
 		Value:    value,
 		MaxAge:   int(Config.SSOCookieExpireDelta.Seconds()),
-		Domain:   Config.CookieDomain,
 		Secure:   true,
 		HTTPOnly: true,
-		SameSite: fiber.CookieSameSiteLaxMode,
+		SameSite: fiber.CookieSameSiteStrictMode,
+		Domain:   Config.CookieDomain,
 	})
+
 }
 
 func AttachMFACookie(ctx fiber.Ctx, value string) {
 	ctx.Cookie(&fiber.Cookie{
 		Name:     Config.MFATokenInCookie,
 		Value:    value,
-		Domain:   Config.CookieDomain,
 		Secure:   false,
 		HTTPOnly: true,
-		SameSite: fiber.CookieSameSiteNoneMode,
+		SameSite: fiber.CookieSameSiteStrictMode,
+		Domain:   Config.CookieDomain,
 	})
+
 }
 
 func DetachAuthCookies(ctx fiber.Ctx) {
-	ctx.Cookie(&fiber.Cookie{Name: Config.RefreshTokenInCookie, Value: "", MaxAge: 1})
-	ctx.Cookie(&fiber.Cookie{Name: Config.CSRFInCookie, Value: "", MaxAge: 1})
+	ctx.Cookie(&fiber.Cookie{
+		Name:     Config.RefreshTokenInCookie,
+		Value:    "",
+		MaxAge:   1,
+		SameSite: fiber.CookieSameSiteStrictMode,
+		Domain:   Config.CookieDomain,
+	})
+	ctx.Cookie(&fiber.Cookie{
+		Name:     Config.CSRFInCookie,
+		Value:    "",
+		MaxAge:   1,
+		SameSite: fiber.CookieSameSiteStrictMode,
+		Domain:   Config.CookieDomain,
+	})
+
 }
 
 func DetachSSOCookies(ctx fiber.Ctx) {
-	ctx.Cookie(&fiber.Cookie{Name: Config.SSOStateInCookie, Value: "", MaxAge: 1})
+	ctx.Cookie(&fiber.Cookie{
+		Name:     Config.SSOStateInCookie,
+		Value:    "",
+		MaxAge:   1,
+		SameSite: fiber.CookieSameSiteStrictMode,
+		Domain:   Config.CookieDomain,
+	})
+
 }
 
 func DetachMFACookies(ctx fiber.Ctx) {
-	ctx.Cookie(&fiber.Cookie{Name: Config.MFATokenInCookie, Value: "", MaxAge: 1})
+	ctx.Cookie(&fiber.Cookie{
+		Name:     Config.MFATokenInCookie,
+		Value:    "",
+		MaxAge:   1,
+		SameSite: fiber.CookieSameSiteStrictMode,
+		Domain:   Config.CookieDomain,
+	})
+
 }

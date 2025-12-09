@@ -8,13 +8,13 @@ import (
 var (
 	ServerFor            = "bhariya"
 	ServerRole           = "auth"
-	CookieDomain         = "bhariya-hidden.ddns.net"
-	ServerSSOCallbackURL = "https://bhariya-hidden.ddns.net/auth/sso/callback"
+	CookieDomain         = "bhariya.ddns.net"
+	ServerSSOCallbackURL = "https://bhariya.ddns.net/auth-backend/sso/callback"
 )
 
 var (
-	CSRFInHeader         = "CSRF"
-	AccessTokenInHeader  = "Authorization"
+	CSRFInHeader         = "csrf"
+	AccessTokenInHeader  = "authorization"
 	ServerName           = fmt.Sprintf("%s_%s", ServerFor, ServerRole)
 	MFATokenInCookie     = fmt.Sprintf("%s_mfa", ServerName)
 	CSRFInCookie         = fmt.Sprintf("%s_csrf", ServerName)

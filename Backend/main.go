@@ -96,7 +96,7 @@ func main() {
 
 	MainApp.Use(Middlewares.ProfilingMiddleware())
 
-	AuthApp := MainApp.Group("/auth")
+	AuthApp := MainApp.Group("/auth-backend")
 
 	AccountRouters.AttachRoutes(AuthApp)
 	PasswordResetRouters.AttachRoutes(AuthApp)

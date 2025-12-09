@@ -26,15 +26,6 @@ func ProcessRefresh(ctx fiber.Ctx) error {
 		RateLimitProcessor.Set(ctx)
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
-	if !AccountProcessor.CheckSessionExists(refresh.UserID, refresh.RefreshID) {
-		Logger.IntentionalFailure(fmt.Sprintf("[ProcessRefresh] Revoked session [UID-%d-RID-%d]", refresh.UserID, refresh.RefreshID))
-		ResponseProcessor.DetachAuthCookies(ctx)
-		RateLimitProcessor.Set(ctx)
-		return ctx.Status(fiber.StatusUnauthorized).JSON(ResponseModels.APIResponseT{
-			Success:       false,
-			Notifications: []string{"This session has been revoked... Please login again"},
-		})
-	}
 	if now.After(refresh.RefreshExpiry) {
 		Logger.IntentionalFailure(fmt.Sprintf("[ProcessRefresh] Expired session [UID-%d-RID-%d]", refresh.UserID, refresh.RefreshID))
 		ResponseProcessor.DetachAuthCookies(ctx)
@@ -44,6 +35,16 @@ func ProcessRefresh(ctx fiber.Ctx) error {
 			Notifications: []string{"This session has expired... Please login again"},
 		})
 	}
+	if !AccountProcessor.CheckSessionExists(refresh.UserID, refresh.RefreshID) {
+		Logger.IntentionalFailure(fmt.Sprintf("[ProcessRefresh] Revoked session [UID-%d-RID-%d]", refresh.UserID, refresh.RefreshID))
+		ResponseProcessor.DetachAuthCookies(ctx)
+		RateLimitProcessor.Set(ctx)
+		return ctx.Status(fiber.StatusUnauthorized).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"This session has been revoked... Please login again"},
+		})
+	}
+
 	var currentIndex uint16
 	err := Stores.MySQLClient.QueryRow("SELECT count FROM activities WHERE refresh = ? AND uid = ?", refresh.RefreshID, refresh.UserID).Scan(&currentIndex)
 	if err != nil {
