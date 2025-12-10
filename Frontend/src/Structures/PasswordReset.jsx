@@ -8,6 +8,8 @@ import {FetchNotificationManager} from "../Contexts/Notification.jsx";
 import {FetchConnectionManager} from "../Contexts/Connection.jsx";
 import OTPInput from "../Elements/OTPInput.jsx";
 import EmailInput from "../Elements/EmailInput.jsx";
+import {Countdown} from "../Utils/Countdown.js";
+import OTPResendButton from "../Elements/OTPResendButton.jsx";
 
 export default function PasswordReset({disabled}) {
     const navigate = useNavigate();
@@ -16,6 +18,8 @@ export default function PasswordReset({disabled}) {
 
     const [uiDisabled, setUiDisabled] = useState(false)
     const [currentStep, setCurrentStep] = useState(1)
+    const OTPResendTimerID = useRef(0)
+    const [OTPDelay, setOTPDelay] = useState(0)
     const [password, setPassword] = useState("")
     const [passwordConfirmation, setPasswordConfirmation] = useState("")
     const [email, setEmail] = useState("")
@@ -23,7 +27,6 @@ export default function PasswordReset({disabled}) {
     const currentToken = useRef("")
 
     const Step1 = () => {
-        setCurrentStep(1)
         if (!EmailIsValid(email)) return SendNotification("Email is invalid");
 
         setUiDisabled(true);
@@ -32,8 +35,11 @@ export default function PasswordReset({disabled}) {
         privateAPI.post(BackendURL + "/passwordreset/step1/", form)
             .then((data) => {
                 if (data["success"]) {
+                    SendNotification("Please enter the OTP sent to your mail")
                     currentToken.current = data["reply"]
                     setCurrentStep(2)
+                } else if (data["reply"]) {
+                    Countdown(data["reply"], OTPResendTimerID, setOTPDelay).then()
                 }
             })
             .catch((error)=>{console.log("PasswordReset Step1 stopped because:", error)})
@@ -43,7 +49,6 @@ export default function PasswordReset({disabled}) {
     };
 
     const Step2 = () => {
-        setCurrentStep(2)
         if (!currentToken.current) return SendNotification("Step 1 incomplete. Please resend OTP");
         if (password !== passwordConfirmation) return SendNotification("Passwords don't match")
         if (!OTPIsValid(verification)) return SendNotification("Incorrect OTP");
@@ -56,6 +61,7 @@ export default function PasswordReset({disabled}) {
         privateAPI.post(BackendURL + "/passwordreset/step2", form)
             .then((data) => {
                 if (data["success"]) {
+                    SendNotification("Password changed successfully")
                     navigate("/sessions")
                 }
             })
@@ -93,6 +99,9 @@ export default function PasswordReset({disabled}) {
                                     value={verification}
                                     onValueChange={setVerification}
                                     disabled={uiDisabled || currentStep !== 2}/>
+                                <div className="flex justify-end">
+                                    <OTPResendButton delay={OTPDelay} onClick={Step1} disabled={uiDisabled || currentStep !== 2} />
+                                </div>
                                 <PasswordInput
                                     value={password} onValueChange={setPassword}
                                     needsConfirm={true}

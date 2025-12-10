@@ -7,7 +7,7 @@ import {Link} from "react-router-dom";
 
 export default function Sessions() {
     const {SendNotification} = FetchNotificationManager();
-    const {privateAPI} = FetchConnectionManager()
+    const {privateAPI, EnsureLoggedIn} = FetchConnectionManager()
 
     const [uiDisabled, setUiDisabled] = useState(false)
     const [loading, setLoading] = useState(false)
@@ -25,65 +25,72 @@ export default function Sessions() {
     }
 
     const FetchDevices = () => {
-        setUiDisabled(true)
-        setLoading(true);
-        privateAPI.post(BackendURL + "/sessions/fetch")
-            .then((data) => {
-                if (data["success"]) {
-                    userID.current = data["reply"]["user_id"]
-                    if (!data["reply"]["activities"]) {
-                        currentSession.current = null
-                        otherSessions.current = []
-                        return setSessions(null)
+        EnsureLoggedIn().then(s=>{
+            if (!s) return SendNotification("You need to be logged in to perform this action");
+            setLoading(true);
+            privateAPI.post(BackendURL + "/sessions/fetch")
+                .then((data) => {
+                    if (data["success"]) {
+                        userID.current = data["reply"]["user_id"]
+                        if (!data["reply"]["activities"]) {
+                            currentSession.current = null
+                            otherSessions.current = []
+                            return setSessions(null)
+                        }
+                        const mapped = data["reply"]["activities"].map(a => ({
+                            id: a["id"],
+                            device: a["device"],
+                            os: a["os"],
+                            browser: a["browser"],
+                            firstSeen: a["creation"],
+                            lastSeen: a["updated"],
+                            remembered: a["remembered"],
+                            count: a["count"],
+                            isCurrent: a["id"] === data["reply"]["device_id"],
+                            type: /iphone|android|mobile|ios/i.test(a["device"] + " " + a["os"]) ? "mobile" : /windows|mac|linux|desktop/i.test(a["device"] + " " + a["os"]) ? "desktop" : "unknown"
+                        }));
+                        mapped.sort((x, y) => {
+                            if (x.isCurrent && !y.isCurrent) return -1;
+                            if (!x.isCurrent && y.isCurrent) return 1;
+                            return new Date(y.lastSeen) - new Date(x.lastSeen);
+                        });
+                        currentSession.current = mapped.find(s => s.isCurrent) || null;
+                        otherSessions.current = mapped.filter(s => !s.isCurrent);
+                        setSessions(mapped);
                     }
-                    const mapped = data["reply"]["activities"].map(a => ({
-                        id: a["id"],
-                        device: a["device"],
-                        os: a["os"],
-                        browser: a["browser"],
-                        firstSeen: a["creation"],
-                        lastSeen: a["updated"],
-                        remembered: a["remembered"],
-                        count: a["count"],
-                        isCurrent: a["id"] === data["reply"]["device_id"],
-                        type: /iphone|android|mobile|ios/i.test(a["device"] + " " + a["os"]) ? "mobile" : /windows|mac|linux|desktop/i.test(a["device"] + " " + a["os"]) ? "desktop" : "unknown"
-                    }));
-                    mapped.sort((x, y) => {
-                        if (x.isCurrent && !y.isCurrent) return -1;
-                        if (!x.isCurrent && y.isCurrent) return 1;
-                        return new Date(y.lastSeen) - new Date(x.lastSeen);
-                    });
-                    currentSession.current = mapped.find(s => s.isCurrent) || null;
-                    otherSessions.current = mapped.filter(s => !s.isCurrent);
-                    setSessions(mapped);
-                }
-            })
-            .catch((error) => {console.log("Devices fetched stopped because:", error)})
-            .finally(_ => {
-                setUiDisabled(false)
-                setLoading(false);
-            })
+                })
+                .catch((error) => {console.log("Devices fetched stopped because:", error)})
+                .finally(_ => {
+                    setLoading(false);
+                })
+        })
     }
 
     const RevokeDevice = (revokeAll, deviceID) => {
-        if (!userID.current) return SendNotification("Step 1 incomplete. Please login or refresh page");
+        EnsureLoggedIn().then(s=> {
+            if (!s) return SendNotification("You need to be logged in to perform this action");
+            if (!userID.current) return SendNotification("Step 1 incomplete. Please login or refresh page");
 
-        setUiDisabled(true)
-        const form = new FormData();
-        form.append("user_id", userID.current)
-        form.append("revoke_all", revokeAll ? "yes" : "no")
-        !revokeAll && form.append("device_id", deviceID)
-        privateAPI.post(BackendURL + "/sessions/revoke", form)
-            .then((data) => {
-                if (data["success"]) {
-                    FetchDevices()
-                }
-            })
-            .catch((error) => {console.log("Devices revoke stopped because:", error)
-            })
-            .finally(_ => {
-                setUiDisabled(false)
-            })
+            setUiDisabled(true)
+            const form = new FormData();
+            form.append("user_id", userID.current)
+            form.append("revoke_all", revokeAll ? "yes" : "no")
+            !revokeAll && form.append("device_id", deviceID)
+            privateAPI.post(BackendURL + "/sessions/revoke", form)
+                .then((data) => {
+                    if (data["success"]) {
+                        if (revokeAll) SendNotification("All sessions have been revoked and will lose access soon")
+                        else SendNotification("Session has been revoked and will lose access soon")
+                        FetchDevices()
+                    }
+                })
+                .catch((error) => {
+                    console.log("Devices revoke stopped because:", error)
+                })
+                .finally(_ => {
+                    setUiDisabled(false)
+                })
+        })
     }
 
     useEffect(() => {
@@ -100,10 +107,10 @@ export default function Sessions() {
                 }}>
                 <div className="flex flex-wrap items-center gap-6 md:gap-10 mb-6 text-md font-medium p-3 rounded-lg border-2 border-gray-800 justify-center">
                     {[
-                        {label: "Login", href: "/auth/login"},
-                        {label: "Register", href: "/auth/register"},
-                        {label: "MFA", href: "/auth/mfa"},
-                        {label: "Change Password", href: "/auth/passwordreset"}
+                        {label: "Login", href: "/login"},
+                        {label: "Register", href: "/register"},
+                        {label: "MFA", href: "/mfa"},
+                        {label: "Change Password", href: "/passwordreset"}
                     ].map(item =>
                         <Link className="relative text-gray-300 hover:text-white transition after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-[2px] after:bg-indigo-500 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:origin-left"
                             to={item.href}

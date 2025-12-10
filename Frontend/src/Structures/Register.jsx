@@ -12,6 +12,8 @@ import {BackendURL} from "../Values/Constants.js";
 import {FetchConnectionManager} from "../Contexts/Connection.jsx";
 import {FetchNotificationManager} from "../Contexts/Notification.jsx";
 import {EmailIsValid, NameIsValid, OTPIsValid, PasswordIsStrong} from "../Utils/Strings.js";
+import {Countdown} from "../Utils/Countdown.js";
+import OTPResendButton from "../Elements/OTPResendButton.jsx";
 
 export default function RegisterPage() {
     const navigate = useNavigate();
@@ -20,6 +22,8 @@ export default function RegisterPage() {
 
     const [uiDisabled, setUiDisabled] = useState(false)
     const [currentStep, setCurrentStep] = useState(1)
+    const OTPResendTimerID = useRef(0)
+    const [OTPDelay, setOTPDelay] = useState(0)
     const [remember, setRemember] = useState(false)
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
@@ -30,7 +34,6 @@ export default function RegisterPage() {
     const currentToken = useRef("")
 
     const Step1 = () => {
-        setCurrentStep(1)
         if (!NameIsValid(name)) return SendNotification("Name is invalid")
         if (!EmailIsValid(email)) return SendNotification("Email is invalid")
         if (!PasswordIsStrong(password)) return SendNotification("Password is too weak")
@@ -46,8 +49,11 @@ export default function RegisterPage() {
         privateAPI.post(BackendURL + "/register/step1", form)
             .then((data) => {
                 if (data["success"]) {
+                    SendNotification("Please enter the OTP sent to your mail")
                     currentToken.current = data["reply"];
                     setCurrentStep(2)
+                } else if (data["reply"]) {
+                    Countdown(data["reply"], OTPResendTimerID, setOTPDelay).then()
                 }
             })
             .catch((error)=>{console.log("Register Step1 stopped because:", error)})
@@ -57,7 +63,6 @@ export default function RegisterPage() {
     };
 
     const Step2 = () => {
-        setCurrentStep(2)
         if (!currentToken.current) return SendNotification("Step 1 incomplete. Please resend OTP");
         if (!OTPIsValid(verification)) return SendNotification("Incorrect OTP");
 
@@ -68,6 +73,7 @@ export default function RegisterPage() {
         privateAPI.post(BackendURL + "/register/step2", form, {forAccessFetch: true})
             .then((data) => {
                 if (data["success"]) {
+                    SendNotification("Registered and logged in Successfully")
                     navigate("/sessions")
                 }
             })
@@ -94,7 +100,7 @@ export default function RegisterPage() {
                     </h2>
                     <div className="text-sm text-gray-400">
                         {currentStep === 1 ?
-                            "Access your account"
+                            "Create an account"
                             :
                             <div className="flex items-center gap-2">
                             <span>{email}</span>
@@ -129,11 +135,7 @@ export default function RegisterPage() {
                     </>}
                     {currentStep === 2 &&
                         <>
-                            <button className="flex-end text-xs text-indigo-400 hover:underline"
-                                type="button"
-                                onClick={Step1}>
-                                Resend OTP
-                            </button>
+                            <OTPResendButton delay={OTPDelay} onClick={Step1} disabled={uiDisabled || currentStep !== 2} />
                             <OTPInput
                                 value={verification}
                                 onValueChange={setVerification}

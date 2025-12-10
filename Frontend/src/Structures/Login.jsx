@@ -12,6 +12,8 @@ import {FetchConnectionManager} from "../Contexts/Connection.jsx";
 import {EmailIsValid, OTPIsValid, PasswordIsStrong} from "../Utils/Strings.js";
 import Divider from "../Elements/Divider.jsx";
 import {FetchNotificationManager} from "../Contexts/Notification.jsx";
+import {Countdown} from "../Utils/Countdown.js";
+import OTPResendButton from "../Elements/OTPResendButton.jsx";
 
 export default function LoginPage() {
     const navigate = useNavigate()
@@ -21,18 +23,19 @@ export default function LoginPage() {
     const [uiDisabled, setUiDisabled] = useState(false)
     const [currentStep, setCurrentStep] = useState(1)
     const [useOtp, setUseOtp] = useState(false)
+    const OTPResendTimerID = useRef(0)
+    const [OTPDelay, setOTPDelay] = useState(0)
     const [remember, setRemember] = useState(false)
     const [email, setEmail] = useState("")
     const [verification, setVerification] = useState()
 
     const tokens = useRef({})
 
-    const Step1 = (tryOTP) => {
-        setCurrentStep(1)
+    const Step1 = (tryOTP, resendOTP) => {
         if (!EmailIsValid(email)) return SendNotification("Email is invalid");
         if (!tokens.current[email]) tokens.current[email] = {}
 
-        if (tokens.current[email][tryOTP]) {
+        if (tokens.current[email][tryOTP] && !resendOTP) {
             setUseOtp(tryOTP)
             return setCurrentStep(2)
         }
@@ -44,9 +47,12 @@ export default function LoginPage() {
         privateAPI.post(BackendURL + `/login/step1/${tryOTP ? "otp" : "password"}`, form)
             .then((data) => {
                 if (data["success"]) {
+                    SendNotification(`Please enter the ${tryOTP?"OTP":"Password"}`)
                     tokens.current[email][tryOTP] = data["reply"]
-                    setCurrentStep(2)
                     setUseOtp(tryOTP)
+                    setCurrentStep(2)
+                } else if (data["reply"]){
+                    Countdown(data["reply"], OTPResendTimerID, setOTPDelay).then()
                 }
             })
             .catch((error)=>{console.log("Login Step1 stopped because:", error)})
@@ -56,7 +62,6 @@ export default function LoginPage() {
     };
 
     const Step2 = () => {
-        setCurrentStep(2)
         if (!tokens.current[email] || !tokens.current[email][useOtp]) return SendNotification("Step 1 incomplete. Please enter email again");
         if (!useOtp) {
             if (!PasswordIsStrong(verification)) return SendNotification("Incorrect Password");
@@ -71,6 +76,7 @@ export default function LoginPage() {
         privateAPI.post(BackendURL + "/login/step2", form, {forAccessFetch: true})
             .then((data) => {
                 if (data["success"]) {
+                    SendNotification("Logged In Successfully")
                     navigate("/sessions");
                 }
             })
@@ -134,11 +140,7 @@ export default function LoginPage() {
                                         Forgot Password?
                                     </Link>
                                     :
-                                    <button className="text-xs text-indigo-400 hover:underline"
-                                        type="button"
-                                        onClick={() => Step1(true)}>
-                                        Resend OTP
-                                    </button>
+                                    <OTPResendButton delay={OTPDelay} onClick={()=>Step1(true, true)} disabled={uiDisabled || currentStep !== 2} />
                                 }
                             </div>
                         </div>

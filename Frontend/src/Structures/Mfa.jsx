@@ -6,55 +6,68 @@ import {useNavigate} from "react-router-dom";
 import {FetchNotificationManager} from "../Contexts/Notification.jsx";
 import {FetchConnectionManager} from "../Contexts/Connection.jsx";
 import {useEffect, useRef, useState} from "react";
+import OTPResendButton from "../Elements/OTPResendButton.jsx";
+import {Countdown} from "../Utils/Countdown.js";
 
 export default function Mfa() {
     const navigate = useNavigate();
     const {SendNotification} = FetchNotificationManager();
-    const {privateAPI} = FetchConnectionManager()
+    const {privateAPI, EnsureLoggedIn} = FetchConnectionManager()
 
     const [uiDisabled, setUiDisabled] = useState(false)
     const [currentStep, setCurrentStep] = useState(1)
+    const OTPResendTimerID = useRef(0)
+    const [OTPDelay, setOTPDelay] = useState(0)
     const [verification, setVerification] = useState("")
     const currentToken = useRef("")
 
     const Step1 = () => {
-        setCurrentStep(1)
-        setUiDisabled(true);
-        privateAPI.post(BackendURL + "/mfa/step1", {}, {requiresCSRF: true})
-            .then((data) => {
-                if (data["success"]) {
-                    currentToken.current = data["reply"]
-                }
-            })
-            .catch((error) => {
-                console.log("Mfa Step1 stopped because:", error)
-            })
-            .finally(() => {
-                setUiDisabled(false);
-            });
-    };
+        EnsureLoggedIn().then(s=> {
+            if (!s) return SendNotification("You need to be logged in to perform this action");
+            setUiDisabled(true);
+            privateAPI.post(BackendURL + "/mfa/step1", {}, {requiresCSRF: true})
+                .then((data) => {
+                    if (data["success"]) {
+                        SendNotification("Please enter the OTP sent to your mail")
+                        currentToken.current = data["reply"]
+                        setCurrentStep(2)
+                    } else if (data["reply"]) {
+                        Countdown(data["reply"], OTPResendTimerID, setOTPDelay).then()
+                    }
+                })
+                .catch((error) => {
+                    console.log("Mfa Step1 stopped because:", error)
+                })
+                .finally(() => {
+                    setUiDisabled(false);
+                });
+        })
+    }
 
     const Step2 = () => {
-        setCurrentStep(2)
-        if (!currentToken.current) return SendNotification("Step 1 incomplete. Please resend OTP");
-        if (!OTPIsValid(verification)) return SendNotification("Incorrect OTP");
+        EnsureLoggedIn().then(s=> {
+            if (!s) return SendNotification("You need to be logged in to perform this action");
+            if (!currentToken.current) return SendNotification("Step 1 incomplete. Please resend OTP");
+            if (!OTPIsValid(verification)) return SendNotification("Incorrect OTP");
 
-        setUiDisabled(true);
-        const form = new FormData();
-        form.append("token", currentToken.current);
-        form.append("verification", verification);
-        privateAPI.post(BackendURL + "/mfa/step2", form, {forMFA: true})
-            .then((data) => {
-                if (data["success"]) {
-                    navigate("/sessions");
-                }
-            })
-            .catch((error) => {
-                console.log("Mfa Step2 stopped because:", error)
-            })
-            .finally(() => {
-                setUiDisabled(false);
-            });
+            setUiDisabled(true);
+            const form = new FormData();
+            form.append("token", currentToken.current);
+            form.append("verification", verification);
+            privateAPI.post(BackendURL + "/mfa/step2", form, {forMFA: true})
+                .then((data) => {
+                    if (data["success"]) {
+                        SendNotification("Verification complete")
+                        navigate("/sessions");
+                    }
+                })
+                .catch((error) => {
+                    console.log("Mfa Step2 stopped because:", error)
+                })
+                .finally(() => {
+                    setUiDisabled(false);
+                });
+        })
     };
 
     useEffect(() => {
@@ -74,24 +87,18 @@ export default function Mfa() {
                     </h2>
                 </div>
                 <div className="space-y-4">
-                    {currentStep === 1 ?
-                        <p className="text-sm text-gray-400">
-                            Enter OTP
-                        </p>
-                        :
+                    {currentStep === 2 &&
                         <>
+                            <div className="flex justify-between">
+                                <p className="text-sm text-gray-400">
+                                    Enter OTP
+                                </p>
+                                <OTPResendButton delay={OTPDelay} onClick={Step1} disabled={uiDisabled || currentStep !== 2} />
+                            </div>
                             <OTPInput
                                 value={verification}
                                 onValueChange={setVerification}
                                 disabled={uiDisabled || currentStep !== 2}/>
-                            <div className="flex justify-end">
-                                <button className="text-xs text-indigo-400 hover:underline"
-                                        type="button"
-                                        onClick={Step1}
-                                        disabled={uiDisabled || currentStep !== 2}>
-                                    Resend OTP
-                                </button>
-                            </div>
                         </>
                     }
                     <SubmitButton

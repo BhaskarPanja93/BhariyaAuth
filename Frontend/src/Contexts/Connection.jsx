@@ -9,9 +9,10 @@ import {BackendURL, CSRFCookiePath, FrontendDomain, FrontendURL, MFACookiePath} 
  * @typedef {Object} ConnectionContextType
  * @property {import("axios").AxiosInstance} publicAPI
  * @property {import("axios").AxiosInstance} privateAPI
- * @property {(URL: string) => Promise} OpenLoginPopup
- * @property {() => Promise} RefreshToken
- * @property {() => Promise} Logout
+ * @property {() => Promise<boolean>} OpenLoginPopup
+ * @property {() => Promise<boolean>} RefreshToken
+ * @property {() => Promise<boolean>} Logout
+ * @property {() => Promise<boolean>} EnsureLoggedIn
  */
 
 /** @type {import('react').Context<ConnectionContextType | null>} */
@@ -19,6 +20,7 @@ const ConnectionContext = createContext(null);
 export default function ConnectionProvider ({children}) {
     const {SendNotification} = FetchNotificationManager();
     const AccessToken = useRef("")
+    const IsLoggedIn = useRef(false)
 
     const GatewayErrors = useRef({})
     const GetGatewayErrors = (host) => {
@@ -39,11 +41,15 @@ export default function ConnectionProvider ({children}) {
         GatewayErrors.current[host] = 1
     }
 
-    const currentLoginPopup = useRef(null);
+    const currentLoginPopup = useRef(null)
     const OpenLoginPopup = () => {
         if (currentLoginPopup.current) return currentLoginPopup.current;
         currentLoginPopup.current = new Promise(async (resolve, _) => {
-            const popup = window.open(FrontendURL+"/login", "_blank");
+            const popup = window.open(
+                FrontendURL + "/login",
+                "Login",
+                "width=500,height=750,menubar=no,toolbar=no,location=no,status=no,resizable=no,scrollbars=no"
+            );
             if (!popup) {
                 SendNotification("Please allow popups to proceed with Login")
                 await Sleep(1)
@@ -87,7 +93,11 @@ export default function ConnectionProvider ({children}) {
     const OpenMFAPopup = () => {
         if (currentMFAPopup.current) return currentMFAPopup.current;
         currentMFAPopup.current = new Promise(async (resolve, _) => {
-            const popup = window.open(FrontendURL + "/mfa", "_blank");
+            const popup = window.open(
+                FrontendURL + "/mfa",
+                "MFA",
+                "width=500,height=400,menubar=no,toolbar=no,location=no,status=no,resizable=no,scrollbars=nos"
+            );
             if (!popup) {
                 SendNotification("Please allow popups to proceed with MFA")
                 await Sleep(1)
@@ -179,6 +189,10 @@ export default function ConnectionProvider ({children}) {
         return currentRefresh.current;
     }
 
+    const EnsureLoggedIn = async () => {
+        return IsLoggedIn.current || await RefreshToken() || await OpenLoginPopup()
+    }
+
     const RetryRequest = async (connection, config) => {
         try {
             return await connection(config);
@@ -226,6 +240,7 @@ export default function ConnectionProvider ({children}) {
             ResetGatewayErrors(config.host)
             if (config.forAccessFetch && data["modify-auth"]) {
                 AccessToken.current = data["new-token"]
+                IsLoggedIn.current = !!AccessToken.current;
                 if (!config.forTokenRefresh && window.opener) {
                     window.opener.postMessage({success: true, token: AccessToken.current}, window.location.origin);
                     window.close();
@@ -249,11 +264,13 @@ export default function ConnectionProvider ({children}) {
 
         // Not authenticated
         if (status === 401) {
+            IsLoggedIn.current = false
             if (!config.forTokenRefresh) {
                 if (await RefreshToken()) {
                     return await RetryRequest(privateAPI, config)
                 } else if (!config.skipLogin || AccessToken.current) {
-                    if (await OpenLoginPopup())
+                    let loginPopupPromise = OpenLoginPopup()
+                    if (await loginPopupPromise())
                         return await RetryRequest(privateAPI, config)
                     else
                         return Promise.reject("Authentication stopped")
@@ -319,7 +336,7 @@ export default function ConnectionProvider ({children}) {
     privateAPI.interceptors.request.use(RequestFulfilledInterceptor, RequestRejectedInterceptor)
     privateAPI.interceptors.response.use(ResponseFulfilledInterceptor, ResponseRejectedInterceptor)
 
-    return (<ConnectionContext.Provider value={{publicAPI, privateAPI, OpenLoginPopup, RefreshToken, Logout}}>
+    return (<ConnectionContext.Provider value={{publicAPI, privateAPI, OpenLoginPopup, RefreshToken, Logout, EnsureLoggedIn}}>
         {children}
     </ConnectionContext.Provider>);
 };
