@@ -87,8 +87,7 @@ func Step2(ctx fiber.Ctx) error {
 	ResponseProcessor.AttachMFACookie(ctx, token)
 	Logger.Success(fmt.Sprintf("[MFA2] Successful for [UID-%d]", MFAData.UserID))
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-		Success:       true,
-		Notifications: []string{"Verification complete"},
+		Success: true,
 	})
 }
 
@@ -130,6 +129,7 @@ func Step1(ctx fiber.Ctx) error {
 	if verification == "" {
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 			Success:       false,
+			Reply:         retry.Seconds(),
 			Notifications: []string{fmt.Sprintf("Unable to send OTP, please try again after %.1f seconds", retry.Seconds())},
 		})
 	}
@@ -158,8 +158,7 @@ func Step1(ctx fiber.Ctx) error {
 	}
 	Logger.Success(fmt.Sprintf("[MFA1] Token Created for [UID-%d]", refresh.UserID))
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-		Success:       true,
-		Reply:         token,
-		Notifications: []string{"Please enter the OTP sent to your mail"},
+		Success: true,
+		Reply:   token,
 	})
 }

@@ -127,10 +127,9 @@ func Step2(ctx fiber.Ctx) error {
 	}
 	Logger.Success(fmt.Sprintf("[Login2] Logged in: [UID-%d]", SignInData.UserID))
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-		Success:       true,
-		ModifyAuth:    true,
-		NewToken:      token.AccessToken,
-		Notifications: []string{"Logged In Successfully"},
+		Success:    true,
+		ModifyAuth: true,
+		NewToken:   token.AccessToken,
 	})
 }
 
@@ -167,6 +166,7 @@ func Step1(ctx fiber.Ctx) error {
 		if verification == "" {
 			return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 				Success:       false,
+				Reply:         retry.Seconds(),
 				Notifications: []string{fmt.Sprintf("Unable to send OTP, please try again after %.1f seconds", retry.Seconds())},
 			})
 		}
@@ -175,7 +175,7 @@ func Step1(ctx fiber.Ctx) error {
 		if !AccountProcessor.CheckUserHasPassword(userID) {
 			return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 				Success:       false,
-				Notifications: []string{"Password has not been set. Please use OTP/SSO to login"},
+				Notifications: []string{"Password has not been set. Please use OTP or SSO to login"},
 			})
 		}
 		SignInData.Step2Code = ""
@@ -201,8 +201,7 @@ func Step1(ctx fiber.Ctx) error {
 	}
 	Logger.Success(fmt.Sprintf("[Login1] Token Created for [UID-%d]", userID))
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-		Success:       true,
-		Reply:         token,
-		Notifications: []string{fmt.Sprintf("Please enter the %s", process)},
+		Success: true,
+		Reply:   token,
 	})
 }

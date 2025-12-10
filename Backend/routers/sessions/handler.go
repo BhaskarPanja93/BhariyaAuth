@@ -50,8 +50,7 @@ func Revoke(ctx fiber.Ctx) error {
 		AccountProcessor.DeleteAllSessions(access.UserID)
 		Logger.Success(fmt.Sprintf("Sessions RevokeAll succeeded for [%d]", access.UserID))
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Success:       true,
-			Notifications: []string{"All sessions have been revoked and will lose access soon"},
+			Success: true,
 		})
 	}
 	RefreshID, ok := StringProcessor.Decrypt(form.DeviceID)
@@ -62,8 +61,7 @@ func Revoke(ctx fiber.Ctx) error {
 	AccountProcessor.DeleteSession(access.UserID, binary.BigEndian.Uint16(RefreshID))
 	Logger.Success(fmt.Sprintf("Sessions Revoke succeeded for [%d-%d]", access.UserID, RefreshID))
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-		Success:       true,
-		Notifications: []string{"Session has been revoked and will lose access soon"},
+		Success: true,
 	})
 }
 
