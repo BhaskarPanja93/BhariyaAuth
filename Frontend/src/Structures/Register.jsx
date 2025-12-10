@@ -1,4 +1,4 @@
-import {useRef, useState} from 'react'
+import {useEffect, useRef, useState} from 'react'
 import {Link, useNavigate} from "react-router-dom";
 import EmailInput from '../Elements/EmailInput.jsx'
 import PasswordInput from '../Elements/PasswordInput.jsx'
@@ -30,6 +30,7 @@ export default function RegisterPage() {
     const currentToken = useRef("")
 
     const Step1 = () => {
+        setCurrentStep(1)
         if (!NameIsValid(name)) return SendNotification("Name is invalid")
         if (!EmailIsValid(email)) return SendNotification("Email is invalid")
         if (!PasswordIsStrong(password)) return SendNotification("Password is too weak")
@@ -56,6 +57,7 @@ export default function RegisterPage() {
     };
 
     const Step2 = () => {
+        setCurrentStep(2)
         if (!currentToken.current) return SendNotification("Step 1 incomplete. Please resend OTP");
         if (!OTPIsValid(verification)) return SendNotification("Incorrect OTP");
 
@@ -75,45 +77,76 @@ export default function RegisterPage() {
             });
     };
 
+    useEffect(() => {
+        document.title = "Register - Bhariya";
+    }, []);
+
     return (<div className="min-h-screen flex items-center justify-center">
         <div className="w-full max-w-sm">
-            <div className="rounded-2xl p-8 shadow-2xl" style={{
-                background: 'linear-gradient(180deg, rgba(12,14,18,0.9), rgba(7,8,10,0.85))', border: '1px solid rgba(255,255,255,0.02)'
-            }}>
+            <div className="rounded-2xl p-8 shadow-2xl"
+                 style={{
+                     background: 'linear-gradient(180deg, rgba(12,14,18,0.9), rgba(7,8,10,0.85))',
+                     border: '1px solid rgba(255,255,255,0.02)'
+                    }}>
                 <div className="flex flex-col items-center gap-4 mb-4">
-                    <h2 className="text-xl font-semibold text-white">Sign Up</h2>
+                    <h2 className="text-xl font-semibold text-white">
+                        Sign Up
+                    </h2>
                     <div className="text-sm text-gray-400">
-                        {currentStep === 1 ? ("Access your account") : (<div className="flex items-center gap-2">
+                        {currentStep === 1 ?
+                            "Access your account"
+                            :
+                            <div className="flex items-center gap-2">
                             <span>{email}</span>
-                            <span
-                                onClick={() => setCurrentStep(1)}
-                                className="text-indigo-400 cursor-pointer"
-                            >Not you?
-                                </span>
-                        </div>)}
+                            <span className="text-indigo-400 cursor-pointer"
+                                onClick={() => setCurrentStep(1)}>
+                                Not you?
+                            </span>
+                        </div>}
                     </div>
                 </div>
                 <div className="space-y-4">
-
                     {currentStep === 1 && <>
-                        <NameInput value={name} onValueChange={setName} disabled={currentStep !== 1 || uiDisabled}/>
-                        <EmailInput value={email} onValueChange={setEmail} disabled={currentStep !== 1 || uiDisabled}/>
-                        <PasswordInput disabled={currentStep !== 1 || uiDisabled} value={password}
-                                       onValueChange={setPassword}
-                                       confirm={passwordConfirmation}
-                                       onConfirmChange={setPasswordConfirmation}
-                                       needsConfirm={true}/>
-                        <RememberCheckbox checked={remember} onCheckedChange={setRemember} disabled={currentStep !== 1 || uiDisabled}/>
+                        <NameInput
+                            value={name}
+                            onValueChange={setName}
+                            disabled={uiDisabled || currentStep !== 1}/>
+                        <EmailInput
+                            value={email}
+                            onValueChange={setEmail}
+                            disabled={uiDisabled || currentStep !== 1}/>
+                        <PasswordInput
+                            disabled={uiDisabled || currentStep !== 1}
+                            value={password}
+                            onValueChange={setPassword}
+                            confirm={passwordConfirmation}
+                            onConfirmChange={setPasswordConfirmation}
+                            needsConfirm={true}/>
+                        <RememberCheckbox
+                            checked={remember}
+                            onCheckedChange={setRemember}
+                            disabled={uiDisabled || currentStep !== 1}/>
                     </>}
-                    {currentStep === 2 && <>
-                        <button type="button" onClick={Step1} className="flex-end text-xs text-indigo-400 hover:underline">
-                            Resend OTP
-                        </button>
-                        <OTPInput value={verification} onValueChange={setVerification} disabled={uiDisabled}/></>}
-                    <SubmitButton text={currentStep === 1 ? "Verify Email" : "VERIFY OTP"}
-                                  onClick={currentStep === 1 ? Step1 : Step2} disabled={uiDisabled}/>
+                    {currentStep === 2 &&
+                        <>
+                            <button className="flex-end text-xs text-indigo-400 hover:underline"
+                                type="button"
+                                onClick={Step1}>
+                                Resend OTP
+                            </button>
+                            <OTPInput
+                                value={verification}
+                                onValueChange={setVerification}
+                                disabled={uiDisabled || currentStep !== 2}/>
+                        </>
+                    }
+                    <SubmitButton
+                        text={currentStep === 1 ? "Verify Email" : "Verify OTP"}
+                        onClick={currentStep === 1 ? Step1 : Step2}
+                        disabled={uiDisabled}/>
                     <Divider/>
-                    <SSOButtons disabled={uiDisabled}/>
+                    <SSOButtons
+                        disabled={uiDisabled}/>
                     <p className="text-center text-sm text-gray-500 mt-4">
                         Already have an account?&nbsp;
                         <Link to="/login" className="text-indigo-400 hover:underline">

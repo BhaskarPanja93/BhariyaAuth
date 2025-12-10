@@ -30,7 +30,7 @@ export default function OTPInput({value, onValueChange, disabled}) {
             <InputOtp
                 value={value}
                 onChange={(e) => onValueChange(e.value)}
-                inputTemplate={({events, props}) => <input {...events} {...props} type="text" className="custom-otp-input"/>}
+                inputTemplate={({events, props}) => <input {...events} {...props} type="text" className="custom-otp-input" name="otp-input"/>}
                 length={6}
                 disabled={disabled}
             />

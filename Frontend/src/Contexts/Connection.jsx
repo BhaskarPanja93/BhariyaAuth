@@ -25,8 +25,9 @@ export default function ConnectionProvider ({children}) {
         return GatewayErrors.current[host] || 0
     }
     const ResetGatewayErrors = (host) => {
-        if (GatewayErrors.current[host] !== 0 && !isNaN(GatewayErrors.current[host]))
+        if (GatewayErrors.current[host] !== 0 && GatewayErrors.current[host] !== undefined) {
             SendNotification("Server is back online")
+        }
         GatewayErrors.current[host] = 0
     }
     const IncrementGatewayErrors = (host) => {
@@ -44,7 +45,7 @@ export default function ConnectionProvider ({children}) {
         currentLoginPopup.current = new Promise(async (resolve, _) => {
             const popup = window.open(FrontendURL+"/login", "_blank");
             if (!popup) {
-                SendNotification("Please allow popups to proceed with LoginPage")
+                SendNotification("Please allow popups to proceed with Login")
                 await Sleep(1)
                 currentLoginPopup.current = null
                 return resolve(false);
@@ -197,16 +198,16 @@ export default function ConnectionProvider ({children}) {
                 await IsServerOnline(config.host)
             }
         }
-        if (AccessToken.current !== "") config.headers["Authorization"] = AccessToken.current;
-        if (config.requiresCSRF) {
-            let csrf = Cookies.get(CSRFCookiePath);
-            if (!csrf) return Promise.reject(config)
-            config.headers["CSRF"] = csrf
-        }
+        if (AccessToken.current !== "") config.headers["authorization"] = AccessToken.current;
         if (config.requiresMFA) {
             let mfa = Cookies.get(MFACookiePath);
             if (!mfa) return Promise.reject(config)
-            config.headers["MFA"] = mfa
+            config.headers["mfa"] = mfa
+        }
+        if (config.requiresCSRF) {
+            let csrf = Cookies.get(CSRFCookiePath);
+            if (!csrf) return Promise.reject(config)
+            config.headers["csrf"] = csrf
         }
         return config
     }
@@ -251,7 +252,7 @@ export default function ConnectionProvider ({children}) {
             if (!config.forTokenRefresh) {
                 if (await RefreshToken()) {
                     return await RetryRequest(privateAPI, config)
-                } else if (!config.skipLogin) {
+                } else if (!config.skipLogin || AccessToken.current) {
                     if (await OpenLoginPopup())
                         return await RetryRequest(privateAPI, config)
                     else

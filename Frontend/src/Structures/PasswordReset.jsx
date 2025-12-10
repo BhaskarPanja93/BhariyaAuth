@@ -1,4 +1,4 @@
-import {useRef, useState} from 'react'
+import {useEffect, useRef, useState} from 'react'
 import SubmitButton from "../Elements/SubmitButton.jsx";
 import PasswordInput from "../Elements/PasswordInput.jsx";
 import {EmailIsValid, OTPIsValid} from "../Utils/Strings.js";
@@ -23,6 +23,7 @@ export default function PasswordReset({disabled}) {
     const currentToken = useRef("")
 
     const Step1 = () => {
+        setCurrentStep(1)
         if (!EmailIsValid(email)) return SendNotification("Email is invalid");
 
         setUiDisabled(true);
@@ -42,6 +43,7 @@ export default function PasswordReset({disabled}) {
     };
 
     const Step2 = () => {
+        setCurrentStep(2)
         if (!currentToken.current) return SendNotification("Step 1 incomplete. Please resend OTP");
         if (password !== passwordConfirmation) return SendNotification("Passwords don't match")
         if (!OTPIsValid(verification)) return SendNotification("Incorrect OTP");
@@ -62,28 +64,47 @@ export default function PasswordReset({disabled}) {
                 setUiDisabled(false);
             });
     };
+
+    useEffect(() => {
+        document.title = "PasswordReset - Bhariya";
+    }, [])
+
     return (<div className="min-h-screen flex items-center justify-center">
             <div className="w-full max-w-sm">
-                <div className="rounded-2xl p-8 shadow-2xl" style={{
-                    background: 'linear-gradient(180deg, rgba(12,14,18,0.9), rgba(7,8,10,0.85))',
-                    border: '1px solid rgba(255,255,255,0.02)'
-                }}>
+                <div className="rounded-2xl p-8 shadow-2xl"
+                     style={{
+                        background: 'linear-gradient(180deg, rgba(12,14,18,0.9), rgba(7,8,10,0.85))',
+                        border: '1px solid rgba(255,255,255,0.02)'
+                    }}>
                     <div className="flex flex-col items-center gap-4 mb-4">
                         <h2 className="text-xl font-semibold text-white">
                             Reset Password
                         </h2>
                     </div>
                     <div className="space-y-4">
-                        <EmailInput value={email} onValueChange={setEmail} disabled={uiDisabled || currentStep !== 1} hidden={currentStep === 2}/>
-                        {currentStep === 1 ?
-                            <SubmitButton text={"Send OTP"} onClick={Step1} disabled={disabled || currentStep !== 1}/>
-                            :
+                        <EmailInput
+                            value={email}
+                            onValueChange={setEmail}
+                            disabled={uiDisabled || currentStep !== 1}
+                            hidden={currentStep === 2}/>
+                        {currentStep === 2 &&
                             <>
-                                <OTPInput value={verification} onValueChange={setVerification} disabled={uiDisabled || currentStep !== 2}/>
-                                <PasswordInput disabled={disabled || currentStep !== 2} value={password} onValueChange={setPassword} confirm={passwordConfirmation} onConfirmChange={setPasswordConfirmation} needsConfirm={true}/>
-                                <SubmitButton text={"Update Password"} onClick={Step2} disabled={disabled || currentStep !== 2}/>
+                                <OTPInput
+                                    value={verification}
+                                    onValueChange={setVerification}
+                                    disabled={uiDisabled || currentStep !== 2}/>
+                                <PasswordInput
+                                    value={password} onValueChange={setPassword}
+                                    needsConfirm={true}
+                                    confirm={passwordConfirmation}
+                                    onConfirmChange={setPasswordConfirmation}
+                                    disabled={disabled || currentStep !== 2} />
                             </>
                         }
+                        <SubmitButton
+                            text={currentStep === 1 ? "Send OTP" : "Update Password"}
+                            onClick={currentStep === 1 ? Step1 : Step2}
+                            disabled={uiDisabled}/>
                     </div>
                 </div>
             </div>
