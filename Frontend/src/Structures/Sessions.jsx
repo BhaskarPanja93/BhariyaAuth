@@ -26,7 +26,7 @@ export default function Sessions() {
 
     const FetchDevices = () => {
         EnsureLoggedIn().then(s=>{
-            if (!s) return SendNotification("You need to be logged in to perform this action");
+            if (!s) return SendNotification("You need to be logged in to fetch devices");
             setLoading(true);
             privateAPI.post(BackendURL + "/sessions/fetch")
                 .then((data) => {
@@ -68,7 +68,7 @@ export default function Sessions() {
 
     const RevokeDevice = (revokeAll, deviceID) => {
         EnsureLoggedIn().then(s=> {
-            if (!s) return SendNotification("You need to be logged in to perform this action");
+            if (!s) return SendNotification("You need to be logged in to revoke a device");
             if (!userID.current) return SendNotification("Step 1 incomplete. Please refresh page.");
 
             setUiDisabled(true)

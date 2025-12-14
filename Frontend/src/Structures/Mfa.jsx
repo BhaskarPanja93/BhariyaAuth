@@ -23,7 +23,7 @@ export default function Mfa() {
 
     const Step1 = () => {
         EnsureLoggedIn().then(s=> {
-            if (!s) return SendNotification("You need to be logged in to perform this action");
+            if (!s) return SendNotification("You need to be logged in to send OTP");
             setUiDisabled(true);
             privateAPI.post(BackendURL + "/mfa/step1", {}, {requiresCSRF: true})
                 .then((data) => {
@@ -46,7 +46,7 @@ export default function Mfa() {
 
     const Step2 = () => {
         EnsureLoggedIn().then(s=> {
-            if (!s) return SendNotification("You need to be logged in to perform this action");
+            if (!s) return SendNotification("You need to be logged in to submit OTP");
             if (!currentToken.current) return SendNotification("Step 1 incomplete. Please resend OTP");
             if (!OTPIsValid(verification)) return SendNotification("Incorrect OTP");
 
@@ -58,7 +58,7 @@ export default function Mfa() {
                 .then((data) => {
                     if (data["success"]) {
                         SendNotification("Verification complete")
-                        navigate("/sessions");
+                        navigate("/");
                     }
                 })
                 .catch((error) => {

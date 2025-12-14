@@ -77,7 +77,7 @@ export default function LoginPage() {
             .then((data) => {
                 if (data["success"]) {
                     SendNotification("Logged In Successfully")
-                    navigate("/sessions");
+                    navigate("/");
                 }
             })
             .catch((error)=>{console.log("Login Step2 stopped because:", error)})

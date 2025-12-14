@@ -12,7 +12,7 @@ export default function SSOButtons({ disabled }) {
     const SSOAction = async (URL) => {
         if (await OpenPopup(URL)) {
             SendNotification("Logged In Successfully")
-            navigate("/sessions");
+            navigate("/");
         }
     }
 

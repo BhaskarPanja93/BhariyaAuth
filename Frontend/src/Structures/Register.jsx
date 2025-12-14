@@ -74,7 +74,7 @@ export default function RegisterPage() {
             .then((data) => {
                 if (data["success"]) {
                     SendNotification("Registered and logged in Successfully")
-                    navigate("/sessions")
+                    navigate("/")
                 }
             })
             .catch((error)=>{console.log("Register Step2 stopped because:", error)})

@@ -62,7 +62,7 @@ export default function PasswordReset({disabled}) {
             .then((data) => {
                 if (data["success"]) {
                     SendNotification("Password changed successfully")
-                    navigate("/sessions")
+                    navigate("/")
                 }
             })
             .catch((error)=>{console.log("PasswordReset Step2 stopped because:", error)})
