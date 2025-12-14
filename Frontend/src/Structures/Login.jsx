@@ -27,12 +27,13 @@ export default function LoginPage() {
     const [OTPDelay, setOTPDelay] = useState(0)
     const [remember, setRemember] = useState(false)
     const [email, setEmail] = useState("")
-    const [verification, setVerification] = useState()
+    const [verification, setVerification] = useState("")
 
     const tokens = useRef({})
 
     const Step1 = (tryOTP, resendOTP) => {
         if (!EmailIsValid(email)) return SendNotification("Email is invalid");
+        setVerification("")
         if (!tokens.current[email]) tokens.current[email] = {}
 
         if (tokens.current[email][tryOTP] && !resendOTP) {
