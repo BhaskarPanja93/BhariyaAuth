@@ -10,7 +10,6 @@ func Set(ctx fiber.Ctx) {
 func Get(ctx fiber.Ctx) uint16 {
 	if ctx.Locals(flagKey) == true {
 		return 100
-	} else {
-		return 1
 	}
+	return 1
 }

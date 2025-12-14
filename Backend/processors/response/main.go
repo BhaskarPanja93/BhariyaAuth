@@ -33,7 +33,20 @@ window.addEventListener('beforeunload', () => {
 }
 
 func SSOFailurePopup(ctx fiber.Ctx, reason string) error {
-	return ctx.Type("html").SendString(fmt.Sprintf("<html><body><h2>%s</h2></body></html>", reason))
+	return ctx.Type("html").SendString(fmt.Sprintf(`
+<html>
+	<script>
+		window.addEventListener('beforeunload', () => {
+			if (!window._authSuccess) {
+				window.opener?.postMessage({ success: false }, window.location.origin);
+			}
+		})
+	</script>
+	<body>
+		<h2>%s</h2>
+	</body>
+</html>
+`, reason))
 }
 
 func AttachAuthCookies(ctx fiber.Ctx, token TokenModels.NewTokenCombinedT) {
@@ -69,7 +82,7 @@ func AttachSSOCookie(ctx fiber.Ctx, value string) {
 		MaxAge:   int(Config.SSOCookieExpireDelta.Seconds()),
 		Secure:   true,
 		HTTPOnly: true,
-		SameSite: fiber.CookieSameSiteStrictMode,
+		SameSite: fiber.CookieSameSiteLaxMode,
 		Domain:   Config.CookieDomain,
 	})
 
@@ -110,7 +123,7 @@ func DetachSSOCookies(ctx fiber.Ctx) {
 		Name:     Config.SSOStateInCookie,
 		Value:    "",
 		MaxAge:   1,
-		SameSite: fiber.CookieSameSiteStrictMode,
+		SameSite: fiber.CookieSameSiteLaxMode,
 		Domain:   Config.CookieDomain,
 	})
 

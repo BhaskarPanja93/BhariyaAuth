@@ -14,22 +14,23 @@ type allT struct {
 
 var All = allT{
 	Unknown: T{
-		Short:  "Unknown",
+		Short:  "U",
 		Claims: []string{},
 	},
 	Viewer: T{
-		Short:  "Viewer",
+		Short:  "V",
 		Claims: []string{"viewer"},
 	},
 	Technical: T{
-		Short:  "Technical",
+		Short:  "T",
 		Claims: []string{"technical", "viewer"},
 	},
 	Admin: T{
-		Short:  "Admin",
+		Short:  "A",
 		Claims: []string{"admin", "technical", "viewer"},
 	},
 }
+
 var _ByName map[string]T
 
 func init() {

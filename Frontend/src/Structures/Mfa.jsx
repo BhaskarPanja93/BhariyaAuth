@@ -32,7 +32,7 @@ export default function Mfa() {
                         currentToken.current = data["reply"]
                         setCurrentStep(2)
                     } else if (data["reply"]) {
-                        Countdown(data["reply"], OTPResendTimerID, setOTPDelay).then()
+                        Countdown(data["reply"], 0.1, OTPResendTimerID, setOTPDelay).then()
                     }
                 })
                 .catch((error) => {

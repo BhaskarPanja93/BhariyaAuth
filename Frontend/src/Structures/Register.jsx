@@ -53,7 +53,7 @@ export default function RegisterPage() {
                     currentToken.current = data["reply"];
                     setCurrentStep(2)
                 } else if (data["reply"]) {
-                    Countdown(data["reply"], OTPResendTimerID, setOTPDelay).then()
+                    Countdown(data["reply"], 0.1, OTPResendTimerID, setOTPDelay).then()
                 }
             })
             .catch((error)=>{console.log("Register Step1 stopped because:", error)})

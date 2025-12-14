@@ -128,30 +128,29 @@ func Step2(ctx fiber.Ctx) error {
 		ResponseProcessor.AttachAuthCookies(ctx, token)
 		Logger.Success(fmt.Sprintf("[SSO2] Registered: [UID-%d-RID-%d-MAIL-%s]", userID, refreshID, user.Email))
 		return ResponseProcessor.SSOSuccessPopup(ctx, token.AccessToken)
-	} else {
-		if AccountProcessor.CheckUserIsBlacklisted(userID) {
-			Logger.IntentionalFailure(fmt.Sprintf("[SSO2] Blacklisted account [UID-%d]", userID))
-			return ResponseProcessor.SSOFailurePopup(ctx, "Your account is disabled, please contact support")
-		}
-		refreshID := Generators.RefreshID()
-		if !AccountProcessor.RecordReturningUser(user.Email, ctx.Get("User-Agent"), refreshID, userID, state.RememberMe) {
-			Logger.AccidentalFailure(fmt.Sprintf("[SSO2] RecordNewReturning Failed for [UID-%d]", userID))
-			return ResponseProcessor.SSOFailurePopup(ctx, "Failed to login, please try again or contact support")
-		}
-		token, ok := TokenProcessor.CreateFreshToken(
-			userID,
-			refreshID,
-			AccountProcessor.GetUserType(userID),
-			state.RememberMe,
-			fmt.Sprintf("%s-login", state.Provider),
-		)
-		if !ok {
-			return ResponseProcessor.SSOFailurePopup(ctx, "Could not create token. Please try again")
-		}
-		ResponseProcessor.AttachAuthCookies(ctx, token)
-		Logger.Success(fmt.Sprintf("[SSO2] LoggedIn: [UID-%d-RID-%d-MAIL-%s]", userID, refreshID, user.Email))
-		return ResponseProcessor.SSOSuccessPopup(ctx, token.AccessToken)
 	}
+	if AccountProcessor.CheckUserIsBlacklisted(userID) {
+		Logger.IntentionalFailure(fmt.Sprintf("[SSO2] Blacklisted account [UID-%d]", userID))
+		return ResponseProcessor.SSOFailurePopup(ctx, "Your account is disabled, please contact support")
+	}
+	refreshID := Generators.RefreshID()
+	if !AccountProcessor.RecordReturningUser(user.Email, ctx.Get("User-Agent"), refreshID, userID, state.RememberMe) {
+		Logger.AccidentalFailure(fmt.Sprintf("[SSO2] RecordNewReturning Failed for [UID-%d]", userID))
+		return ResponseProcessor.SSOFailurePopup(ctx, "Failed to login, please try again or contact support")
+	}
+	token, ok := TokenProcessor.CreateFreshToken(
+		userID,
+		refreshID,
+		AccountProcessor.GetUserType(userID),
+		state.RememberMe,
+		fmt.Sprintf("%s-login", state.Provider),
+	)
+	if !ok {
+		return ResponseProcessor.SSOFailurePopup(ctx, "Could not create token. Please try again")
+	}
+	ResponseProcessor.AttachAuthCookies(ctx, token)
+	Logger.Success(fmt.Sprintf("[SSO2] LoggedIn: [UID-%d-RID-%d-MAIL-%s]", userID, refreshID, user.Email))
+	return ResponseProcessor.SSOSuccessPopup(ctx, token.AccessToken)
 }
 
 func Step1(ctx fiber.Ctx) error {

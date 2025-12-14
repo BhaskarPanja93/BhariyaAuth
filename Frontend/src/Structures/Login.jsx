@@ -52,7 +52,7 @@ export default function LoginPage() {
                     setUseOtp(tryOTP)
                     setCurrentStep(2)
                 } else if (data["reply"]){
-                    Countdown(data["reply"], OTPResendTimerID, setOTPDelay).then()
+                    Countdown(data["reply"], 0.1, OTPResendTimerID, setOTPDelay).then()
                 }
             })
             .catch((error)=>{console.log("Login Step1 stopped because:", error)})

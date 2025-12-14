@@ -69,7 +69,7 @@ export default function Sessions() {
     const RevokeDevice = (revokeAll, deviceID) => {
         EnsureLoggedIn().then(s=> {
             if (!s) return SendNotification("You need to be logged in to perform this action");
-            if (!userID.current) return SendNotification("Step 1 incomplete. Please login or refresh page");
+            if (!userID.current) return SendNotification("Step 1 incomplete. Please refresh page.");
 
             setUiDisabled(true)
             const form = new FormData();

@@ -9,8 +9,7 @@ import {BackendURL, CSRFCookiePath, FrontendDomain, FrontendURL, MFACookiePath} 
  * @typedef {Object} ConnectionContextType
  * @property {import("axios").AxiosInstance} publicAPI
  * @property {import("axios").AxiosInstance} privateAPI
- * @property {() => Promise<boolean>} OpenLoginPopup
- * @property {() => Promise<boolean>} RefreshToken
+ * @property {(string) => Promise<boolean>} OpenPopup
  * @property {() => Promise<boolean>} Logout
  * @property {() => Promise<boolean>} EnsureLoggedIn
  */
@@ -41,78 +40,29 @@ export default function ConnectionProvider ({children}) {
         GatewayErrors.current[host] = 1
     }
 
-    const currentLoginPopup = useRef(null)
-    const OpenLoginPopup = () => {
-        if (currentLoginPopup.current) return currentLoginPopup.current;
-        currentLoginPopup.current = new Promise(async (resolve, _) => {
+    const currentPopup = useRef({})
+    const OpenPopup = (URL) => {
+        if (currentPopup.current[URL]) return currentPopup.current[URL];
+        currentPopup.current[URL] = new Promise(async (resolve, _) => {
             const popup = window.open(
-                FrontendURL + "/login",
-                "Login",
+                URL,
+                URL,
                 "width=500,height=750,menubar=no,toolbar=no,location=no,status=no,resizable=no,scrollbars=no"
-            );
+            )
             if (!popup) {
-                SendNotification("Please allow popups to proceed with Login")
-                await Sleep(1)
-                currentLoginPopup.current = null
+                currentPopup.current[URL] = null
                 return resolve(false);
             }
             let finished = false;
             function onMessage(event) {
                 if (event.source === popup && event.origin === FrontendDomain) {
-                    window.removeEventListener("message", onMessage);
-                    if (event.data && event.data && event.data.success) {
-                        if (event.data["token"]) {
-                            finished = true;
-                            AccessToken.current = event.data["token"]
-                            currentLoginPopup.current = null;
-                            if (window.opener) {
-                                window.opener.postMessage({success: true, token: AccessToken.current}, window.location.origin);
-                                window.close();
-                            }
-                            return resolve(true);
-                        }
-                    }
-                }
-            }
-            window.addEventListener("message", onMessage);
-            while (!popup.closed) await Sleep(200)
-            if (!finished) {
-                currentLoginPopup.current = null;
-                window.removeEventListener("message", onMessage);
-                if (window.opener) {
-                    window.opener.postMessage({success: false}, window.location.origin);
-                    window.close();
-                }
-                return resolve(false);
-            }
-        });
-        return currentLoginPopup.current;
-    }
-
-    const currentMFAPopup = useRef(null);
-    const OpenMFAPopup = () => {
-        if (currentMFAPopup.current) return currentMFAPopup.current;
-        currentMFAPopup.current = new Promise(async (resolve, _) => {
-            const popup = window.open(
-                FrontendURL + "/mfa",
-                "MFA",
-                "width=500,height=400,menubar=no,toolbar=no,location=no,status=no,resizable=no,scrollbars=nos"
-            );
-            if (!popup) {
-                SendNotification("Please allow popups to proceed with MFA")
-                await Sleep(1)
-                currentMFAPopup.current = null
-                return resolve(false);
-            }
-            let finished = false;
-            function onMessage(event) {
-                if (event.source === popup && event.origin === FrontendURL) {
-                    window.removeEventListener("message", onMessage);
-                    if (event.data && event.data && event.data.success) {
-                        finished = true;
-                        currentMFAPopup.current = null;
+                    if (event.data && event.data.success) {
+                        window.removeEventListener("message", onMessage);
+                        finished = true
+                        if (event.data["token"]) AccessToken.current = event.data["token"]
+                        currentPopup.current[URL] = null;
                         if (window.opener) {
-                            window.opener.postMessage({success: true}, window.location.origin);
+                            window.opener.postMessage({success: true, token: event.data["token"]}, window.location.origin);
                             window.close();
                         }
                         return resolve(true);
@@ -122,16 +72,12 @@ export default function ConnectionProvider ({children}) {
             window.addEventListener("message", onMessage);
             while (!popup.closed) await Sleep(200)
             if (!finished) {
-                currentMFAPopup.current = null;
+                currentPopup.current[URL] = null;
                 window.removeEventListener("message", onMessage);
-                if (window.opener) {
-                    window.opener.postMessage({success: false}, window.location.origin);
-                    window.close();
-                }
                 return resolve(false);
             }
         });
-        return currentMFAPopup.current;
+        return currentPopup.current[URL];
     }
 
     const currentPings = useRef({});
@@ -159,6 +105,7 @@ export default function ConnectionProvider ({children}) {
                 requiresCSRF: true,
                 forAccessFetch: true,
             }).then(()=>{
+                SendNotification("Logged out")
                 resolve(true)
             }).catch(() => {
                 resolve(false)
@@ -178,7 +125,6 @@ export default function ConnectionProvider ({children}) {
                 forTokenRefresh: true,
                 forAccessFetch: true,
             }).then(()=>{
-                SendNotification("Access refreshed..")
                 resolve(true)
             }).catch(() => {
                 resolve(false)
@@ -190,7 +136,7 @@ export default function ConnectionProvider ({children}) {
     }
 
     const EnsureLoggedIn = async () => {
-        return IsLoggedIn.current || await RefreshToken() || await OpenLoginPopup()
+        return IsLoggedIn.current || await RefreshToken() || await OpenPopup(FrontendURL+"/login")
     }
 
     const RetryRequest = async (connection, config) => {
@@ -269,8 +215,7 @@ export default function ConnectionProvider ({children}) {
                 if (await RefreshToken()) {
                     return await RetryRequest(privateAPI, config)
                 } else if (!config.skipLogin || AccessToken.current) {
-                    let loginPopupPromise = OpenLoginPopup()
-                    if (await loginPopupPromise())
+                    if (await OpenPopup(FrontendURL+"/login"))
                         return await RetryRequest(privateAPI, config)
                     else
                         return Promise.reject("Authentication stopped")
@@ -285,7 +230,7 @@ export default function ConnectionProvider ({children}) {
                 config.requiresMFA = true;
                 return await RetryRequest(privateAPI, config)
             } else {
-                if (await OpenMFAPopup())
+                if (await OpenPopup(FrontendURL+"/mfa"))
                     return await RetryRequest(privateAPI, config)
                 else
                     return Promise.reject("Mfa stopped")
@@ -336,7 +281,7 @@ export default function ConnectionProvider ({children}) {
     privateAPI.interceptors.request.use(RequestFulfilledInterceptor, RequestRejectedInterceptor)
     privateAPI.interceptors.response.use(ResponseFulfilledInterceptor, ResponseRejectedInterceptor)
 
-    return (<ConnectionContext.Provider value={{publicAPI, privateAPI, OpenLoginPopup, RefreshToken, Logout, EnsureLoggedIn}}>
+    return (<ConnectionContext.Provider value={{publicAPI, privateAPI, OpenPopup, Logout, EnsureLoggedIn}}>
         {children}
     </ConnectionContext.Provider>);
 };

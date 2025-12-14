@@ -98,9 +98,8 @@ func Send(mail string, identifier string) (string, time.Duration) {
 		Stores.RedisClient.Set(Stores.Ctx, key, otp, 5*time.Minute)
 		currentDelay = RecordSent(rateLimitKey, alreadySentCount+1)
 		return verification, currentDelay
-	} else {
-		return "", currentDelay
 	}
+	return "", currentDelay
 }
 
 func Validate(verification, otp string) bool {

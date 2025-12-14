@@ -1,18 +1,18 @@
 import {Sleep} from "./Sleep.js";
 
-export const Countdown = async (seconds, currentCountdownIDRef, setValue) => {
-    let dummyValue = seconds
-    if (isNaN(seconds)) return
+export const Countdown = async (duration, interval, currentCountdownIDRef, setter) => {
+    let dummyValue = duration
+    if (isNaN(duration)) return
     const newID = currentCountdownIDRef.current + 1
     currentCountdownIDRef.current = newID
-    await Sleep(100)
-    setValue(seconds)
+    await Sleep(interval)
+    setter(duration)
     while (newID === currentCountdownIDRef.current && dummyValue !== 0) {
-        let newTime = dummyValue-0.1
+        let newTime = dummyValue-interval
         if (newTime < 0)
             newTime = 0
-        setValue(newTime)
+        setter(newTime)
         dummyValue = newTime
-        await Sleep(100)
+        await Sleep(interval)
     }
 }

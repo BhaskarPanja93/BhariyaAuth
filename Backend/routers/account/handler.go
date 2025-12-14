@@ -92,8 +92,7 @@ func ProcessLogout(ctx fiber.Ctx) error {
 	ResponseProcessor.DetachMFACookies(ctx)
 	ResponseProcessor.DetachAuthCookies(ctx)
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-		Success:       true,
-		ModifyAuth:    true,
-		Notifications: []string{"Logged Out Successfully"},
+		Success:    true,
+		ModifyAuth: true,
 	})
 }
