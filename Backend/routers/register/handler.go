@@ -1,6 +1,7 @@
 package register
 
 import (
+	MailModels "BhariyaAuth/models/mail"
 	ResponseModels "BhariyaAuth/models/responses"
 	TokenModels "BhariyaAuth/models/tokens"
 	UserTypes "BhariyaAuth/models/users"
@@ -172,7 +173,7 @@ func Step1(ctx fiber.Ctx) error {
 		Name:       form.Name,
 		Password:   form.Password,
 	}
-	verification, retry := OTPProcessor.Send(form.MailAddress, "Email Verification", "Enter the OTP below to complete your registration:", true, ctx.IP())
+	verification, retry := OTPProcessor.Send(form.MailAddress, MailModels.All.RegisterInitiate, ctx.IP())
 	if verification == "" {
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 			Success:       false,

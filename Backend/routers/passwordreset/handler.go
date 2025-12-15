@@ -1,6 +1,7 @@
 package passwordreset
 
 import (
+	MailModels "BhariyaAuth/models/mail"
 	ResponseModels "BhariyaAuth/models/responses"
 	TokenModels "BhariyaAuth/models/tokens"
 	AccountProcessor "BhariyaAuth/processors/account"
@@ -109,7 +110,7 @@ func Step1(ctx fiber.Ctx) error {
 		UserID:    userID,
 		Step2Code: "",
 	}
-	verification, retry := OTPProcessor.Send(form.MailAddress, "Password Reset Verification", "Use the OTP below to reset your account password:", true, ctx.IP())
+	verification, retry := OTPProcessor.Send(form.MailAddress, MailModels.All.PasswordResetInitiate, ctx.IP())
 	if verification == "" {
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 			Success:       false,

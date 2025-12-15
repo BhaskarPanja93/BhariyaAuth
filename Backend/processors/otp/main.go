@@ -2,6 +2,7 @@ package otp
 
 import (
 	Config "BhariyaAuth/constants/config"
+	MailModels "BhariyaAuth/models/mail"
 	Generators "BhariyaAuth/processors/generator"
 	MailNotifier "BhariyaAuth/processors/mail"
 	Stores "BhariyaAuth/stores"
@@ -85,12 +86,12 @@ func RecordSent(identifier string, value int64) time.Duration {
 	return calculateResendDelay(value)
 }
 
-func Send(mail string, subject string, heading string, ignorable bool, identifier string) (string, time.Duration) {
+func Send(mail string, mailOptions MailModels.T, identifier string) (string, time.Duration) {
 	rateLimitKey := fmt.Sprintf("%s:%s", mail, identifier)
 	canSend, alreadySentCount, currentDelay := CheckCanSend(rateLimitKey)
 	if canSend {
 		otp := Generators.SafeNumber(6)
-		if success := MailNotifier.OTP(mail, subject, heading, otp, ignorable, 2); !success {
+		if success := MailNotifier.OTP(mail, otp, mailOptions, 2); !success {
 			return "", currentDelay
 		}
 		verification := Generators.SafeString(10)

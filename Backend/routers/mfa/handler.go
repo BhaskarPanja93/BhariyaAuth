@@ -1,6 +1,7 @@
 package mfa
 
 import (
+	MailModels "BhariyaAuth/models/mail"
 	ResponseModels "BhariyaAuth/models/responses"
 	TokenModels "BhariyaAuth/models/tokens"
 	AccountProcessor "BhariyaAuth/processors/account"
@@ -125,7 +126,7 @@ func Step1(ctx fiber.Ctx) error {
 		RateLimitProcessor.Set(ctx)
 		return ctx.SendStatus(fiber.StatusInternalServerError)
 	}
-	verification, retry := OTPProcessor.Send(mail, "Multi-Factor Verification", "Enter the OTP below to complete MFA verification:", false, fmt.Sprintf("%s:verified", ctx.IP()))
+	verification, retry := OTPProcessor.Send(mail, MailModels.All.MFAInitiate, fmt.Sprintf("%s:verified", ctx.IP()))
 	if verification == "" {
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 			Success:       false,

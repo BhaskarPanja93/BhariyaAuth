@@ -2,6 +2,7 @@ package mail
 
 import (
 	Secrets "BhariyaAuth/constants/secrets"
+	MailModels "BhariyaAuth/models/mail"
 	Logger "BhariyaAuth/processors/logs"
 	"context"
 	"fmt"
@@ -62,10 +63,10 @@ func sendMail(mail, subject, content string, attempts uint8) bool {
 	return true
 }
 
-func OTP(mail, subject string, heading string, otp string, ignorable bool, attempts uint8) bool {
+func OTP(mail, otp string, mailOptions MailModels.T, attempts uint8) bool {
 	ignorableText := `
 	<p style="margin: 0; font-size: 12px; color: #6b7280;">you can safely ignore this message</p>`
-	if !ignorable {
+	if !mailOptions.Ignorable {
 		ignorableText = `<a href="https://bhariya.ddns.net/auth/passwordreset" style="margin: 0; font-size: 14px; color: #5865f2;" target="_blank"><b>change your password immediately</b></a>`
 	}
 	content := fmt.Sprintf(`
@@ -75,33 +76,29 @@ func OTP(mail, subject string, heading string, otp string, ignorable bool, attem
     <meta charset="UTF-8" />
     <title>BhariyaAuth OTP</title>
 </head>
-
 <body style="
     margin:0;
     padding:0;
     background-color: #eef0f3;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
 ">
-<table width="100%" cellpadding="0" cellspacing="0">
+<table width="100%%" cellpadding="0" cellspacing="0">
     <tr>
         <td align="center" style="padding: 48px 16px;">
-
-            <table width="100%" cellpadding="0" cellspacing="0" style="
+            <table width="100%%" cellpadding="0" cellspacing="0" style="
                 max-width: 520px;
                 background-color: #ffffff;
                 border-radius: 14px;
                 border: 1px solid #e5e7eb;
                 overflow: hidden;
             ">
-
                 <tr>
                     <td style="
                         background: linear-gradient(135deg, #1f2937, #0b0d10);
                         padding: 28px;
                         border-bottom: 1px solid #1f2937;
                     " align="center">
-
-                        <table width="100%" cellpadding="0" cellspacing="0" style="
+                        <table width="100%%" cellpadding="0" cellspacing="0" style="
                             border: 1px solid rgba(255,255,255,0.12);
                             border-radius: 10px;
                         ">
@@ -119,18 +116,15 @@ func OTP(mail, subject string, heading string, otp string, ignorable bool, attem
 
                     </td>
                 </tr>
-
                 <tr>
                     <td style="padding: 28px;">
-
-                        <table width="100%" cellpadding="0" cellspacing="0" style="
+                        <table width="100%%" cellpadding="0" cellspacing="0" style="
                             background-color: #ffffff;
                             border: 1px solid #e5e7eb;
                             border-radius: 10px;
                         ">
                             <tr>
                                 <td style="padding: 28px; text-align: center;">
-
                                     <p style="
                                         margin: 0 0 16px;
                                         font-size: 15px;
@@ -139,7 +133,6 @@ func OTP(mail, subject string, heading string, otp string, ignorable bool, attem
                                     ">
                                         %s
                                     </p>
-
                                     <div style="
                                         margin: 24px auto;
                                         padding: 14px 28px;
@@ -153,7 +146,6 @@ func OTP(mail, subject string, heading string, otp string, ignorable bool, attem
                                     ">
                                         %s
                                     </div>
-
                                     <p style="
                                         margin: 20px 0 0;
                                         font-size: 13px;
@@ -161,18 +153,15 @@ func OTP(mail, subject string, heading string, otp string, ignorable bool, attem
                                     ">
                                         This OTP is valid for <strong>5 minutes</strong>.
                                     </p>
-
                                 </td>
                             </tr>
                         </table>
-
                     </td>
                 </tr>
-
                 <tr>
                     <td style="padding: 0 28px 28px;">
 
-                        <table width="100%" cellpadding="0" cellspacing="0" style="
+                        <table width="100%%" cellpadding="0" cellspacing="0" style="
                             background-color: #f9fafb;
                             border: 1px solid #e5e7eb;
                             border-radius: 10px;
@@ -190,20 +179,16 @@ func OTP(mail, subject string, heading string, otp string, ignorable bool, attem
                                 </td>
                             </tr>
                         </table>
-
                     </td>
                 </tr>
-
             </table>
-
         </td>
     </tr>
 </table>
 </body>
 </html>
-
-`, heading, otp, ignorableText)
-	return sendMail(mail, subject, content, attempts)
+`, mailOptions.Header, otp, ignorableText)
+	return sendMail(mail, mailOptions.Subject, content, attempts)
 }
 
 func NewLogin(mail string, attempts uint8) bool {
