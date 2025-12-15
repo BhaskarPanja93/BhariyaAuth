@@ -192,7 +192,144 @@ func OTP(mail, otp string, mailOptions MailModels.T, attempts uint8) bool {
 }
 
 func NewLogin(mail string, mailOptions MailModels.T, attempts uint8) bool {
-	content := `A new device has logged in to your account.`
+	content := `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>New Login Detected</title>
+</head>
+<body style="
+    margin:0;
+    padding:0;
+    background-color: #eef0f3;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+">
+<table width="100%%" cellpadding="0" cellspacing="0">
+    <tr>
+        <td align="center" style="padding: 48px 16px;">
+
+            <table width="100%%" cellpadding="0" cellspacing="0" style="
+                max-width: 520px;
+                background-color: #ffffff;
+                border-radius: 14px;
+                border: 1px solid #e5e7eb;
+                overflow: hidden;
+            ">
+
+                <tr>
+                    <td style="
+                        background: linear-gradient(135deg, #1f2937, #0b0d10);
+                        padding: 28px;
+                        border-bottom: 1px solid #1f2937;
+                    " align="center">
+                        <table width="100%%" cellpadding="0" cellspacing="0" style="
+                            border: 1px solid rgba(255,255,255,0.12);
+                            border-radius: 10px;
+                        ">
+                            <tr>
+                                <td align="center" style="padding: 20px;">
+                                    <img
+                                            src="https://bhariya.ddns.net/auth/favicon-dark-mode.png"
+                                            alt="Bhariya"
+                                            width="120"
+                                            style="display:block;"
+                                    />
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="padding: 28px;">
+                        <table width="100%%" cellpadding="0" cellspacing="0" style="
+                            background-color: #ffffff;
+                            border: 1px solid #e5e7eb;
+                            border-radius: 10px;
+                        ">
+                            <tr>
+                                <td style="padding: 28px;">
+
+                                    <p style="
+                                        margin: 0 0 12px;
+                                        font-size: 15px;
+                                        color: #374151;
+                                    ">
+                                        <strong>Hey,</strong>
+                                    </p>
+
+                                    <p style="
+                                        margin: 0 0 20px;
+                                        font-size: 15px;
+                                        color: #374151;
+                                        line-height: 1.5;
+                                    ">
+                                        There was a new login to your account. We’re letting you know to help keep your account safe.
+                                    </p>
+
+                                    <!-- Device Info -->
+                                    <table width="100%%" cellpadding="0" cellspacing="0" style="
+                                        border: 1px solid #e5e7eb;
+                                        border-radius: 8px;
+                                    ">
+                                        <tr>
+                                            <td style="padding: 16px; vertical-align: center;" width="56">
+                                                %s
+                                            </td>
+                                            <td style="padding: 16px;">
+                                                <p style="margin:0; font-size:14px; color:#374151;">
+                                                    <strong>IP Address:</strong> %s
+                                                </p>
+                                                <p style="margin:6px 0 0; font-size:14px; color:#374151;">
+                                                    <strong>Device:</strong> %s
+                                                </p>
+                                                <p style="margin:6px 0 0; font-size:14px; color:#374151;">
+                                                    <strong>Browser:</strong> %s
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    </table>
+
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td style="padding: 0 28px 28px;">
+                        <table width="100%%" cellpadding="0" cellspacing="0" style="
+                            background-color: #f9fafb;
+                            border: 1px solid #e5e7eb;
+                            border-radius: 10px;
+                        ">
+                            <tr>
+                                <td style="padding: 18px; text-align: center;">
+                                    <p style="
+                                        margin: 0;
+                                        font-size: 12px;
+                                        color: #6b7280;
+                                    ">
+                                        If this wasn't you,
+                                    </p>
+                                    <a href="https://bhariya.ddns.net/auth/passwordreset" style="margin: 0; font-size: 14px; color: #5865f2;" target="_blank"><b>change your password immediately</b></a>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+
+            </table>
+
+        </td>
+    </tr>
+</table>
+</body>
+</html>
+
+
+`
 	return sendMail(mail, mailOptions.Subject, content, attempts)
 }
 
