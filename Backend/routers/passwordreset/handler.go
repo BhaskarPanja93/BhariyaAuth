@@ -78,7 +78,7 @@ func Step2(ctx fiber.Ctx) error {
 		})
 	}
 	Logger.Success(fmt.Sprintf("[Reset2] Password changed for [UID-%d]", ResetData.UserID))
-	MailNotifier.PasswordChange(ResetData.Mail, 2)
+	MailNotifier.PasswordReset(ResetData.Mail, MailModels.All.PasswordResetSuccessful, 2)
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 		Success: true,
 	})

@@ -191,26 +191,22 @@ func OTP(mail, otp string, mailOptions MailModels.T, attempts uint8) bool {
 	return sendMail(mail, mailOptions.Subject, content, attempts)
 }
 
-func NewLogin(mail string, attempts uint8) bool {
-	subject := "New login"
-	content := "A new device has logged in to your account."
-	return sendMail(mail, subject, content, attempts)
+func NewLogin(mail string, mailOptions MailModels.T, attempts uint8) bool {
+	content := `A new device has logged in to your account.`
+	return sendMail(mail, mailOptions.Subject, content, attempts)
 }
 
-func NewAccount(mail string, attempts uint8) bool {
-	subject := "Welcome"
-	content := "Your account for BhariyaAuth has been created. You will be using this account credentials for logging in to all our services."
-	return sendMail(mail, subject, content, attempts)
+func NewAccount(mail string, mailOptions MailModels.T, attempts uint8) bool {
+	content := `Your account for BhariyaAuth has been created. You will be using this account credentials for logging in to all our services.`
+	return sendMail(mail, mailOptions.Subject, content, attempts)
 }
 
-func PasswordChange(mail string, attempts uint8) bool {
-	subject := "Password Changed"
-	content := "Your account password has been changed. Contact support if you think this is a mistake."
-	return sendMail(mail, subject, content, attempts)
+func PasswordReset(mail string, mailOptions MailModels.T, attempts uint8) bool {
+	content := `Your account password has been changed. Contact support if you think this is a mistake.`
+	return sendMail(mail, mailOptions.Subject, content, attempts)
 }
 
-func AccountBlacklisted(mail string, attempts uint8) bool {
-	subject := "Blacklisted"
-	content := "Your account has been flagged. All future actions will be blocked. Contact support ASAP if you think this is a mistake."
-	return sendMail(mail, subject, content, attempts)
+func AccountBlacklisted(mail string, mailOptions MailModels.T, attempts uint8) bool {
+	content := `Your account has been flagged. All future actions will be blocked. Contact support ASAP if you think this is a mistake.`
+	return sendMail(mail, mailOptions.Subject, content, attempts)
 }

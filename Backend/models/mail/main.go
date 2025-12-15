@@ -15,6 +15,7 @@ type allT struct {
 	PasswordResetSuccessful T
 	LoginSuccessful         T
 	RegisterSuccessful      T
+	AccountBlacklisted      T
 }
 
 var All = allT{
@@ -56,6 +57,11 @@ var All = allT{
 	RegisterSuccessful: T{
 		Subject:   "Welcome! Your account is ready",
 		Header:    "Registration Complete",
+		Ignorable: false,
+	},
+	AccountBlacklisted: T{
+		Subject:   "",
+		Header:    "",
 		Ignorable: false,
 	},
 }
