@@ -75,23 +75,18 @@ func OTP(mail, subject string, heading string, otp string, ignorable bool, attem
     <meta charset="UTF-8" />
     <title>BhariyaAuth OTP</title>
 </head>
-<body style="margin:0; padding:0; background: linear-gradient(135deg, #4b5563, #1a1c20, #0b0d10); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;">
+<body style="margin:0; padding:0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;">
 <table width="100%%" cellpadding="0" cellspacing="0">
     <tr>
         <td align="center" style="padding: 40px 16px;">
             <table width="100%%" cellpadding="0" cellspacing="0" style="max-width: 520px; background-color: #0f1115; border-radius: 14px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); overflow: hidden;">
                 <tr>
-                    <td align="center" style="padding: 32px 24px 16px;">
+                    <td align="center" style="padding: 32px 24px 16px;  background: linear-gradient(135deg, #4b5563, #1a1c20, #0b0d10);">
                         <img src="https://bhariya.ddns.net/auth/favicon-dark-mode.png" alt="Bhariya" width="120" style="display:block; margin-bottom: 12px;" />
                     </td>
                 </tr>
                 <tr>
-                    <td>
-                        <div style="height:1px; background: linear-gradient(to right, #8b5cf6, #7c3aed); opacity:0.5;"></div>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="padding: 28px 24px; text-align: center;">
+                    <td style="padding: 28px 24px; text-align: center; background-color: #0f0f10">
                         <p style="margin: 0 0 12px; font-size: 15px; color: #cbd5f5;">
                             %s
                         </p>
@@ -104,11 +99,11 @@ func OTP(mail, subject string, heading string, otp string, ignorable bool, attem
                     </td>
                 </tr>
                 <tr>
-                    <td style="padding: 20px 24px; text-align: center; background-color: #0b0d10;">
+                    <td style="padding: 20px 24px; text-align: center; background-color: #202227">
                         <p style="margin: 0; font-size: 12px; color: #6b7280;">
                             If you didn’t request this,
                         </p>
-						%s
+                        %s
                     </td>
                 </tr>
             </table>
