@@ -62,9 +62,62 @@ func sendMail(mail, subject, content string, attempts uint8) bool {
 	return true
 }
 
-func OTP(mail, otp string, attempts uint8) bool {
-	subject := "BhariyaAuth OTP"
-	content := fmt.Sprintf("Your OTP (valid for 5 Minutes) for BhariyaAuth is: <b>%s</b>", otp)
+func OTP(mail, subject string, heading string, otp string, ignorable bool, attempts uint8) bool {
+	ignorableText := `
+	<p style="margin: 0; font-size: 12px; color: #6b7280;">you can safely ignore this message</p>`
+	if !ignorable {
+		ignorableText = `<a href="https://bhariya.ddns.net/auth/passwordreset" style="margin: 0; font-size: 14px; color: #5865f2;" target="_blank"><b>change your password immediately</b></a>`
+	}
+	content := fmt.Sprintf(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>BhariyaAuth OTP</title>
+</head>
+<body style="margin:0; padding:0; background: linear-gradient(135deg, #4b5563, #1a1c20, #0b0d10); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;">
+<table width="100%%" cellpadding="0" cellspacing="0">
+    <tr>
+        <td align="center" style="padding: 40px 16px;">
+            <table width="100%%" cellpadding="0" cellspacing="0" style="max-width: 520px; background-color: #0f1115; border-radius: 14px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); overflow: hidden;">
+                <tr>
+                    <td align="center" style="padding: 32px 24px 16px;">
+                        <img src="https://bhariya.ddns.net/auth/favicon-dark-mode.png" alt="Bhariya" width="120" style="display:block; margin-bottom: 12px;" />
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <div style="height:1px; background: linear-gradient(to right, #8b5cf6, #7c3aed); opacity:0.5;"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 28px 24px; text-align: center;">
+                        <p style="margin: 0 0 12px; font-size: 15px; color: #cbd5f5;">
+                            %s
+                        </p>
+                        <div style="margin: 24px auto; padding: 16px 24px; display: inline-block; background: linear-gradient(to right, #8b5cf6, #7c3aed); color: #ffffff; font-size: 28px; letter-spacing: 6px; font-weight: 700; border-radius: 10px; ">
+                            %s
+                        </div>
+                        <p style="margin: 20px 0 0; font-size: 14px; color: #9ca3af;">
+                            This OTP is valid for <strong>5 minutes</strong>.
+                        </p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 20px 24px; text-align: center; background-color: #0b0d10;">
+                        <p style="margin: 0; font-size: 12px; color: #6b7280;">
+                            If you didn’t request this,
+                        </p>
+						%s
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>
+`, heading, otp, ignorableText)
 	return sendMail(mail, subject, content, attempts)
 }
 

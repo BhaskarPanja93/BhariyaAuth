@@ -172,7 +172,7 @@ func Step1(ctx fiber.Ctx) error {
 		Name:       form.Name,
 		Password:   form.Password,
 	}
-	verification, retry := OTPProcessor.Send(form.MailAddress, ctx.IP())
+	verification, retry := OTPProcessor.Send(form.MailAddress, "Email Verification", "Enter the OTP below to complete your registration:", true, ctx.IP())
 	if verification == "" {
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 			Success:       false,

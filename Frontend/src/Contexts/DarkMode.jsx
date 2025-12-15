@@ -1,7 +1,5 @@
 import React, {createContext, useContext, useEffect, useState} from "react";
 import {SetFavicon} from "../Utils/Favicon.js";
-import FaviconDarkMode from "../Favicon/DarkMode.png"
-import FaviconLightMode from "../Favicon/LightMode.png"
 
 /**
  * @typedef {Object} DarkModeContextType
@@ -17,7 +15,7 @@ export default function DarkModeProvider({children}) {
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
         const handler = (event) => {
             setIsDarkMode(event.matches);
-            SetFavicon(event.matches ? FaviconDarkMode : FaviconLightMode)
+            SetFavicon(event.matches ? "/auth/favicon-dark-mode.png" : "/auth/favicon-light-mode.png")
         };
         mediaQuery.addEventListener('change', handler);
         handler(mediaQuery);
