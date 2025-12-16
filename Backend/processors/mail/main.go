@@ -202,6 +202,12 @@ func NewLogin(mail string, IP string, UA string, attempts uint8) bool {
                                 </td>
                             </tr>
                         </table>
+						<p style="margin: 16px 0 0; font-size: 14px; color: #4b5563;">
+                            To manage your active sessions,
+                            <a href="https://bhariya.ddns.net/auth" style="color:#5865f2; text-decoration:none; font-weight:500;" target="_blank">
+                                visit your dashboard
+                            </a>.
+                        </p>
                     </td>
                 </tr>
                 <tr>
@@ -229,7 +235,88 @@ func NewLogin(mail string, IP string, UA string, attempts uint8) bool {
 }
 
 func NewAccount(mail string, attempts uint8) bool {
-	content := `Your account for BhariyaAuth has been created. You will be using this account credentials for logging in to all our services.`
+	content := `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>New Login Detected</title>
+</head>
+<body style="margin:0; padding:0; background-color: #eef0f3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;">
+<table width="100%%" cellpadding="0" cellspacing="0">
+    <tr>
+        <td align="center" style="padding: 48px 16px;">
+            <table width="100%%" cellpadding="0" cellspacing="0" style="max-width: 520px; background-color: #ffffff; border-radius: 14px; border: 1px solid #e5e7eb; overflow: hidden;">
+                <tr>
+                    <td style="background: linear-gradient(135deg, #1f2937, #0b0d10); padding: 28px; border-bottom: 1px solid #1f2937;" align="center">
+                        <table width="100%%" cellpadding="0" cellspacing="0" style="border: 1px solid rgba(255,255,255,0.12); border-radius: 10px;">
+                            <tr>
+                                <td align="center" style="padding: 20px;">
+                                    <img src="%s/favicons/DarkMode.png" width="120" style="display:block;"/>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 28px;">
+                        <table width="100%%" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px;">
+                            <tr>
+                                <td style="padding: 28px;">
+                                    <p style="margin: 0 0 8px; font-size: 15px; color: #065f46; font-weight: 600;">
+                                        Account created successfully
+                                    </p>
+                                    <p style="margin: 0 0 12px; font-size: 15px; color: #374151;">
+                                        <strong>Hey, %s</strong>
+                                    </p>
+                                    <p style="margin: 0 0 20px; font-size: 15px; color: #374151; line-height: 1.5;">
+                                        Your account is ready. You can now sign in and start with our services.
+                                    </p>
+                                    <table width="100%%" cellpadding="0" cellspacing="0" style="border: 1px solid #d1fae5; border-radius: 8px; background-color: #ecfdf5;">
+                                        <tr>
+                                            <td style="padding: 16px;">
+                                                <p style="margin:0; font-size:14px; color:#065f46;">
+                                                    <strong>Account created from this device</strong>
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                    <table width="100%%" cellpadding="0" cellspacing="0" style="border: 1px solid #e5e7eb; border-radius: 8px; margin-top: 14px;">
+                                        <tr>
+                                            <td style="padding: 16px; vertical-align: center;" width="56">
+                                                <img src="%s/device-icons/%s.png" />
+                                            </td>
+                                            <td style="padding: 16px;">
+                                                <p style="margin:0; font-size:14px; color:#374151;">
+                                                    <strong>IP Address:</strong> %s
+                                                </p>
+                                                <p style="margin:6px 0 0; font-size:14px; color:#374151;">
+                                                    <strong>Device:</strong> %s
+                                                </p>
+                                                <p style="margin:6px 0 0; font-size:14px; color:#374151;">
+                                                    <strong>Browser:</strong> %s
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                        <p style="margin: 16px 0 0; font-size: 14px; color: #4b5563;">
+                            To get more control over your account,
+                            <a href="https://bhariya.ddns.net/auth" style="color:#5865f2; text-decoration:none; font-weight:500;" target="_blank">
+                                visit your dashboard
+                            </a>.
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>
+`
 	return sendMail(mail, "Account Created", content, attempts)
 }
 
