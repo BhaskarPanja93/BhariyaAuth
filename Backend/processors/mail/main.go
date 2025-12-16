@@ -8,6 +8,7 @@ import (
 	StringProcessor "BhariyaAuth/processors/string"
 	"context"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -66,10 +67,9 @@ func sendMail(mail, subject, content string, attempts uint8) bool {
 }
 
 func OTP(mail, otp string, mailOptions MailModels.OtpT, attempts uint8) bool {
-	ignorableText := `
-	<p style="margin: 0; font-size: 12px; color: #6b7280;">you can safely ignore this message</p>`
+	ignorableText := `you can safely ignore this message`
 	if !mailOptions.Ignorable {
-		ignorableText = fmt.Sprintf(`<a href="%s/passwordreset" style="margin: 0; font-size: 14px; color: #5865f2;" target="_blank"><b>change your password immediately</b></a>`, Config.FrontendURL)
+		ignorableText = fmt.Sprintf(`<br><a href="%s/passwordreset" style="margin: 0; font-size: 14px; color: #5865f2;" target="_blank"><b>change your password immediately</b></a>`, Config.FrontendURL)
 	}
 	content := fmt.Sprintf(`
 <!DOCTYPE html>
@@ -119,9 +119,8 @@ func OTP(mail, otp string, mailOptions MailModels.OtpT, attempts uint8) bool {
                             <tr>
                                 <td style="padding: 18px; text-align: center;">
                                     <p style="margin: 0; font-size: 12px; color: #6b7280;">
-                                        If you didn’t request this,
+                                        If you didn’t request this, %s
                                     </p>
-                                    %s
                                 </td>
                             </tr>
                         </table>
@@ -134,7 +133,7 @@ func OTP(mail, otp string, mailOptions MailModels.OtpT, attempts uint8) bool {
 </body>
 </html>
 `, Config.FrontendURL, mailOptions.Header, otp, ignorableText)
-	return sendMail(mail, mailOptions.Subject, content, attempts)
+	return sendMail(mail, mailOptions.Subject[rand.Intn(len(mailOptions.Subject))], content, attempts)
 }
 
 func NewLogin(mail string, IP string, UA string, attempts uint8) bool {
@@ -146,6 +145,17 @@ func NewLogin(mail string, IP string, UA string, attempts uint8) bool {
 	device := ua.Device()
 	if device == "" {
 		device = "Unknown"
+	}
+	var subjects = []string{
+		"New device signed in to your account",
+		"A new device just accessed your account",
+		"New login",
+		"Your account was accessed from a new device",
+		"New device activity detected",
+		"Was this you? New device login",
+		"Security alert: new device sign-in",
+		"New device connected to your account",
+		"Account access from a new device",
 	}
 	content := fmt.Sprintf(`
 <!DOCTYPE html>
@@ -231,7 +241,7 @@ func NewLogin(mail string, IP string, UA string, attempts uint8) bool {
 </body>
 </html>
 `, Config.FrontendURL, Config.FrontendURL, device, IP, device, browser, Config.FrontendURL, Config.FrontendURL)
-	return sendMail(mail, "New Login", content, attempts)
+	return sendMail(mail, subjects[rand.Intn(len(subjects))], content, attempts)
 }
 
 func NewAccount(mail string, name string, IP string, UA string, attempts uint8) bool {
@@ -320,7 +330,7 @@ func NewAccount(mail string, name string, IP string, UA string, attempts uint8) 
                                 <td style="padding: 18px; text-align: center;">
                                     <p style="margin: 0; font-size: 12px; color: #6b7280;">
                                        To get more control over your account,
-                            			<a href="https://bhariya.ddns.net/auth" style="color:#5865f2; text-decoration:none; font-weight:500;" target="_blank">
+                            			<a href="%s" style="color:#5865f2; text-decoration:none; font-weight:500;" target="_blank">
                                 		visit your dashboard
                             			</a>.
                                     </p>
@@ -339,8 +349,28 @@ func NewAccount(mail string, name string, IP string, UA string, attempts uint8) 
 	return sendMail(mail, "Account Created", content, attempts)
 }
 
-func PasswordReset(mail string, attempts uint8) bool {
-	content := `
+func PasswordReset(mail string, IP string, UA string, attempts uint8) bool {
+	ua := StringProcessor.UAParser.Parse(UA)
+	browser := ua.Browser()
+	if browser == "" {
+		browser = "Unknown"
+	}
+	device := ua.Device()
+	if device == "" {
+		device = "Unknown"
+	}
+	var subjects = []string{
+		"Your password was changed successfully",
+		"Password updated",
+		"Your account password has been updated",
+		"Password changed successfully",
+		"Security update: password changed",
+		"Your new password is now set",
+		"Your account is now secure",
+		"Password successfully updated",
+		"Your password has been changed",
+	}
+	content := fmt.Sprintf(`
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -425,8 +455,8 @@ func PasswordReset(mail string, attempts uint8) bool {
 </table>
 </body>
 </html>
-`
-	return sendMail(mail, "Password Changed", content, attempts)
+`, Config.FrontendURL, Config.FrontendURL, device, IP, device, browser)
+	return sendMail(mail, subjects[rand.Intn(len(subjects))], content, attempts)
 }
 
 func AccountBlacklisted(mail string, attempts uint8) bool {
