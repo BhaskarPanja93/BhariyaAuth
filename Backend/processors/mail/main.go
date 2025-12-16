@@ -204,7 +204,7 @@ func NewLogin(mail string, IP string, UA string, attempts uint8) bool {
                         </table>
 						<p style="margin: 16px 0 0; font-size: 14px; color: #4b5563;">
                             To manage your active sessions,
-                            <a href="https://bhariya.ddns.net/auth" style="color:#5865f2; text-decoration:none; font-weight:500;" target="_blank">
+                            <a href="%s" style="color:#5865f2; text-decoration:none; font-weight:500;" target="_blank">
                                 visit your dashboard
                             </a>.
                         </p>
@@ -230,12 +230,21 @@ func NewLogin(mail string, IP string, UA string, attempts uint8) bool {
 </table>
 </body>
 </html>
-`, Config.FrontendURL, Config.FrontendURL, device, IP, device, browser, Config.FrontendURL)
+`, Config.FrontendURL, Config.FrontendURL, device, IP, device, browser, Config.FrontendURL, Config.FrontendURL)
 	return sendMail(mail, "New Login", content, attempts)
 }
 
-func NewAccount(mail string, attempts uint8) bool {
-	content := `
+func NewAccount(mail string, name string, IP string, UA string, attempts uint8) bool {
+	ua := StringProcessor.UAParser.Parse(UA)
+	browser := ua.Browser()
+	if browser == "" {
+		browser = "Unknown"
+	}
+	device := ua.Device()
+	if device == "" {
+		device = "Unknown"
+	}
+	content := fmt.Sprintf(`
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -304,7 +313,7 @@ func NewAccount(mail string, attempts uint8) bool {
                         </table>
                         <p style="margin: 16px 0 0; font-size: 14px; color: #4b5563;">
                             To get more control over your account,
-                            <a href="https://bhariya.ddns.net/auth" style="color:#5865f2; text-decoration:none; font-weight:500;" target="_blank">
+                            <a href="%s" style="color:#5865f2; text-decoration:none; font-weight:500;" target="_blank">
                                 visit your dashboard
                             </a>.
                         </p>
@@ -316,7 +325,7 @@ func NewAccount(mail string, attempts uint8) bool {
 </table>
 </body>
 </html>
-`
+`, Config.FrontendURL, name, Config.FrontendURL, device, IP, device, browser, Config.FrontendURL)
 	return sendMail(mail, "Account Created", content, attempts)
 }
 
