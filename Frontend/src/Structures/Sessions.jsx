@@ -111,7 +111,7 @@ export default function Sessions() {
                         {label: "MFA", href: "/mfa"},
                         {label: "Change Password", href: "/passwordreset"}
                     ].map(item =>
-                        <Link className="relative text-gray-300 hover:text-white transition after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-[2px] after:bg-indigo-500 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:origin-left"
+                        <Link className="relative text-gray-300 hover:text-white transition after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-0.5 after:bg-indigo-500 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:origin-left"
                             to={item.href}
                             key={item.href}>
                             {item.label}
@@ -136,7 +136,7 @@ export default function Sessions() {
                         </div>
                         {currentSession.current ?
                             <div className="flex items-center gap-4 p-4 rounded-lg bg-[#0b0f14] border border-gray-800">
-                                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex justify-center items-center">
+                                <div className="w-14 h-14 rounded-full bg-linear-to-br from-gray-800 to-gray-900 flex justify-center items-center">
                                     <img alt={currentSession.current.device} src={currentSession.current.icon}/>
                                 </div>
 
@@ -194,7 +194,7 @@ export default function Sessions() {
                             {!loading && otherSessions.current.map(session =>
                                 <div className="flex items-center gap-4 p-4 rounded-lg bg-[#0b0f14] border border-gray-800"
                                     key={session.id}>
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex justify-center items-center">
+                                    <div className="w-12 h-12 rounded-full bg-linear-to-br from-gray-800 to-gray-900 flex justify-center items-center">
                                         <img alt={session.device} src={session.icon}/>
                                     </div>
                                     <div className="flex-1 min-w-0">
