@@ -340,7 +340,92 @@ func NewAccount(mail string, name string, IP string, UA string, attempts uint8) 
 }
 
 func PasswordReset(mail string, attempts uint8) bool {
-	content := `Your account password has been changed. Contact support if you think this is a mistake.`
+	content := `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>New Login Detected</title>
+</head>
+<body style="margin:0; padding:0; background-color: #eef0f3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;">
+<table width="100%%" cellpadding="0" cellspacing="0">
+    <tr>
+        <td align="center" style="padding: 48px 16px;">
+            <table width="100%%" cellpadding="0" cellspacing="0" style="max-width: 520px; background-color: #ffffff; border-radius: 14px; border: 1px solid #e5e7eb; overflow: hidden;">
+                <tr>
+                    <td style="background: linear-gradient(135deg, #1f2937, #0b0d10); padding: 28px; border-bottom: 1px solid #1f2937;" align="center">
+                        <table width="100%%" cellpadding="0" cellspacing="0" style="border: 1px solid rgba(255,255,255,0.12); border-radius: 10px;">
+                            <tr>
+                                <td align="center" style="padding: 20px;">
+                                    <img src="%s/favicons/DarkMode.png" width="120" style="display:block;"/>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 28px;">
+                        <table width="100%%" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px;">
+                            <tr>
+                                <td style="padding: 28px;">
+                                    <p style="margin: 0 0 8px; font-size: 15px; color: #92400e; font-weight: 600;">
+                                        Password Changed
+                                    </p>
+                                    <p style="margin: 0 0 20px; font-size: 15px; color: #374151; line-height: 1.5;">
+                                        This is a confirmation that your account password was successfully changed.
+                                    </p>
+                                    <table width="100%%" cellpadding="0" cellspacing="0" style="border: 1px solid #fecaca; border-radius: 8px; background-color: #fef2f2;">
+                                        <tr>
+                                            <td style="padding: 16px;">
+                                                <p style="margin:0; font-size:14px; color:#7f1d1d;">
+                                                    <strong>Password changed from this device</strong>
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                    <table width="100%%" cellpadding="0" cellspacing="0" style="border: 1px solid #e5e7eb; border-radius: 8px; margin-top: 14px;">
+                                        <tr>
+                                            <td style="padding: 16px; vertical-align: center;" width="56">
+                                                <img src="%s/device-icons/%s.png" />
+                                            </td>
+                                            <td style="padding: 16px;">
+                                                <p style="margin:0; font-size:14px; color:#374151;">
+                                                    <strong>IP Address:</strong> %s
+                                                </p>
+                                                <p style="margin:6px 0 0; font-size:14px; color:#374151;">
+                                                    <strong>Device:</strong> %s
+                                                </p>
+                                                <p style="margin:6px 0 0; font-size:14px; color:#374151;">
+                                                    <strong>Browser:</strong> %s
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 0 28px 28px;">
+                        <table width="100%%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;">
+                            <tr>
+                                <td style="padding: 18px; text-align: center;">
+                                    <p style="margin: 0; font-size: 12px; color: #6b7280;">
+                                        You have been signed out of all devices.
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>
+`
 	return sendMail(mail, "Password Changed", content, attempts)
 }
 
