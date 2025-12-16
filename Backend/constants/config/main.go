@@ -9,7 +9,8 @@ var (
 	ServerFor            = "bhariya"
 	ServerRole           = "auth"
 	CookieDomain         = "bhariya.ddns.net"
-	ServerSSOCallbackURL = "https://bhariya.ddns.net/auth-backend/sso/callback"
+	FrontendURL          = fmt.Sprintf("https://%s/auth", CookieDomain)
+	ServerSSOCallbackURL = fmt.Sprintf("https://%s/auth-backend/sso/callback", CookieDomain)
 )
 
 var (

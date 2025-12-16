@@ -1,5 +1,4 @@
 import React, {useEffect, useRef, useState} from "react";
-import {DeviceIcons} from "../Elements/DeviceIcons"
 import {FetchConnectionManager} from "../Contexts/Connection.jsx";
 import {BackendURL} from "../Values/Constants.js";
 import {FetchNotificationManager} from "../Contexts/Notification.jsx";
@@ -47,7 +46,7 @@ export default function Sessions() {
                             remembered: a["remembered"],
                             count: a["count"],
                             isCurrent: a["id"] === data["reply"]["device_id"],
-                            type: /iphone|android|mobile|ios/i.test(a["device"] + " " + a["os"]) ? "mobile" : /windows|mac|linux|desktop/i.test(a["device"] + " " + a["os"]) ? "desktop" : "unknown"
+                            icon: `/auth/device-icons/${a["device"]}.svg`
                         }));
                         mapped.sort((x, y) => {
                             if (x.isCurrent && !y.isCurrent) return -1;
@@ -138,7 +137,7 @@ export default function Sessions() {
                         {currentSession.current ?
                             <div className="flex items-center gap-4 p-4 rounded-lg bg-[#0b0f14] border border-gray-800">
                                 <div className="w-14 h-14 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex justify-center items-center">
-                                    <DeviceIcons type={currentSession.current.type}/>
+                                    <img alt={currentSession.current.device} src={currentSession.current.icon}/>
                                 </div>
 
                                 <div className="flex-1">
@@ -196,7 +195,7 @@ export default function Sessions() {
                                 <div className="flex items-center gap-4 p-4 rounded-lg bg-[#0b0f14] border border-gray-800"
                                     key={session.id}>
                                     <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex justify-center items-center">
-                                        <DeviceIcons type={session.type}/>
+                                        <img alt={session.device} src={session.icon}/>
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="text-sm text-white font-medium truncate">

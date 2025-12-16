@@ -118,9 +118,18 @@ func Fetch(ctx fiber.Ctx) error {
 			continue
 		}
 		ua := StringProcessor.UAParser.Parse(UA)
-		a.OS = string(ua.OS())
-		a.Device = string(ua.Device())
-		a.Browser = string(ua.Browser())
+		a.OS = ua.OS().String()
+		a.Device = ua.Device().String()
+		a.Browser = ua.Browser().String()
+		if a.OS == "" {
+			a.OS = "Unknown"
+		}
+		if a.Device == "" {
+			a.Device = "Unknown"
+		}
+		if a.Browser == "" {
+			a.Browser = "Unknown"
+		}
 		if RefreshID == access.RefreshID {
 			response.DeviceID = a.ID
 		}

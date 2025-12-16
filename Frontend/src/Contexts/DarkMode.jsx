@@ -15,7 +15,7 @@ export default function DarkModeProvider({children}) {
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
         const handler = (event) => {
             setIsDarkMode(event.matches);
-            SetFavicon(event.matches ? "/auth/favicon-dark-mode.png" : "/auth/favicon-light-mode.png")
+            SetFavicon(event.matches ? "/auth/favicons/DarkMode.png" : "/auth/favicons/LightMode.png")
         };
         mediaQuery.addEventListener('change', handler);
         handler(mediaQuery);

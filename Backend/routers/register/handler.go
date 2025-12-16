@@ -88,7 +88,7 @@ func Step2(ctx fiber.Ctx) error {
 			Notifications: []string{"Failed to register (DB-write issue)... Retrying"},
 		})
 	}
-	if !AccountProcessor.RecordReturningUser(SignUpData.Mail, ctx.Get("User-Agent"), refreshID, userID, SignUpData.RememberMe) {
+	if !AccountProcessor.RecordReturningUser(SignUpData.Mail, ctx.IP(), ctx.Get("User-Agent"), refreshID, userID, SignUpData.RememberMe) {
 		Logger.AccidentalFailure(fmt.Sprintf("[Register2] Record Returning failed for [UID-%d]", userID))
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 			Success:       false,
@@ -173,7 +173,7 @@ func Step1(ctx fiber.Ctx) error {
 		Name:       form.Name,
 		Password:   form.Password,
 	}
-	verification, retry := OTPProcessor.Send(form.MailAddress, MailModels.All.RegisterInitiate, ctx.IP())
+	verification, retry := OTPProcessor.Send(form.MailAddress, MailModels.RegisterInitiated, ctx.IP())
 	if verification == "" {
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 			Success:       false,

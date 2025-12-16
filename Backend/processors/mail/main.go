@@ -1,9 +1,11 @@
 package mail
 
 import (
+	Config "BhariyaAuth/constants/config"
 	Secrets "BhariyaAuth/constants/secrets"
 	MailModels "BhariyaAuth/models/mail"
 	Logger "BhariyaAuth/processors/logs"
+	StringProcessor "BhariyaAuth/processors/string"
 	"context"
 	"fmt"
 	"time"
@@ -63,11 +65,11 @@ func sendMail(mail, subject, content string, attempts uint8) bool {
 	return true
 }
 
-func OTP(mail, otp string, mailOptions MailModels.T, attempts uint8) bool {
+func OTP(mail, otp string, mailOptions MailModels.OtpT, attempts uint8) bool {
 	ignorableText := `
 	<p style="margin: 0; font-size: 12px; color: #6b7280;">you can safely ignore this message</p>`
 	if !mailOptions.Ignorable {
-		ignorableText = `<a href="https://bhariya.ddns.net/auth/passwordreset" style="margin: 0; font-size: 14px; color: #5865f2;" target="_blank"><b>change your password immediately</b></a>`
+		ignorableText = fmt.Sprintf(`<a href="%s/passwordreset" style="margin: 0; font-size: 14px; color: #5865f2;" target="_blank"><b>change your password immediately</b></a>`, Config.FrontendURL)
 	}
 	content := fmt.Sprintf(`
 <!DOCTYPE html>
@@ -105,7 +107,7 @@ func OTP(mail, otp string, mailOptions MailModels.T, attempts uint8) bool {
                             <tr>
                                 <td align="center" style="padding: 20px;">
                                     <img
-                                            src="https://bhariya.ddns.net/auth/favicon-dark-mode.png"
+                                            src="%s/favicons/DarkMode.png"
                                             alt="Bhariya"
                                             width="120"
                                             style="display:block;"
@@ -187,12 +189,21 @@ func OTP(mail, otp string, mailOptions MailModels.T, attempts uint8) bool {
 </table>
 </body>
 </html>
-`, mailOptions.Header, otp, ignorableText)
+`, Config.FrontendURL, mailOptions.Header, otp, ignorableText)
 	return sendMail(mail, mailOptions.Subject, content, attempts)
 }
 
-func NewLogin(mail string, mailOptions MailModels.T, attempts uint8) bool {
-	content := `
+func NewLogin(mail string, IP string, UA string, attempts uint8) bool {
+	ua := StringProcessor.UAParser.Parse(UA)
+	browser := ua.Browser()
+	if browser == "" {
+		browser = "Unknown"
+	}
+	device := ua.Device()
+	if device == "" {
+		device = "Unknown"
+	}
+	content := fmt.Sprintf(`
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -230,7 +241,7 @@ func NewLogin(mail string, mailOptions MailModels.T, attempts uint8) bool {
                             <tr>
                                 <td align="center" style="padding: 20px;">
                                     <img
-                                            src="https://bhariya.ddns.net/auth/favicon-dark-mode.png"
+                                            src="%s/favicons/DarkMode.png"
                                             alt="Bhariya"
                                             width="120"
                                             style="display:block;"
@@ -240,7 +251,6 @@ func NewLogin(mail string, mailOptions MailModels.T, attempts uint8) bool {
                         </table>
                     </td>
                 </tr>
-
                 <tr>
                     <td style="padding: 28px;">
                         <table width="100%%" cellpadding="0" cellspacing="0" style="
@@ -258,7 +268,6 @@ func NewLogin(mail string, mailOptions MailModels.T, attempts uint8) bool {
                                     ">
                                         <strong>Hey,</strong>
                                     </p>
-
                                     <p style="
                                         margin: 0 0 20px;
                                         font-size: 15px;
@@ -267,15 +276,13 @@ func NewLogin(mail string, mailOptions MailModels.T, attempts uint8) bool {
                                     ">
                                         There was a new login to your account. We’re letting you know to help keep your account safe.
                                     </p>
-
-                                    <!-- Device Info -->
                                     <table width="100%%" cellpadding="0" cellspacing="0" style="
                                         border: 1px solid #e5e7eb;
                                         border-radius: 8px;
                                     ">
                                         <tr>
                                             <td style="padding: 16px; vertical-align: center;" width="56">
-                                                %s
+                                                <img src="%s/device-icons/%s.png" />
                                             </td>
                                             <td style="padding: 16px;">
                                                 <p style="margin:0; font-size:14px; color:#374151;">
@@ -290,13 +297,11 @@ func NewLogin(mail string, mailOptions MailModels.T, attempts uint8) bool {
                                             </td>
                                         </tr>
                                     </table>
-
                                 </td>
                             </tr>
                         </table>
                     </td>
                 </tr>
-
                 <tr>
                     <td style="padding: 0 28px 28px;">
                         <table width="100%%" cellpadding="0" cellspacing="0" style="
@@ -313,37 +318,33 @@ func NewLogin(mail string, mailOptions MailModels.T, attempts uint8) bool {
                                     ">
                                         If this wasn't you,
                                     </p>
-                                    <a href="https://bhariya.ddns.net/auth/passwordreset" style="margin: 0; font-size: 14px; color: #5865f2;" target="_blank"><b>change your password immediately</b></a>
+                                    <a href="%s/auth/passwordreset" style="margin: 0; font-size: 14px; color: #5865f2;" target="_blank"><b>change your password immediately</b></a>
                                 </td>
                             </tr>
                         </table>
                     </td>
                 </tr>
-
             </table>
-
         </td>
     </tr>
 </table>
 </body>
 </html>
-
-
-`
-	return sendMail(mail, mailOptions.Subject, content, attempts)
+`, Config.FrontendURL, Config.FrontendURL, device, IP, device, browser, Config.FrontendURL)
+	return sendMail(mail, "New Login", content, attempts)
 }
 
-func NewAccount(mail string, mailOptions MailModels.T, attempts uint8) bool {
+func NewAccount(mail string, attempts uint8) bool {
 	content := `Your account for BhariyaAuth has been created. You will be using this account credentials for logging in to all our services.`
-	return sendMail(mail, mailOptions.Subject, content, attempts)
+	return sendMail(mail, "Account Created", content, attempts)
 }
 
-func PasswordReset(mail string, mailOptions MailModels.T, attempts uint8) bool {
+func PasswordReset(mail string, attempts uint8) bool {
 	content := `Your account password has been changed. Contact support if you think this is a mistake.`
-	return sendMail(mail, mailOptions.Subject, content, attempts)
+	return sendMail(mail, "Password Changed", content, attempts)
 }
 
-func AccountBlacklisted(mail string, mailOptions MailModels.T, attempts uint8) bool {
-	content := `Your account has been flagged. All future actions will be blocked. Contact support ASAP if you think this is a mistake.`
-	return sendMail(mail, mailOptions.Subject, content, attempts)
+func AccountBlacklisted(mail string, attempts uint8) bool {
+	content := `Your account has been flagged. AllOTP future actions will be blocked. Contact support ASAP if you think this is a mistake.`
+	return sendMail(mail, "Account Blacklisted", content, attempts)
 }

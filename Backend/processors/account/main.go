@@ -2,7 +2,6 @@ package account
 
 import (
 	Config "BhariyaAuth/constants/config"
-	MailModels "BhariyaAuth/models/mail"
 	ResponseModels "BhariyaAuth/models/responses"
 	UserTypes "BhariyaAuth/models/users"
 	Logger "BhariyaAuth/processors/logs"
@@ -56,7 +55,7 @@ func BlacklistUser(userID uint32) bool {
 		Logger.AccidentalFailure(fmt.Sprintf("[BlacklistUser] failed to fetch mail [UID-%d] reason: %s", userID, err.Error()))
 		return false
 	}
-	MailNotifier.AccountBlacklisted(mail, MailModels.All.AccountBlacklisted, 2)
+	MailNotifier.AccountBlacklisted(mail, 2)
 	return true
 }
 
@@ -162,11 +161,11 @@ func RecordNewUser(userID uint32, password string, mail string, name string) boo
 		Logger.AccidentalFailure(fmt.Sprintf("[RecordNewUser] failed for [UID-%d-MAIL-%s] reason: %s", userID, mail, err.Error()))
 		return false
 	}
-	MailNotifier.NewAccount(mail, MailModels.All.RegisterSuccessful, 2)
+	MailNotifier.NewAccount(mail, 2)
 	return true
 }
 
-func RecordReturningUser(mail string, ua string, refreshID uint16, userID uint32, rememberMe bool) bool {
+func RecordReturningUser(mail string, IP string, ua string, refreshID uint16, userID uint32, rememberMe bool) bool {
 	now := time.Now().UTC()
 	var count int
 	err := Stores.MySQLClient.QueryRow("SELECT COUNT(*) FROM activities WHERE uid = ?", userID).Scan(&count)
@@ -187,7 +186,7 @@ func RecordReturningUser(mail string, ua string, refreshID uint16, userID uint32
 		Logger.AccidentalFailure(fmt.Sprintf("[RecordReturningUser] insert failed for [UID-%d-RID-%d]: %s", userID, refreshID, err.Error()))
 		return false
 	}
-	MailNotifier.NewLogin(mail, MailModels.All.LoginSuccessful, 2)
+	MailNotifier.NewLogin(mail, IP, ua, 2)
 	return true
 }
 

@@ -83,7 +83,7 @@ func Step2(ctx fiber.Ctx) error {
 		})
 	}
 	refreshID := Generators.RefreshID()
-	if !AccountProcessor.RecordReturningUser(SignInData.Mail, ctx.Get("User-Agent"), refreshID, SignInData.UserID, SignInData.RememberMe) {
+	if !AccountProcessor.RecordReturningUser(SignInData.Mail, ctx.IP(), ctx.Get("User-Agent"), refreshID, SignInData.UserID, SignInData.RememberMe) {
 		Logger.AccidentalFailure(fmt.Sprintf("[Login2] Record Returning failed for [UID-%d]", SignInData.UserID))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
 			Success:       false,
@@ -163,7 +163,7 @@ func Step1(ctx fiber.Ctx) error {
 		Mail:         form.MailAddress,
 	}
 	if process == "otp" {
-		verification, retry := OTPProcessor.Send(form.MailAddress, MailModels.All.LoginInitiate, ctx.IP())
+		verification, retry := OTPProcessor.Send(form.MailAddress, MailModels.LoginInitiated, ctx.IP())
 		if verification == "" {
 			return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 				Success:       false,

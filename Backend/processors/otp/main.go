@@ -86,7 +86,7 @@ func RecordSent(identifier string, value int64) time.Duration {
 	return calculateResendDelay(value)
 }
 
-func Send(mail string, mailOptions MailModels.T, identifier string) (string, time.Duration) {
+func Send(mail string, mailOptions MailModels.OtpT, identifier string) (string, time.Duration) {
 	rateLimitKey := fmt.Sprintf("%s:%s", mail, identifier)
 	canSend, alreadySentCount, currentDelay := CheckCanSend(rateLimitKey)
 	if canSend {

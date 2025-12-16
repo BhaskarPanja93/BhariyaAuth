@@ -78,7 +78,7 @@ func Step2(ctx fiber.Ctx) error {
 		})
 	}
 	Logger.Success(fmt.Sprintf("[Reset2] Password changed for [UID-%d]", ResetData.UserID))
-	MailNotifier.PasswordReset(ResetData.Mail, MailModels.All.PasswordResetSuccessful, 2)
+	MailNotifier.PasswordReset(ResetData.Mail, 2)
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 		Success: true,
 	})
@@ -110,7 +110,7 @@ func Step1(ctx fiber.Ctx) error {
 		UserID:    userID,
 		Step2Code: "",
 	}
-	verification, retry := OTPProcessor.Send(form.MailAddress, MailModels.All.PasswordResetInitiate, ctx.IP())
+	verification, retry := OTPProcessor.Send(form.MailAddress, MailModels.PasswordResetInitiated, ctx.IP())
 	if verification == "" {
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 			Success:       false,
