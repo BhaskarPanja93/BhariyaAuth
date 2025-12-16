@@ -81,14 +81,14 @@ func Step2(ctx fiber.Ctx) error {
 	}
 	userID = Generators.UserID()
 	refreshID := Generators.RefreshID()
-	if !AccountProcessor.RecordNewUser(userID, SignUpData.Password, SignUpData.Mail, SignUpData.Name) {
+	if !AccountProcessor.RecordNewUser(userID, SignUpData.Password, SignUpData.Mail, SignUpData.Name, ctx.IP(), ctx.Get("User-Agent")) {
 		Logger.AccidentalFailure(fmt.Sprintf("[Register2] Record New failed for [MAIL-%s]", SignUpData.Mail))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
 			Success:       false,
 			Notifications: []string{"Failed to register (DB-write issue)... Retrying"},
 		})
 	}
-	if !AccountProcessor.RecordReturningUser(SignUpData.Mail, ctx.IP(), ctx.Get("User-Agent"), refreshID, userID, SignUpData.RememberMe) {
+	if !AccountProcessor.RecordReturningUser(SignUpData.Mail, ctx.IP(), ctx.Get("User-Agent"), refreshID, userID, SignUpData.RememberMe, false) {
 		Logger.AccidentalFailure(fmt.Sprintf("[Register2] Record Returning failed for [UID-%d]", userID))
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 			Success:       false,

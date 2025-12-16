@@ -107,11 +107,11 @@ func Step2(ctx fiber.Ctx) error {
 	if !found {
 		userID = Generators.UserID()
 		refreshID := Generators.RefreshID()
-		if !AccountProcessor.RecordNewUser(userID, "", user.Email, user.Name) {
+		if !AccountProcessor.RecordNewUser(userID, "", user.Email, user.Name, ctx.IP(), ctx.Get("User-Agent")) {
 			Logger.AccidentalFailure(fmt.Sprintf("[SSO2] RecordNew Failed for [MAIL-%s]", user.Email))
 			return ResponseProcessor.SSOFailurePopup(ctx, "Failed to create account, please contact support")
 		}
-		if !AccountProcessor.RecordReturningUser(user.Email, ctx.IP(), ctx.Get("User-Agent"), refreshID, userID, state.RememberMe) {
+		if !AccountProcessor.RecordReturningUser(user.Email, ctx.IP(), ctx.Get("User-Agent"), refreshID, userID, state.RememberMe, false) {
 			Logger.AccidentalFailure(fmt.Sprintf("[SSO2] RecordNewReturning Failed for [UID-%d]", userID))
 			return ResponseProcessor.SSOFailurePopup(ctx, "Failed to login, please try again or contact support")
 		}
@@ -134,7 +134,7 @@ func Step2(ctx fiber.Ctx) error {
 		return ResponseProcessor.SSOFailurePopup(ctx, "Your account is disabled, please contact support")
 	}
 	refreshID := Generators.RefreshID()
-	if !AccountProcessor.RecordReturningUser(user.Email, ctx.IP(), ctx.Get("User-Agent"), refreshID, userID, state.RememberMe) {
+	if !AccountProcessor.RecordReturningUser(user.Email, ctx.IP(), ctx.Get("User-Agent"), refreshID, userID, state.RememberMe, true) {
 		Logger.AccidentalFailure(fmt.Sprintf("[SSO2] RecordNewReturning Failed for [UID-%d]", userID))
 		return ResponseProcessor.SSOFailurePopup(ctx, "Failed to login, please try again or contact support")
 	}

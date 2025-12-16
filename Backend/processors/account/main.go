@@ -145,7 +145,7 @@ func hashPassword(password string) (string, bool) {
 	return string(hash), true
 }
 
-func RecordNewUser(userID uint32, password string, mail string, name string) bool {
+func RecordNewUser(userID uint32, password string, mail string, name string, IP string, ua string) bool {
 	var hash string
 	var ok bool
 	if password != "" {
@@ -161,11 +161,11 @@ func RecordNewUser(userID uint32, password string, mail string, name string) boo
 		Logger.AccidentalFailure(fmt.Sprintf("[RecordNewUser] failed for [UID-%d-MAIL-%s] reason: %s", userID, mail, err.Error()))
 		return false
 	}
-	MailNotifier.NewAccount(mail, 2)
+	MailNotifier.NewAccount(mail, name, IP, ua, 2)
 	return true
 }
 
-func RecordReturningUser(mail string, IP string, ua string, refreshID uint16, userID uint32, rememberMe bool) bool {
+func RecordReturningUser(mail string, IP string, ua string, refreshID uint16, userID uint32, rememberMe bool, sendMail bool) bool {
 	now := time.Now().UTC()
 	var count int
 	err := Stores.MySQLClient.QueryRow("SELECT COUNT(*) FROM activities WHERE uid = ?", userID).Scan(&count)
@@ -186,7 +186,9 @@ func RecordReturningUser(mail string, IP string, ua string, refreshID uint16, us
 		Logger.AccidentalFailure(fmt.Sprintf("[RecordReturningUser] insert failed for [UID-%d-RID-%d]: %s", userID, refreshID, err.Error()))
 		return false
 	}
-	MailNotifier.NewLogin(mail, IP, ua, 2)
+	if sendMail {
+		MailNotifier.NewLogin(mail, IP, ua, 2)
+	}
 	return true
 }
 
