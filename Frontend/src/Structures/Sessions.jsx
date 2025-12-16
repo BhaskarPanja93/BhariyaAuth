@@ -144,7 +144,7 @@ export default function Sessions() {
                                     <div className="font-medium text-white">
                                         {currentSession.current.device}
                                         <span className="text-xs text-gray-400">
-                                            · {currentSession.current.os}
+                                           &nbsp;·&nbsp; {currentSession.current.os}
                                         </span>
                                     </div>
                                     <div className="text-xs text-gray-400">
