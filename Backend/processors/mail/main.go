@@ -78,81 +78,34 @@ func OTP(mail, otp string, mailOptions MailModels.OtpT, attempts uint8) bool {
     <meta charset="UTF-8" />
     <title>BhariyaAuth OTP</title>
 </head>
-<body style="
-    margin:0;
-    padding:0;
-    background-color: #eef0f3;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-">
+<body style="margin:0; padding:0; background-color: #eef0f3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;">
 <table width="100%%" cellpadding="0" cellspacing="0">
     <tr>
         <td align="center" style="padding: 48px 16px;">
-            <table width="100%%" cellpadding="0" cellspacing="0" style="
-                max-width: 520px;
-                background-color: #ffffff;
-                border-radius: 14px;
-                border: 1px solid #e5e7eb;
-                overflow: hidden;
-            ">
+            <table width="100%%" cellpadding="0" cellspacing="0" style="max-width: 520px; background-color: #ffffff; border-radius: 14px; border: 1px solid #e5e7eb; overflow: hidden;">
                 <tr>
-                    <td style="
-                        background: linear-gradient(135deg, #1f2937, #0b0d10);
-                        padding: 28px;
-                        border-bottom: 1px solid #1f2937;
-                    " align="center">
-                        <table width="100%%" cellpadding="0" cellspacing="0" style="
-                            border: 1px solid rgba(255,255,255,0.12);
-                            border-radius: 10px;
-                        ">
+                    <td style="background: linear-gradient(135deg, #1f2937, #0b0d10); padding: 28px; border-bottom: 1px solid #1f2937;" align="center">
+                        <table width="100%%" cellpadding="0" cellspacing="0" style="border: 1px solid rgba(255,255,255,0.12); border-radius: 10px;">
                             <tr>
                                 <td align="center" style="padding: 20px;">
-                                    <img
-                                            src="%s/favicons/DarkMode.png"
-                                            alt="Bhariya"
-                                            width="120"
-                                            style="display:block;"
-                                    />
+                                    <img src="%s/favicons/DarkMode.png" width="120" style="display:block;" />
                                 </td>
                             </tr>
                         </table>
-
                     </td>
                 </tr>
                 <tr>
                     <td style="padding: 28px;">
-                        <table width="100%%" cellpadding="0" cellspacing="0" style="
-                            background-color: #ffffff;
-                            border: 1px solid #e5e7eb;
-                            border-radius: 10px;
-                        ">
+                        <table width="100%%" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px;">
                             <tr>
                                 <td style="padding: 28px; text-align: center;">
-                                    <p style="
-                                        margin: 0 0 16px;
-                                        font-size: 15px;
-                                        color: #374151;
-                                        line-height: 1.5;
-                                    ">
+                                    <p style="margin: 0 0 16px; font-size: 15px; color: #374151; line-height: 1.5;">
                                         %s
                                     </p>
-                                    <div style="
-                                        margin: 24px auto;
-                                        padding: 14px 28px;
-                                        display: inline-block;
-                                        background: linear-gradient(to right, #8b5cf6, #7c3aed);
-                                        color: #ffffff;
-                                        font-size: 28px;
-                                        letter-spacing: 6px;
-                                        font-weight: 700;
-                                        border-radius: 8px;
-                                    ">
+                                    <div style="margin: 24px auto; padding: 14px 28px; display: inline-block; background: linear-gradient(to right, #8b5cf6, #7c3aed); color: #ffffff; font-size: 28px; letter-spacing: 6px; font-weight: 700; border-radius: 8px;">
                                         %s
                                     </div>
-                                    <p style="
-                                        margin: 20px 0 0;
-                                        font-size: 13px;
-                                        color: #4b5563;
-                                    ">
+                                    <p style="margin: 20px 0 0; font-size: 13px; color: #4b5563;">
                                         This OTP is valid for <strong>5 minutes</strong>.
                                     </p>
                                 </td>
@@ -162,19 +115,10 @@ func OTP(mail, otp string, mailOptions MailModels.OtpT, attempts uint8) bool {
                 </tr>
                 <tr>
                     <td style="padding: 0 28px 28px;">
-
-                        <table width="100%%" cellpadding="0" cellspacing="0" style="
-                            background-color: #f9fafb;
-                            border: 1px solid #e5e7eb;
-                            border-radius: 10px;
-                        ">
+                        <table width="100%%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;">
                             <tr>
                                 <td style="padding: 18px; text-align: center;">
-                                    <p style="
-                                        margin: 0;
-                                        font-size: 12px;
-                                        color: #6b7280;
-                                    ">
+                                    <p style="margin: 0; font-size: 12px; color: #6b7280;">
                                         If you didn’t request this,
                                     </p>
                                     %s
@@ -210,42 +154,17 @@ func NewLogin(mail string, IP string, UA string, attempts uint8) bool {
     <meta charset="UTF-8" />
     <title>New Login Detected</title>
 </head>
-<body style="
-    margin:0;
-    padding:0;
-    background-color: #eef0f3;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-">
+<body style="margin:0; padding:0; background-color: #eef0f3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;">
 <table width="100%%" cellpadding="0" cellspacing="0">
     <tr>
         <td align="center" style="padding: 48px 16px;">
-
-            <table width="100%%" cellpadding="0" cellspacing="0" style="
-                max-width: 520px;
-                background-color: #ffffff;
-                border-radius: 14px;
-                border: 1px solid #e5e7eb;
-                overflow: hidden;
-            ">
-
+            <table width="100%%" cellpadding="0" cellspacing="0" style="max-width: 520px; background-color: #ffffff; border-radius: 14px; border: 1px solid #e5e7eb; overflow: hidden;">
                 <tr>
-                    <td style="
-                        background: linear-gradient(135deg, #1f2937, #0b0d10);
-                        padding: 28px;
-                        border-bottom: 1px solid #1f2937;
-                    " align="center">
-                        <table width="100%%" cellpadding="0" cellspacing="0" style="
-                            border: 1px solid rgba(255,255,255,0.12);
-                            border-radius: 10px;
-                        ">
+                    <td style="background: linear-gradient(135deg, #1f2937, #0b0d10); padding: 28px; border-bottom: 1px solid #1f2937;" align="center">
+                        <table width="100%%" cellpadding="0" cellspacing="0" style="border: 1px solid rgba(255,255,255,0.12); border-radius: 10px;">
                             <tr>
                                 <td align="center" style="padding: 20px;">
-                                    <img
-                                            src="%s/favicons/DarkMode.png"
-                                            alt="Bhariya"
-                                            width="120"
-                                            style="display:block;"
-                                    />
+                                    <img src="%s/favicons/DarkMode.png" width="120" style="display:block;"/>
                                 </td>
                             </tr>
                         </table>
@@ -253,33 +172,16 @@ func NewLogin(mail string, IP string, UA string, attempts uint8) bool {
                 </tr>
                 <tr>
                     <td style="padding: 28px;">
-                        <table width="100%%" cellpadding="0" cellspacing="0" style="
-                            background-color: #ffffff;
-                            border: 1px solid #e5e7eb;
-                            border-radius: 10px;
-                        ">
+                        <table width="100%%" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px;">
                             <tr>
                                 <td style="padding: 28px;">
-
-                                    <p style="
-                                        margin: 0 0 12px;
-                                        font-size: 15px;
-                                        color: #374151;
-                                    ">
+                                    <p style="margin: 0 0 12px; font-size: 15px; color: #374151;">
                                         <strong>Hey,</strong>
                                     </p>
-                                    <p style="
-                                        margin: 0 0 20px;
-                                        font-size: 15px;
-                                        color: #374151;
-                                        line-height: 1.5;
-                                    ">
+                                    <p style="margin: 0 0 20px; font-size: 15px; color: #374151; line-height: 1.5;">
                                         There was a new login to your account. We’re letting you know to help keep your account safe.
                                     </p>
-                                    <table width="100%%" cellpadding="0" cellspacing="0" style="
-                                        border: 1px solid #e5e7eb;
-                                        border-radius: 8px;
-                                    ">
+                                    <table width="100%%" cellpadding="0" cellspacing="0" style="border: 1px solid #e5e7eb; border-radius: 8px;">
                                         <tr>
                                             <td style="padding: 16px; vertical-align: center;" width="56">
                                                 <img src="%s/device-icons/%s.png" />
@@ -304,18 +206,10 @@ func NewLogin(mail string, IP string, UA string, attempts uint8) bool {
                 </tr>
                 <tr>
                     <td style="padding: 0 28px 28px;">
-                        <table width="100%%" cellpadding="0" cellspacing="0" style="
-                            background-color: #f9fafb;
-                            border: 1px solid #e5e7eb;
-                            border-radius: 10px;
-                        ">
+                        <table width="100%%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;">
                             <tr>
                                 <td style="padding: 18px; text-align: center;">
-                                    <p style="
-                                        margin: 0;
-                                        font-size: 12px;
-                                        color: #6b7280;
-                                    ">
+                                    <p style="margin: 0; font-size: 12px; color: #6b7280;">
                                         If this wasn't you,
                                     </p>
                                     <a href="%s/auth/passwordreset" style="margin: 0; font-size: 14px; color: #5865f2;" target="_blank"><b>change your password immediately</b></a>
