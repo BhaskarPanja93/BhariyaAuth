@@ -302,12 +302,22 @@ func NewAccount(mail string, attempts uint8) bool {
                                 </td>
                             </tr>
                         </table>
-                        <p style="margin: 16px 0 0; font-size: 14px; color: #4b5563;">
-                            To get more control over your account,
-                            <a href="https://bhariya.ddns.net/auth" style="color:#5865f2; text-decoration:none; font-weight:500;" target="_blank">
-                                visit your dashboard
-                            </a>.
-                        </p>
+                    </td>
+                </tr>
+				<tr>
+                    <td style="padding: 0 28px 28px;">
+                        <table width="100%%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;">
+                            <tr>
+                                <td style="padding: 18px; text-align: center;">
+                                    <p style="margin: 0; font-size: 12px; color: #6b7280;">
+                                       To get more control over your account,
+                            			<a href="https://bhariya.ddns.net/auth" style="color:#5865f2; text-decoration:none; font-weight:500;" target="_blank">
+                                		visit your dashboard
+                            			</a>.
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
                     </td>
                 </tr>
             </table>
