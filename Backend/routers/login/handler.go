@@ -83,7 +83,7 @@ func Step2(ctx fiber.Ctx) error {
 		})
 	}
 	refreshID := Generators.RefreshID()
-	if !AccountProcessor.RecordReturningUser(SignInData.Mail, ctx.IP(), ctx.Get("User-Agent"), refreshID, SignInData.UserID, SignInData.RememberMe) {
+	if !AccountProcessor.RecordReturningUser(SignInData.Mail, ctx.IP(), ctx.Get("User-Agent"), refreshID, SignInData.UserID, SignInData.RememberMe, true) {
 		Logger.AccidentalFailure(fmt.Sprintf("[Login2] Record Returning failed for [UID-%d]", SignInData.UserID))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
 			Success:       false,
