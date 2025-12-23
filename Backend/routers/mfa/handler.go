@@ -12,6 +12,7 @@ import (
 	StringProcessor "BhariyaAuth/processors/string"
 	TokenProcessor "BhariyaAuth/processors/token"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/goccy/go-json"
@@ -20,13 +21,13 @@ import (
 
 const tokenType = "mfa"
 
-type Step2FormT struct {
+type Form2MFA struct {
 	Token        string `form:"token"`
 	Verification string `form:"verification"`
 }
 
 func Step2(ctx fiber.Ctx) error {
-	form := new(Step2FormT)
+	form := new(Form2MFA)
 	var MFAData TokenModels.MFATokenT
 	if err := ctx.Bind().Form(form); err != nil {
 		if err = ctx.Bind().Body(form); err != nil {
@@ -126,7 +127,8 @@ func Step1(ctx fiber.Ctx) error {
 		RateLimitProcessor.Set(ctx)
 		return ctx.SendStatus(fiber.StatusInternalServerError)
 	}
-	verification, retry := OTPProcessor.Send(mail, MailModels.MFAInitiated, fmt.Sprintf("%s:verified", ctx.IP()))
+	mailModel := MailModels.MFAInitiated
+	verification, retry := OTPProcessor.Send(mail, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], mailModel.Header, mailModel.Ignorable, ctx.IP())
 	if verification == "" {
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 			Success:       false,

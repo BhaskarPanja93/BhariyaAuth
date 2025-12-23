@@ -2,6 +2,7 @@ package account
 
 import (
 	Config "BhariyaAuth/constants/config"
+	MailModels "BhariyaAuth/models/mail"
 	ResponseModels "BhariyaAuth/models/responses"
 	UserTypes "BhariyaAuth/models/users"
 	Logger "BhariyaAuth/processors/logs"
@@ -9,6 +10,7 @@ import (
 	StringProcessor "BhariyaAuth/processors/string"
 	Stores "BhariyaAuth/stores"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/goccy/go-json"
@@ -161,7 +163,17 @@ func RecordNewUser(userID uint32, password string, mail string, name string, IP 
 		Logger.AccidentalFailure(fmt.Sprintf("[RecordNewUser] failed for [UID-%d-MAIL-%s] reason: %s", userID, mail, err.Error()))
 		return false
 	}
-	MailNotifier.NewAccount(mail, name, IP, ua, 2)
+	UA := StringProcessor.UAParser.Parse(ua)
+	browser := UA.Browser().String()
+	if browser == "" {
+		browser = "Unknown"
+	}
+	device := UA.Device().String()
+	if device == "" {
+		device = "Unknown"
+	}
+	mailModel := MailModels.RegistrationCompleted
+	MailNotifier.NewAccount(mail, name, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], IP, device, browser, 2)
 	return true
 }
 
@@ -187,7 +199,17 @@ func RecordReturningUser(mail string, IP string, ua string, refreshID uint16, us
 		return false
 	}
 	if sendMail {
-		MailNotifier.NewLogin(mail, IP, ua, 2)
+		UA := StringProcessor.UAParser.Parse(ua)
+		browser := UA.Browser().String()
+		if browser == "" {
+			browser = "Unknown"
+		}
+		device := UA.Device().String()
+		if device == "" {
+			device = "Unknown"
+		}
+		mailModel := MailModels.NewLogin
+		MailNotifier.NewLogin(mail, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], IP, device, browser, 2)
 	}
 	return true
 }

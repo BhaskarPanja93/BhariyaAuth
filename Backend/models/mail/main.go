@@ -1,14 +1,14 @@
 package mail
 
-type OtpT struct {
-	Subject   []string
+type T struct {
+	Subjects  []string
 	Header    string
 	Ignorable bool
 }
 
 var (
-	MFAInitiated = OtpT{
-		Subject: []string{
+	MFAInitiated = T{
+		Subjects: []string{
 			"Just checking if its actually you",
 			"MFA required",
 			"MFA verification",
@@ -21,8 +21,8 @@ var (
 		Header: "Enter the OTP below to verify your session and continue:",
 	}
 
-	PasswordResetInitiated = OtpT{
-		Subject: []string{
+	PasswordResetInitiated = T{
+		Subjects: []string{
 			"Reset your password securely",
 			"Your password reset code",
 			"Let’s set a new password",
@@ -36,8 +36,8 @@ var (
 		Header: "Enter the OTP below to reset password:",
 	}
 
-	LoginInitiated = OtpT{
-		Subject: []string{
+	LoginInitiated = T{
+		Subjects: []string{
 			"Confirm your login",
 			"Logging in? Verify here",
 			"Your login verification code",
@@ -50,8 +50,8 @@ var (
 		Header: "Enter the OTP below to login:",
 	}
 
-	RegisterInitiated = OtpT{
-		Subject: []string{
+	RegisterInitiated = T{
+		Subjects: []string{
 			"Welcome! Let’s verify your email",
 			"Complete your registration",
 			"Almost done — confirm your email",
@@ -64,5 +64,45 @@ var (
 			"Let’s get your account ready",
 		},
 		Header: "Enter the OTP below to verify your email:",
+	}
+
+	NewLogin = T{
+		Subjects: []string{
+			"New device signed in to your account",
+			"A new device just accessed your account",
+			"New login",
+			"Your account was accessed from a new device",
+			"New device activity detected",
+			"Was this you? New device login",
+			"Security alert: new device sign-in",
+			"New device connected to your account",
+			"Account access from a new device",
+		},
+	}
+
+	RegistrationCompleted = T{
+		Subjects: []string{
+			"Welcome! Your account has been created",
+			"Your new account is ready",
+			"Account successfully created",
+			"Welcome to our platform",
+			"Your account has been set up",
+			"New account confirmation",
+			"Thanks for signing up",
+		},
+	}
+
+	PasswordChanged = T{
+		Subjects: []string{
+			"Your password was changed successfully",
+			"Password updated",
+			"Your account password has been updated",
+			"Password changed successfully",
+			"Security update: password changed",
+			"Your new password is now set",
+			"Your account is now secure",
+			"Password successfully updated",
+			"Your password has been changed",
+		},
 	}
 )

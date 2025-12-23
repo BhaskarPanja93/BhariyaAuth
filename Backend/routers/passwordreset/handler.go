@@ -11,16 +11,17 @@ import (
 	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
 	StringProcessor "BhariyaAuth/processors/string"
 	"fmt"
+	"math/rand"
 
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v3"
 )
 
-type Step1FormT struct {
+type Form1PasswordReset struct {
 	MailAddress string `form:"mail_address"`
 }
 
-type Step2FormT struct {
+type Form2PasswordReset struct {
 	Token        string `form:"token"`
 	Verification string `form:"verification"`
 	NewPassword  string `form:"new_password"`
@@ -29,7 +30,7 @@ type Step2FormT struct {
 const tokenType = "PasswordReset"
 
 func Step2(ctx fiber.Ctx) error {
-	form := new(Step2FormT)
+	form := new(Form2PasswordReset)
 	var ResetData TokenModels.PasswordResetT
 	if err := ctx.Bind().Form(form); err != nil {
 		if err = ctx.Bind().Body(form); err != nil {
@@ -78,14 +79,24 @@ func Step2(ctx fiber.Ctx) error {
 		})
 	}
 	Logger.Success(fmt.Sprintf("[Reset2] Password changed for [UID-%d]", ResetData.UserID))
-	MailNotifier.PasswordReset(ResetData.Mail, ctx.IP(), ctx.Get("User-Agent"), 2)
+	UA := StringProcessor.UAParser.Parse(ctx.Get("User-Agent"))
+	browser := UA.Browser().String()
+	if browser == "" {
+		browser = "Unknown"
+	}
+	device := UA.Device().String()
+	if device == "" {
+		device = "Unknown"
+	}
+	mailModel := MailModels.PasswordChanged
+	MailNotifier.PasswordReset(ResetData.Mail, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], ctx.IP(), device, browser, 2)
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 		Success: true,
 	})
 }
 
 func Step1(ctx fiber.Ctx) error {
-	form := new(Step1FormT)
+	form := new(Form1PasswordReset)
 	if err := ctx.Bind().Form(form); err != nil {
 		if err = ctx.Bind().Body(form); err != nil {
 			RateLimitProcessor.Set(ctx)
@@ -110,7 +121,8 @@ func Step1(ctx fiber.Ctx) error {
 		UserID:    userID,
 		Step2Code: "",
 	}
-	verification, retry := OTPProcessor.Send(form.MailAddress, MailModels.PasswordResetInitiated, ctx.IP())
+	mailModel := MailModels.PasswordResetInitiated
+	verification, retry := OTPProcessor.Send(form.MailAddress, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], mailModel.Header, mailModel.Ignorable, ctx.IP())
 	if verification == "" {
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 			Success:       false,

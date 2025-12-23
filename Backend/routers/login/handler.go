@@ -12,6 +12,7 @@ import (
 	ResponseProcessor "BhariyaAuth/processors/response"
 	StringProcessor "BhariyaAuth/processors/string"
 	TokenProcessor "BhariyaAuth/processors/token"
+	"math/rand"
 	"time"
 
 	"fmt"
@@ -20,12 +21,12 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-type Step1FormT struct {
+type Form1Login struct {
 	MailAddress string `form:"mail_address"`
 	RememberMe  string `form:"remember_me"`
 }
 
-type Step2FormT struct {
+type Form2Login struct {
 	Token        string `form:"token"`
 	Verification string `form:"verification"`
 }
@@ -33,7 +34,7 @@ type Step2FormT struct {
 const tokenType = "Login"
 
 func Step2(ctx fiber.Ctx) error {
-	form := new(Step2FormT)
+	form := new(Form2Login)
 	var SignInData TokenModels.SignInT
 	if err := ctx.Bind().Form(form); err != nil {
 		if err = ctx.Bind().Body(form); err != nil {
@@ -135,7 +136,7 @@ func Step2(ctx fiber.Ctx) error {
 }
 
 func Step1(ctx fiber.Ctx) error {
-	form := new(Step1FormT)
+	form := new(Form1Login)
 	if err := ctx.Bind().Form(form); err != nil {
 		if err = ctx.Bind().Body(form); err != nil {
 			RateLimitProcessor.Set(ctx)
@@ -163,7 +164,8 @@ func Step1(ctx fiber.Ctx) error {
 		Mail:         form.MailAddress,
 	}
 	if process == "otp" {
-		verification, retry := OTPProcessor.Send(form.MailAddress, MailModels.LoginInitiated, ctx.IP())
+		mailModel := MailModels.LoginInitiated
+		verification, retry := OTPProcessor.Send(form.MailAddress, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], mailModel.Header, mailModel.Ignorable, ctx.IP())
 		if verification == "" {
 			return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 				Success:       false,

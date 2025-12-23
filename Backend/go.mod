@@ -1,6 +1,6 @@
 module BhariyaAuth
 
-go 1.25.5
+go 1.26rc1
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.13.1
@@ -9,9 +9,10 @@ require (
 	github.com/gofiber/contrib/monitor v0.1.2
 	github.com/gofiber/fiber/v3 v3.0.0-rc.3
 	github.com/markbates/goth v1.82.0
-	github.com/medama-io/go-useragent v1.2.2
-	github.com/microsoftgraph/msgraph-sdk-go v1.91.0
+	github.com/medama-io/go-useragent v1.2.3
+	github.com/microsoftgraph/msgraph-sdk-go v1.92.0
 	github.com/redis/go-redis/v9 v9.17.2
+	github.com/valyala/quicktemplate v1.8.0
 	golang.org/x/crypto v0.46.0
 )
 
@@ -30,7 +31,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/gofiber/schema v1.6.0 // indirect
-	github.com/gofiber/utils/v2 v2.0.0-rc.4 // indirect
+	github.com/gofiber/utils/v2 v2.0.0-rc.5 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.18.2 // indirect

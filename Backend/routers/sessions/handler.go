@@ -16,7 +16,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-type Step2FormT struct {
+type Form2Revoke struct {
 	UserID    string `form:"user_id"`
 	RevokeAll string `form:"revoke_all"`
 	DeviceID  string `form:"device_id"`
@@ -24,7 +24,7 @@ type Step2FormT struct {
 
 func Revoke(ctx fiber.Ctx) error {
 	now := time.Now().UTC()
-	form := new(Step2FormT)
+	form := new(Form2Revoke)
 	if err := ctx.Bind().Form(form); err != nil {
 		if err = ctx.Bind().Body(form); err != nil {
 			RateLimitProcessor.Set(ctx)

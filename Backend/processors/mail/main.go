@@ -3,12 +3,10 @@ package mail
 import (
 	Config "BhariyaAuth/constants/config"
 	Secrets "BhariyaAuth/constants/secrets"
-	MailModels "BhariyaAuth/models/mail"
+	MailTemplates "BhariyaAuth/models/mail/templates"
 	Logger "BhariyaAuth/processors/logs"
-	StringProcessor "BhariyaAuth/processors/string"
 	"context"
 	"fmt"
-	"math/rand"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -66,400 +64,40 @@ func sendMail(mail, subject, content string, attempts uint8) bool {
 	return true
 }
 
-func OTP(mail, otp string, mailOptions MailModels.OtpT, attempts uint8) bool {
-	ignorableText := `you can safely ignore this message`
-	if !mailOptions.Ignorable {
-		ignorableText = fmt.Sprintf(`<br><a href="%s/passwordreset" style="margin: 0; font-size: 14px; color: #5865f2;" target="_blank"><b>change your password immediately</b></a>`, Config.FrontendURL)
-	}
-	content := fmt.Sprintf(`
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <title>BhariyaAuth OTP</title>
-</head>
-<body style="margin:0; padding:0; background-color: #eef0f3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;">
-<table width="100%%" cellpadding="0" cellspacing="0">
-    <tr>
-        <td align="center" style="padding: 48px 16px;">
-            <table width="100%%" cellpadding="0" cellspacing="0" style="max-width: 520px; background-color: #ffffff; border-radius: 14px; border: 1px solid #e5e7eb; overflow: hidden;">
-                <tr>
-                    <td style="background: linear-gradient(135deg, #1f2937, #0b0d10); padding: 28px; border-bottom: 1px solid #1f2937;" align="center">
-                        <table width="100%%" cellpadding="0" cellspacing="0" style="border: 1px solid rgba(255,255,255,0.12); border-radius: 10px;">
-                            <tr>
-                                <td align="center" style="padding: 20px;">
-                                    <img src="%s/favicons/DarkMode.png" width="120" style="display:block;" />
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="padding: 28px;">
-                        <table width="100%%" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px;">
-                            <tr>
-                                <td style="padding: 28px; text-align: center;">
-                                    <p style="margin: 0 0 16px; font-size: 15px; color: #374151; line-height: 1.5;">
-                                        %s
-                                    </p>
-                                    <div style="margin: 24px auto; padding: 14px 28px; display: inline-block; background: linear-gradient(to right, #8b5cf6, #7c3aed); color: #ffffff; font-size: 28px; letter-spacing: 6px; font-weight: 700; border-radius: 8px;">
-                                        %s
-                                    </div>
-                                    <p style="margin: 20px 0 0; font-size: 13px; color: #4b5563;">
-                                        This OTP is valid for <strong>5 minutes</strong>.
-                                    </p>
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="padding: 0 28px 28px;">
-                        <table width="100%%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;">
-                            <tr>
-                                <td style="padding: 18px; text-align: center;">
-                                    <p style="margin: 0; font-size: 12px; color: #6b7280;">
-                                        If you didn’t request this, %s
-                                    </p>
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-            </table>
-        </td>
-    </tr>
-</table>
-</body>
-</html>
-`, Config.FrontendURL, mailOptions.Header, otp, ignorableText)
-	return sendMail(mail, mailOptions.Subject[rand.Intn(len(mailOptions.Subject))], content, attempts)
+func OTP(mail, otp string, subject string, header string, ignorable bool, attempts uint8) bool {
+	return sendMail(
+		mail,
+		subject,
+		MailTemplates.OTP(Config.FrontendURL, header, otp, ignorable),
+		attempts,
+	)
 }
 
-func NewLogin(mail string, IP string, UA string, attempts uint8) bool {
-	ua := StringProcessor.UAParser.Parse(UA)
-	browser := ua.Browser()
-	if browser == "" {
-		browser = "Unknown"
-	}
-	device := ua.Device()
-	if device == "" {
-		device = "Unknown"
-	}
-	var subjects = []string{
-		"New device signed in to your account",
-		"A new device just accessed your account",
-		"New login",
-		"Your account was accessed from a new device",
-		"New device activity detected",
-		"Was this you? New device login",
-		"Security alert: new device sign-in",
-		"New device connected to your account",
-		"Account access from a new device",
-	}
-	content := fmt.Sprintf(`
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <title>New Login Detected</title>
-</head>
-<body style="margin:0; padding:0; background-color: #eef0f3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;">
-<table width="100%%" cellpadding="0" cellspacing="0">
-    <tr>
-        <td align="center" style="padding: 48px 16px;">
-            <table width="100%%" cellpadding="0" cellspacing="0" style="max-width: 520px; background-color: #ffffff; border-radius: 14px; border: 1px solid #e5e7eb; overflow: hidden;">
-                <tr>
-                    <td style="background: linear-gradient(135deg, #1f2937, #0b0d10); padding: 28px; border-bottom: 1px solid #1f2937;" align="center">
-                        <table width="100%%" cellpadding="0" cellspacing="0" style="border: 1px solid rgba(255,255,255,0.12); border-radius: 10px;">
-                            <tr>
-                                <td align="center" style="padding: 20px;">
-                                    <img src="%s/favicons/DarkMode.png" width="120" style="display:block;"/>
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="padding: 28px;">
-                        <table width="100%%" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px;">
-                            <tr>
-                                <td style="padding: 28px;">
-                                    <p style="margin: 0 0 12px; font-size: 15px; color: #374151;">
-                                        <strong>Hey,</strong>
-                                    </p>
-                                    <p style="margin: 0 0 20px; font-size: 15px; color: #374151; line-height: 1.5;">
-                                        There was a new login to your account. We’re letting you know to help keep your account safe.
-                                    </p>
-                                    <table width="100%%" cellpadding="0" cellspacing="0" style="border: 1px solid #e5e7eb; border-radius: 8px;">
-                                        <tr>
-                                            <td style="padding: 16px; vertical-align: center;" width="56">
-                                                <img src="%s/device-icons/%s.png" />
-                                            </td>
-                                            <td style="padding: 16px;">
-                                                <p style="margin:0; font-size:14px; color:#374151;">
-                                                    <strong>IP Address:</strong> %s
-                                                </p>
-                                                <p style="margin:6px 0 0; font-size:14px; color:#374151;">
-                                                    <strong>Device:</strong> %s
-                                                </p>
-                                                <p style="margin:6px 0 0; font-size:14px; color:#374151;">
-                                                    <strong>Browser:</strong> %s
-                                                </p>
-                                            </td>
-                                        </tr>
-                                    </table>
-                                </td>
-                            </tr>
-                        </table>
-						<p style="margin: 16px 0 0; font-size: 14px; color: #4b5563;">
-                            To manage your active sessions,
-                            <a href="%s" style="color:#5865f2; text-decoration:none; font-weight:500;" target="_blank">
-                                visit your dashboard
-                            </a>.
-                        </p>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="padding: 0 28px 28px;">
-                        <table width="100%%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;">
-                            <tr>
-                                <td style="padding: 18px; text-align: center;">
-                                    <p style="margin: 0; font-size: 12px; color: #6b7280;">
-                                        If this wasn't you,
-                                    </p>
-                                    <a href="%s/auth/passwordreset" style="margin: 0; font-size: 14px; color: #5865f2;" target="_blank"><b>change your password immediately</b></a>
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-            </table>
-        </td>
-    </tr>
-</table>
-</body>
-</html>
-`, Config.FrontendURL, Config.FrontendURL, device, IP, device, browser, Config.FrontendURL, Config.FrontendURL)
-	return sendMail(mail, subjects[rand.Intn(len(subjects))], content, attempts)
+func NewLogin(mail string, subject string, IP string, device string, browser string, attempts uint8) bool {
+	return sendMail(
+		mail,
+		subject,
+		MailTemplates.NewLogin(Config.FrontendURL, device, browser, IP),
+		attempts)
 }
 
-func NewAccount(mail string, name string, IP string, UA string, attempts uint8) bool {
-	ua := StringProcessor.UAParser.Parse(UA)
-	browser := ua.Browser()
-	if browser == "" {
-		browser = "Unknown"
-	}
-	device := ua.Device()
-	if device == "" {
-		device = "Unknown"
-	}
-	content := fmt.Sprintf(`
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <title>New Login Detected</title>
-</head>
-<body style="margin:0; padding:0; background-color: #eef0f3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;">
-<table width="100%%" cellpadding="0" cellspacing="0">
-    <tr>
-        <td align="center" style="padding: 48px 16px;">
-            <table width="100%%" cellpadding="0" cellspacing="0" style="max-width: 520px; background-color: #ffffff; border-radius: 14px; border: 1px solid #e5e7eb; overflow: hidden;">
-                <tr>
-                    <td style="background: linear-gradient(135deg, #1f2937, #0b0d10); padding: 28px; border-bottom: 1px solid #1f2937;" align="center">
-                        <table width="100%%" cellpadding="0" cellspacing="0" style="border: 1px solid rgba(255,255,255,0.12); border-radius: 10px;">
-                            <tr>
-                                <td align="center" style="padding: 20px;">
-                                    <img src="%s/favicons/DarkMode.png" width="120" style="display:block;"/>
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="padding: 28px;">
-                        <table width="100%%" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px;">
-                            <tr>
-                                <td style="padding: 28px;">
-                                    <p style="margin: 0 0 8px; font-size: 15px; color: #065f46; font-weight: 600;">
-                                        Account created successfully
-                                    </p>
-                                    <p style="margin: 0 0 12px; font-size: 15px; color: #374151;">
-                                        <strong>Hey, %s</strong>
-                                    </p>
-                                    <p style="margin: 0 0 20px; font-size: 15px; color: #374151; line-height: 1.5;">
-                                        Your account is ready. You can now sign in and start with our services.
-                                    </p>
-                                    <table width="100%%" cellpadding="0" cellspacing="0" style="border: 1px solid #d1fae5; border-radius: 8px; background-color: #ecfdf5;">
-                                        <tr>
-                                            <td style="padding: 16px;">
-                                                <p style="margin:0; font-size:14px; color:#065f46;">
-                                                    <strong>Account created from this device</strong>
-                                                </p>
-                                            </td>
-                                        </tr>
-                                    </table>
-                                    <table width="100%%" cellpadding="0" cellspacing="0" style="border: 1px solid #e5e7eb; border-radius: 8px; margin-top: 14px;">
-                                        <tr>
-                                            <td style="padding: 16px; vertical-align: center;" width="56">
-                                                <img src="%s/device-icons/%s.png" />
-                                            </td>
-                                            <td style="padding: 16px;">
-                                                <p style="margin:0; font-size:14px; color:#374151;">
-                                                    <strong>IP Address:</strong> %s
-                                                </p>
-                                                <p style="margin:6px 0 0; font-size:14px; color:#374151;">
-                                                    <strong>Device:</strong> %s
-                                                </p>
-                                                <p style="margin:6px 0 0; font-size:14px; color:#374151;">
-                                                    <strong>Browser:</strong> %s
-                                                </p>
-                                            </td>
-                                        </tr>
-                                    </table>
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-				<tr>
-                    <td style="padding: 0 28px 28px;">
-                        <table width="100%%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;">
-                            <tr>
-                                <td style="padding: 18px; text-align: center;">
-                                    <p style="margin: 0; font-size: 12px; color: #6b7280;">
-                                       To get more control over your account,
-                            			<a href="%s" style="color:#5865f2; text-decoration:none; font-weight:500;" target="_blank">
-                                		visit your dashboard
-                            			</a>.
-                                    </p>
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-            </table>
-        </td>
-    </tr>
-</table>
-</body>
-</html>
-`, Config.FrontendURL, name, Config.FrontendURL, device, IP, device, browser, Config.FrontendURL)
-	return sendMail(mail, "Account Created", content, attempts)
+func NewAccount(mail string, name string, subject string, IP string, device string, browser string, attempts uint8) bool {
+	return sendMail(
+		mail,
+		subject,
+		MailTemplates.NewAccount(Config.FrontendURL, name, device, browser, IP),
+		attempts)
 }
 
-func PasswordReset(mail string, IP string, UA string, attempts uint8) bool {
-	ua := StringProcessor.UAParser.Parse(UA)
-	browser := ua.Browser()
-	if browser == "" {
-		browser = "Unknown"
-	}
-	device := ua.Device()
-	if device == "" {
-		device = "Unknown"
-	}
-	var subjects = []string{
-		"Your password was changed successfully",
-		"Password updated",
-		"Your account password has been updated",
-		"Password changed successfully",
-		"Security update: password changed",
-		"Your new password is now set",
-		"Your account is now secure",
-		"Password successfully updated",
-		"Your password has been changed",
-	}
-	content := fmt.Sprintf(`
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <title>New Login Detected</title>
-</head>
-<body style="margin:0; padding:0; background-color: #eef0f3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;">
-<table width="100%%" cellpadding="0" cellspacing="0">
-    <tr>
-        <td align="center" style="padding: 48px 16px;">
-            <table width="100%%" cellpadding="0" cellspacing="0" style="max-width: 520px; background-color: #ffffff; border-radius: 14px; border: 1px solid #e5e7eb; overflow: hidden;">
-                <tr>
-                    <td style="background: linear-gradient(135deg, #1f2937, #0b0d10); padding: 28px; border-bottom: 1px solid #1f2937;" align="center">
-                        <table width="100%%" cellpadding="0" cellspacing="0" style="border: 1px solid rgba(255,255,255,0.12); border-radius: 10px;">
-                            <tr>
-                                <td align="center" style="padding: 20px;">
-                                    <img src="%s/favicons/DarkMode.png" width="120" style="display:block;"/>
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="padding: 28px;">
-                        <table width="100%%" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px;">
-                            <tr>
-                                <td style="padding: 28px;">
-                                    <p style="margin: 0 0 8px; font-size: 15px; color: #92400e; font-weight: 600;">
-                                        Password Changed
-                                    </p>
-                                    <p style="margin: 0 0 20px; font-size: 15px; color: #374151; line-height: 1.5;">
-                                        This is a confirmation that your account password was successfully changed.
-                                    </p>
-                                    <table width="100%%" cellpadding="0" cellspacing="0" style="border: 1px solid #fecaca; border-radius: 8px; background-color: #fef2f2;">
-                                        <tr>
-                                            <td style="padding: 16px;">
-                                                <p style="margin:0; font-size:14px; color:#7f1d1d;">
-                                                    <strong>Password changed from this device</strong>
-                                                </p>
-                                            </td>
-                                        </tr>
-                                    </table>
-                                    <table width="100%%" cellpadding="0" cellspacing="0" style="border: 1px solid #e5e7eb; border-radius: 8px; margin-top: 14px;">
-                                        <tr>
-                                            <td style="padding: 16px; vertical-align: center;" width="56">
-                                                <img src="%s/device-icons/%s.png" />
-                                            </td>
-                                            <td style="padding: 16px;">
-                                                <p style="margin:0; font-size:14px; color:#374151;">
-                                                    <strong>IP Address:</strong> %s
-                                                </p>
-                                                <p style="margin:6px 0 0; font-size:14px; color:#374151;">
-                                                    <strong>Device:</strong> %s
-                                                </p>
-                                                <p style="margin:6px 0 0; font-size:14px; color:#374151;">
-                                                    <strong>Browser:</strong> %s
-                                                </p>
-                                            </td>
-                                        </tr>
-                                    </table>
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="padding: 0 28px 28px;">
-                        <table width="100%%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;">
-                            <tr>
-                                <td style="padding: 18px; text-align: center;">
-                                    <p style="margin: 0; font-size: 12px; color: #6b7280;">
-                                        You have been signed out of all devices.
-                                    </p>
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-            </table>
-        </td>
-    </tr>
-</table>
-</body>
-</html>
-`, Config.FrontendURL, Config.FrontendURL, device, IP, device, browser)
-	return sendMail(mail, subjects[rand.Intn(len(subjects))], content, attempts)
+func PasswordReset(mail string, subject string, IP string, device string, browser string, attempts uint8) bool {
+	return sendMail(
+		mail,
+		subject,
+		MailTemplates.PasswordReset(Config.FrontendURL, device, browser, IP),
+		attempts)
 }
 
 func AccountBlacklisted(mail string, attempts uint8) bool {
-	content := `Your account has been flagged. AllOTP future actions will be blocked. Contact support ASAP if you think this is a mistake.`
+	content := `Your account has been flagged. All future actions will be blocked. Contact support ASAP if you think this is a mistake.`
 	return sendMail(mail, "Account Blacklisted", content, attempts)
 }
