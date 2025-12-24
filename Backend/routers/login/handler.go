@@ -1,6 +1,7 @@
 package login
 
 import (
+	FormModels "BhariyaAuth/models/forms"
 	MailModels "BhariyaAuth/models/mails"
 	ResponseModels "BhariyaAuth/models/responses"
 	TokenModels "BhariyaAuth/models/tokens"
@@ -21,20 +22,84 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-type Form1Login struct {
-	MailAddress string `form:"mail_address"`
-	RememberMe  string `form:"remember_me"`
-}
-
-type Form2Login struct {
-	Token        string `form:"token"`
-	Verification string `form:"verification"`
-}
-
 const tokenType = "Login"
 
+func Step1(ctx fiber.Ctx) error {
+	form := new(FormModels.LoginForm1)
+	if err := ctx.Bind().Form(form); err != nil {
+		if err = ctx.Bind().Body(form); err != nil {
+			RateLimitProcessor.Set(ctx)
+			return ctx.SendStatus(fiber.StatusUnprocessableEntity)
+		}
+	}
+	if !StringProcessor.EmailIsValid(form.MailAddress) {
+		RateLimitProcessor.Set(ctx)
+		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
+	}
+	userID, found := AccountProcessor.GetIDFromMail(form.MailAddress)
+	if !found {
+		RateLimitProcessor.Set(ctx)
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Account doesn't exist with the email"},
+		})
+	}
+	process := ctx.Params("process")
+	SignInData := TokenModels.SignInT{
+		UserID:       userID,
+		TokenType:    tokenType,
+		RememberMe:   form.RememberMe == "yes",
+		Step2Process: process,
+		Mail:         form.MailAddress,
+	}
+	if process == "otp" {
+		mailModel := MailModels.LoginInitiated
+		verification, retry := OTPProcessor.Send(form.MailAddress, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], mailModel.Header, mailModel.Ignorable, ctx.IP())
+		if verification == "" {
+			return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+				Success:       false,
+				Reply:         retry.Seconds(),
+				Notifications: []string{fmt.Sprintf("Unable to send OTP, please try again after %.1f seconds", retry.Seconds())},
+			})
+		}
+		SignInData.Step2Code = verification
+	} else if process == "password" {
+		if !AccountProcessor.CheckUserHasPassword(userID) {
+			return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+				Success:       false,
+				Notifications: []string{"Password has not been set. Please use OTP or SSO to login"},
+			})
+		}
+		SignInData.Step2Code = ""
+	} else {
+		RateLimitProcessor.Set(ctx)
+		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
+	}
+	data, err := json.Marshal(SignInData)
+	if err != nil {
+		Logger.AccidentalFailure(fmt.Sprintf("[Login1] Marshal Failed for [UID-%d] reason: %s", userID, err.Error()))
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Failed to acquire token (Parser issue)... Retrying"},
+		})
+	}
+	token, ok := StringProcessor.Encrypt(data)
+	if !ok {
+		Logger.AccidentalFailure(fmt.Sprintf("[Login1] Encrypt Failed for [UID-%d]", userID))
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
+		})
+	}
+	Logger.Success(fmt.Sprintf("[Login1] Token Created for [UID-%d]", userID))
+	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+		Success: true,
+		Reply:   token,
+	})
+}
+
 func Step2(ctx fiber.Ctx) error {
-	form := new(Form2Login)
+	form := new(FormModels.LoginForm2)
 	var SignInData TokenModels.SignInT
 	if err := ctx.Bind().Form(form); err != nil {
 		if err = ctx.Bind().Body(form); err != nil {
@@ -132,79 +197,5 @@ func Step2(ctx fiber.Ctx) error {
 		Success:    true,
 		ModifyAuth: true,
 		NewToken:   token.AccessToken,
-	})
-}
-
-func Step1(ctx fiber.Ctx) error {
-	form := new(Form1Login)
-	if err := ctx.Bind().Form(form); err != nil {
-		if err = ctx.Bind().Body(form); err != nil {
-			RateLimitProcessor.Set(ctx)
-			return ctx.SendStatus(fiber.StatusUnprocessableEntity)
-		}
-	}
-	if !StringProcessor.EmailIsValid(form.MailAddress) {
-		RateLimitProcessor.Set(ctx)
-		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
-	}
-	userID, found := AccountProcessor.GetIDFromMail(form.MailAddress)
-	if !found {
-		RateLimitProcessor.Set(ctx)
-		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Success:       false,
-			Notifications: []string{"Account doesn't exist with the email"},
-		})
-	}
-	process := ctx.Params("process")
-	SignInData := TokenModels.SignInT{
-		UserID:       userID,
-		TokenType:    tokenType,
-		RememberMe:   form.RememberMe == "yes",
-		Step2Process: process,
-		Mail:         form.MailAddress,
-	}
-	if process == "otp" {
-		mailModel := MailModels.LoginInitiated
-		verification, retry := OTPProcessor.Send(form.MailAddress, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], mailModel.Header, mailModel.Ignorable, ctx.IP())
-		if verification == "" {
-			return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-				Success:       false,
-				Reply:         retry.Seconds(),
-				Notifications: []string{fmt.Sprintf("Unable to send OTP, please try again after %.1f seconds", retry.Seconds())},
-			})
-		}
-		SignInData.Step2Code = verification
-	} else if process == "password" {
-		if !AccountProcessor.CheckUserHasPassword(userID) {
-			return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-				Success:       false,
-				Notifications: []string{"Password has not been set. Please use OTP or SSO to login"},
-			})
-		}
-		SignInData.Step2Code = ""
-	} else {
-		RateLimitProcessor.Set(ctx)
-		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
-	}
-	data, err := json.Marshal(SignInData)
-	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("[Login1] Marshal Failed for [UID-%d] reason: %s", userID, err.Error()))
-		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
-			Notifications: []string{"Failed to acquire token (Parser issue)... Retrying"},
-		})
-	}
-	token, ok := StringProcessor.Encrypt(data)
-	if !ok {
-		Logger.AccidentalFailure(fmt.Sprintf("[Login1] Encrypt Failed for [UID-%d]", userID))
-		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
-			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
-		})
-	}
-	Logger.Success(fmt.Sprintf("[Login1] Token Created for [UID-%d]", userID))
-	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-		Success: true,
-		Reply:   token,
 	})
 }

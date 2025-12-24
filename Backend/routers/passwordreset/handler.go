@@ -1,6 +1,7 @@
 package passwordreset
 
 import (
+	FormModels "BhariyaAuth/models/forms"
 	MailModels "BhariyaAuth/models/mails"
 	ResponseModels "BhariyaAuth/models/responses"
 	TokenModels "BhariyaAuth/models/tokens"
@@ -17,20 +18,69 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-type Form1PasswordReset struct {
-	MailAddress string `form:"mail_address"`
-}
-
-type Form2PasswordReset struct {
-	Token        string `form:"token"`
-	Verification string `form:"verification"`
-	NewPassword  string `form:"new_password"`
-}
-
 const tokenType = "PasswordReset"
 
+func Step1(ctx fiber.Ctx) error {
+	form := new(FormModels.PasswordResetForm1)
+	if err := ctx.Bind().Form(form); err != nil {
+		if err = ctx.Bind().Body(form); err != nil {
+			RateLimitProcessor.Set(ctx)
+			return ctx.SendStatus(fiber.StatusUnprocessableEntity)
+		}
+	}
+	if !StringProcessor.EmailIsValid(form.MailAddress) {
+		RateLimitProcessor.Set(ctx)
+		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
+	}
+	userID, found := AccountProcessor.GetIDFromMail(form.MailAddress)
+	if !found {
+		RateLimitProcessor.Set(ctx)
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Account doesn't exist with the email"},
+		})
+	}
+	PasswordReset := TokenModels.PasswordResetT{
+		TokenType: tokenType,
+		Mail:      form.MailAddress,
+		UserID:    userID,
+		Step2Code: "",
+	}
+	mailModel := MailModels.PasswordResetInitiated
+	verification, retry := OTPProcessor.Send(form.MailAddress, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], mailModel.Header, mailModel.Ignorable, ctx.IP())
+	if verification == "" {
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Reply:         retry.Seconds(),
+			Notifications: []string{fmt.Sprintf("Unable to send OTP, please try again after %.1f seconds", retry.Seconds())},
+		})
+	}
+	PasswordReset.Step2Code = verification
+	data, err := json.Marshal(PasswordReset)
+	if err != nil {
+		Logger.AccidentalFailure(fmt.Sprintf("[Reset1] Marshal Failed for [UID-%d] reason: %s", userID, err.Error()))
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
+		})
+	}
+	token, ok := StringProcessor.Encrypt(data)
+	if !ok {
+		Logger.AccidentalFailure(fmt.Sprintf("[Reset1] Encrypt Failed for [UID-%d]", userID))
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
+		})
+	}
+	Logger.Success(fmt.Sprintf("[Reset1] Token Created for [UID-%d]", userID))
+	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+		Success: true,
+		Reply:   token,
+	})
+}
+
 func Step2(ctx fiber.Ctx) error {
-	form := new(Form2PasswordReset)
+	form := new(FormModels.PasswordResetForm2)
 	var ResetData TokenModels.PasswordResetT
 	if err := ctx.Bind().Form(form); err != nil {
 		if err = ctx.Bind().Body(form); err != nil {
@@ -92,64 +142,5 @@ func Step2(ctx fiber.Ctx) error {
 	MailNotifier.PasswordReset(ResetData.Mail, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], ctx.IP(), device, browser, 2)
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 		Success: true,
-	})
-}
-
-func Step1(ctx fiber.Ctx) error {
-	form := new(Form1PasswordReset)
-	if err := ctx.Bind().Form(form); err != nil {
-		if err = ctx.Bind().Body(form); err != nil {
-			RateLimitProcessor.Set(ctx)
-			return ctx.SendStatus(fiber.StatusUnprocessableEntity)
-		}
-	}
-	if !StringProcessor.EmailIsValid(form.MailAddress) {
-		RateLimitProcessor.Set(ctx)
-		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
-	}
-	userID, found := AccountProcessor.GetIDFromMail(form.MailAddress)
-	if !found {
-		RateLimitProcessor.Set(ctx)
-		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Success:       false,
-			Notifications: []string{"Account doesn't exist with the email"},
-		})
-	}
-	PasswordReset := TokenModels.PasswordResetT{
-		TokenType: tokenType,
-		Mail:      form.MailAddress,
-		UserID:    userID,
-		Step2Code: "",
-	}
-	mailModel := MailModels.PasswordResetInitiated
-	verification, retry := OTPProcessor.Send(form.MailAddress, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], mailModel.Header, mailModel.Ignorable, ctx.IP())
-	if verification == "" {
-		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Success:       false,
-			Reply:         retry.Seconds(),
-			Notifications: []string{fmt.Sprintf("Unable to send OTP, please try again after %.1f seconds", retry.Seconds())},
-		})
-	}
-	PasswordReset.Step2Code = verification
-	data, err := json.Marshal(PasswordReset)
-	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("[Reset1] Marshal Failed for [UID-%d] reason: %s", userID, err.Error()))
-		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
-			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
-		})
-	}
-	token, ok := StringProcessor.Encrypt(data)
-	if !ok {
-		Logger.AccidentalFailure(fmt.Sprintf("[Reset1] Encrypt Failed for [UID-%d]", userID))
-		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
-			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
-		})
-	}
-	Logger.Success(fmt.Sprintf("[Reset1] Token Created for [UID-%d]", userID))
-	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-		Success: true,
-		Reply:   token,
 	})
 }

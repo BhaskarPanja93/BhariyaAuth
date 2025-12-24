@@ -1,6 +1,7 @@
 package mfa
 
 import (
+	FormModels "BhariyaAuth/models/forms"
 	MailModels "BhariyaAuth/models/mails"
 	ResponseModels "BhariyaAuth/models/responses"
 	TokenModels "BhariyaAuth/models/tokens"
@@ -20,78 +21,6 @@ import (
 )
 
 const tokenType = "mfa"
-
-type Form2MFA struct {
-	Token        string `form:"token"`
-	Verification string `form:"verification"`
-}
-
-func Step2(ctx fiber.Ctx) error {
-	form := new(Form2MFA)
-	var MFAData TokenModels.MFATokenT
-	if err := ctx.Bind().Form(form); err != nil {
-		if err = ctx.Bind().Body(form); err != nil {
-			RateLimitProcessor.Set(ctx)
-			return ctx.SendStatus(fiber.StatusUnprocessableEntity)
-		}
-	}
-	data, ok := StringProcessor.Decrypt(form.Token)
-	if !ok {
-		Logger.AccidentalFailure("[MFA2] Decrypt Failed")
-		RateLimitProcessor.Set(ctx)
-		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
-	}
-	err := json.Unmarshal(data, &MFAData)
-	if err != nil {
-		Logger.AccidentalFailure("[MFA2] Unmarshal Failed")
-		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
-			Notifications: []string{"Failed to read token (Encryptor issue)... Retrying"},
-		})
-	}
-	if MFAData.TokenType != tokenType {
-		RateLimitProcessor.Set(ctx)
-		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
-	}
-	if !OTPProcessor.Validate(MFAData.Step2Code, form.Verification) {
-		Logger.IntentionalFailure(fmt.Sprintf("[MFA2] Incorrect OTP for [UID-%d]", MFAData.UserID))
-		RateLimitProcessor.Set(ctx)
-		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Success:       false,
-			Notifications: []string{"Incorrect OTP"},
-		})
-	}
-	if AccountProcessor.CheckUserIsBlacklisted(MFAData.UserID) {
-		Logger.IntentionalFailure(fmt.Sprintf("[MFA2] Blacklisted account [UID-%d] attempted Mfa", MFAData.UserID))
-		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Success:       false,
-			Notifications: []string{"Your account is disabled, please contact support"},
-		})
-	}
-	MFAData.Verified = true
-	MFAData.Creation = time.Now().UTC()
-	data, err = json.Marshal(MFAData)
-	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("[MFA2] Marshal Failed for [UID-%d] reason: %s", MFAData.UserID, err.Error()))
-		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
-			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
-		})
-	}
-	token, ok := StringProcessor.Encrypt(data)
-	if !ok {
-		Logger.AccidentalFailure(fmt.Sprintf("[MFA2] Encrypt Failed for [UID-%d]", MFAData.UserID))
-		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
-			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
-		})
-	}
-	ResponseProcessor.AttachMFACookie(ctx, token)
-	Logger.Success(fmt.Sprintf("[MFA2] Successful for [UID-%d]", MFAData.UserID))
-	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-		Success: true,
-	})
-}
 
 func Step1(ctx fiber.Ctx) error {
 	now := time.Now().UTC()
@@ -163,5 +92,72 @@ func Step1(ctx fiber.Ctx) error {
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 		Success: true,
 		Reply:   token,
+	})
+}
+
+func Step2(ctx fiber.Ctx) error {
+	form := new(FormModels.MFAForm)
+	var MFAData TokenModels.MFATokenT
+	if err := ctx.Bind().Form(form); err != nil {
+		if err = ctx.Bind().Body(form); err != nil {
+			RateLimitProcessor.Set(ctx)
+			return ctx.SendStatus(fiber.StatusUnprocessableEntity)
+		}
+	}
+	data, ok := StringProcessor.Decrypt(form.Token)
+	if !ok {
+		Logger.AccidentalFailure("[MFA2] Decrypt Failed")
+		RateLimitProcessor.Set(ctx)
+		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
+	}
+	err := json.Unmarshal(data, &MFAData)
+	if err != nil {
+		Logger.AccidentalFailure("[MFA2] Unmarshal Failed")
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Failed to read token (Encryptor issue)... Retrying"},
+		})
+	}
+	if MFAData.TokenType != tokenType {
+		RateLimitProcessor.Set(ctx)
+		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
+	}
+	if !OTPProcessor.Validate(MFAData.Step2Code, form.Verification) {
+		Logger.IntentionalFailure(fmt.Sprintf("[MFA2] Incorrect OTP for [UID-%d]", MFAData.UserID))
+		RateLimitProcessor.Set(ctx)
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Incorrect OTP"},
+		})
+	}
+	if AccountProcessor.CheckUserIsBlacklisted(MFAData.UserID) {
+		Logger.IntentionalFailure(fmt.Sprintf("[MFA2] Blacklisted account [UID-%d] attempted Mfa", MFAData.UserID))
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Your account is disabled, please contact support"},
+		})
+	}
+	MFAData.Verified = true
+	MFAData.Creation = time.Now().UTC()
+	data, err = json.Marshal(MFAData)
+	if err != nil {
+		Logger.AccidentalFailure(fmt.Sprintf("[MFA2] Marshal Failed for [UID-%d] reason: %s", MFAData.UserID, err.Error()))
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
+		})
+	}
+	token, ok := StringProcessor.Encrypt(data)
+	if !ok {
+		Logger.AccidentalFailure(fmt.Sprintf("[MFA2] Encrypt Failed for [UID-%d]", MFAData.UserID))
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Success:       false,
+			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
+		})
+	}
+	ResponseProcessor.AttachMFACookie(ctx, token)
+	Logger.Success(fmt.Sprintf("[MFA2] Successful for [UID-%d]", MFAData.UserID))
+	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+		Success: true,
 	})
 }

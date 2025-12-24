@@ -1,6 +1,7 @@
 package sessions
 
 import (
+	FormModels "BhariyaAuth/models/forms"
 	ResponseModels "BhariyaAuth/models/responses"
 	AccountProcessor "BhariyaAuth/processors/account"
 	Logger "BhariyaAuth/processors/logs"
@@ -15,55 +16,6 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 )
-
-type Form2Revoke struct {
-	UserID    string `form:"user_id"`
-	RevokeAll string `form:"revoke_all"`
-	DeviceID  string `form:"device_id"`
-}
-
-func Revoke(ctx fiber.Ctx) error {
-	now := time.Now().UTC()
-	form := new(Form2Revoke)
-	if err := ctx.Bind().Form(form); err != nil {
-		if err = ctx.Bind().Body(form); err != nil {
-			RateLimitProcessor.Set(ctx)
-			return ctx.SendStatus(fiber.StatusUnprocessableEntity)
-		}
-	}
-	access := TokenProcessor.ReadAccessToken(ctx)
-	if access.UserID == 0 || now.After(access.AccessExpiry) {
-		RateLimitProcessor.Set(ctx)
-		return ctx.SendStatus(fiber.StatusUnauthorized)
-	}
-	uidbuf, ok := StringProcessor.Decrypt(form.UserID)
-	if !ok {
-		Logger.AccidentalFailure("[Revoke] UID Decrypt failed")
-		RateLimitProcessor.Set(ctx)
-		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
-	}
-	if access.UserID != binary.BigEndian.Uint32(uidbuf) {
-		RateLimitProcessor.Set(ctx)
-		return ctx.SendStatus(fiber.StatusUnauthorized)
-	}
-	if form.RevokeAll == "yes" {
-		AccountProcessor.DeleteAllSessions(access.UserID)
-		Logger.Success(fmt.Sprintf("Sessions RevokeAll succeeded for [%d]", access.UserID))
-		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Success: true,
-		})
-	}
-	RefreshID, ok := StringProcessor.Decrypt(form.DeviceID)
-	if !ok {
-		Logger.AccidentalFailure(fmt.Sprintf("RevokeAll RID Decrypt failed [%s]", form.DeviceID))
-		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
-	}
-	AccountProcessor.DeleteSession(access.UserID, binary.BigEndian.Uint16(RefreshID))
-	Logger.Success(fmt.Sprintf("Sessions Revoke succeeded for [%d-%d]", access.UserID, RefreshID))
-	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-		Success: true,
-	})
-}
 
 func Fetch(ctx fiber.Ctx) error {
 	now := time.Now().UTC()
@@ -141,5 +93,48 @@ func Fetch(ctx fiber.Ctx) error {
 		Success:       true,
 		Reply:         response,
 		Notifications: []string{fmt.Sprintf("Fetched data, successful: %d failed: %d", success, failure)},
+	})
+}
+
+func Revoke(ctx fiber.Ctx) error {
+	now := time.Now().UTC()
+	form := new(FormModels.DeviceRevokeForm)
+	if err := ctx.Bind().Form(form); err != nil {
+		if err = ctx.Bind().Body(form); err != nil {
+			RateLimitProcessor.Set(ctx)
+			return ctx.SendStatus(fiber.StatusUnprocessableEntity)
+		}
+	}
+	access := TokenProcessor.ReadAccessToken(ctx)
+	if access.UserID == 0 || now.After(access.AccessExpiry) {
+		RateLimitProcessor.Set(ctx)
+		return ctx.SendStatus(fiber.StatusUnauthorized)
+	}
+	uidbuf, ok := StringProcessor.Decrypt(form.UserID)
+	if !ok {
+		Logger.AccidentalFailure("[Revoke] UID Decrypt failed")
+		RateLimitProcessor.Set(ctx)
+		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
+	}
+	if access.UserID != binary.BigEndian.Uint32(uidbuf) {
+		RateLimitProcessor.Set(ctx)
+		return ctx.SendStatus(fiber.StatusUnauthorized)
+	}
+	if form.RevokeAll == "yes" {
+		AccountProcessor.DeleteAllSessions(access.UserID)
+		Logger.Success(fmt.Sprintf("Sessions RevokeAll succeeded for [%d]", access.UserID))
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Success: true,
+		})
+	}
+	RefreshID, ok := StringProcessor.Decrypt(form.DeviceID)
+	if !ok {
+		Logger.AccidentalFailure(fmt.Sprintf("RevokeAll RID Decrypt failed [%s]", form.DeviceID))
+		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
+	}
+	AccountProcessor.DeleteSession(access.UserID, binary.BigEndian.Uint16(RefreshID))
+	Logger.Success(fmt.Sprintf("Sessions Revoke succeeded for [%d-%d]", access.UserID, RefreshID))
+	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+		Success: true,
 	})
 }

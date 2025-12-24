@@ -44,6 +44,52 @@ func init() {
 	)
 }
 
+func Step1(ctx fiber.Ctx) error {
+	now := time.Now().UTC()
+	processor := ctx.Params("processor")
+	provider, err := goth.GetProvider(processor)
+	if err != nil {
+		return ResponseProcessor.SSOFailurePopup(ctx, "Provider unknown")
+	}
+	state := TokenModels.SSOStateT{
+		Provider:   processor,
+		Expiry:     now.Add(Config.SSOCookieExpireDelta),
+		RememberMe: ctx.Query("remember_me", "no") == "yes",
+	}
+	stateMarshal, err := json.Marshal(state)
+	if err != nil {
+		Logger.AccidentalFailure(fmt.Sprintf("[SSO1] State Marshal failed reason: %s", err.Error()))
+		return ResponseProcessor.SSOFailurePopup(ctx, "State Parse issue. Please try again")
+	}
+	encryptedState, ok := StringProcessor.Encrypt(stateMarshal)
+	if !ok {
+		Logger.AccidentalFailure("[SSO1] State Encrypt failed")
+		return ResponseProcessor.SSOFailurePopup(ctx, "State Encrypt issue. Please try again")
+	}
+	sess, err := provider.BeginAuth(encryptedState)
+	if err != nil {
+		Logger.AccidentalFailure(fmt.Sprintf("[SSO1] BeginAuth error: %s", err.Error()))
+		return ResponseProcessor.SSOFailurePopup(ctx, "Begin auth issue. Please try again")
+	}
+	sendURL, err := sess.GetAuthURL()
+	if err != nil {
+		Logger.AccidentalFailure(fmt.Sprintf("[SSO1] GetAuthURL error: %s", err.Error()))
+		return ResponseProcessor.SSOFailurePopup(ctx, "Get Auth URL issue. Please try again")
+	}
+	marshal, err := json.Marshal(sess)
+	if err != nil {
+		Logger.AccidentalFailure(fmt.Sprintf("[SSO1] Session Marshal error: %s", err.Error()))
+		return ResponseProcessor.SSOFailurePopup(ctx, "Session Parse issue. Please try again")
+	}
+	enc, ok := StringProcessor.Encrypt(marshal)
+	if !ok {
+		Logger.AccidentalFailure("[SSO1] Session Encrypt failed")
+		return ResponseProcessor.SSOFailurePopup(ctx, "Session Encrypt issue. Please try again")
+	}
+	ResponseProcessor.AttachSSOCookie(ctx, enc)
+	return ctx.Redirect().To(sendURL)
+}
+
 func Step2(ctx fiber.Ctx) error {
 	now := time.Now().UTC()
 	stateString := ctx.Query("state")
@@ -151,50 +197,4 @@ func Step2(ctx fiber.Ctx) error {
 	ResponseProcessor.AttachAuthCookies(ctx, token)
 	Logger.Success(fmt.Sprintf("[SSO2] LoggedIn: [UID-%d-RID-%d-MAIL-%s]", userID, refreshID, user.Email))
 	return ResponseProcessor.SSOSuccessPopup(ctx, token.AccessToken)
-}
-
-func Step1(ctx fiber.Ctx) error {
-	now := time.Now().UTC()
-	processor := ctx.Params("processor")
-	provider, err := goth.GetProvider(processor)
-	if err != nil {
-		return ResponseProcessor.SSOFailurePopup(ctx, "Provider unknown")
-	}
-	state := TokenModels.SSOStateT{
-		Provider:   processor,
-		Expiry:     now.Add(Config.SSOCookieExpireDelta),
-		RememberMe: ctx.Query("remember_me", "no") == "yes",
-	}
-	stateMarshal, err := json.Marshal(state)
-	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("[SSO1] State Marshal failed reason: %s", err.Error()))
-		return ResponseProcessor.SSOFailurePopup(ctx, "State Parse issue. Please try again")
-	}
-	encryptedState, ok := StringProcessor.Encrypt(stateMarshal)
-	if !ok {
-		Logger.AccidentalFailure("[SSO1] State Encrypt failed")
-		return ResponseProcessor.SSOFailurePopup(ctx, "State Encrypt issue. Please try again")
-	}
-	sess, err := provider.BeginAuth(encryptedState)
-	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("[SSO1] BeginAuth error: %s", err.Error()))
-		return ResponseProcessor.SSOFailurePopup(ctx, "Begin auth issue. Please try again")
-	}
-	sendURL, err := sess.GetAuthURL()
-	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("[SSO1] GetAuthURL error: %s", err.Error()))
-		return ResponseProcessor.SSOFailurePopup(ctx, "Get Auth URL issue. Please try again")
-	}
-	marshal, err := json.Marshal(sess)
-	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("[SSO1] Session Marshal error: %s", err.Error()))
-		return ResponseProcessor.SSOFailurePopup(ctx, "Session Parse issue. Please try again")
-	}
-	enc, ok := StringProcessor.Encrypt(marshal)
-	if !ok {
-		Logger.AccidentalFailure("[SSO1] Session Encrypt failed")
-		return ResponseProcessor.SSOFailurePopup(ctx, "Session Encrypt issue. Please try again")
-	}
-	ResponseProcessor.AttachSSOCookie(ctx, enc)
-	return ctx.Redirect().To(sendURL)
 }
