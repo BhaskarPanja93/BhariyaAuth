@@ -1,7 +1,7 @@
 package register
 
 import (
-	MailModels "BhariyaAuth/models/mail"
+	MailModels "BhariyaAuth/models/mails"
 	ResponseModels "BhariyaAuth/models/responses"
 	TokenModels "BhariyaAuth/models/tokens"
 	UserTypes "BhariyaAuth/models/users"

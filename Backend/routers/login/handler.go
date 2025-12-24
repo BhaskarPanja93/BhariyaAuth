@@ -1,7 +1,7 @@
 package login
 
 import (
-	MailModels "BhariyaAuth/models/mail"
+	MailModels "BhariyaAuth/models/mails"
 	ResponseModels "BhariyaAuth/models/responses"
 	TokenModels "BhariyaAuth/models/tokens"
 	AccountProcessor "BhariyaAuth/processors/account"

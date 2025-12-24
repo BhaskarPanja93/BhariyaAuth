@@ -2,7 +2,7 @@ package account
 
 import (
 	Config "BhariyaAuth/constants/config"
-	MailModels "BhariyaAuth/models/mail"
+	MailModels "BhariyaAuth/models/mails"
 	ResponseModels "BhariyaAuth/models/responses"
 	UserTypes "BhariyaAuth/models/users"
 	Logger "BhariyaAuth/processors/logs"

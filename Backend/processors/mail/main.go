@@ -3,7 +3,7 @@ package mail
 import (
 	Config "BhariyaAuth/constants/config"
 	Secrets "BhariyaAuth/constants/secrets"
-	MailTemplates "BhariyaAuth/models/mail/templates"
+	MailTemplates "BhariyaAuth/models/mails/templates"
 	Logger "BhariyaAuth/processors/logs"
 	"context"
 	"fmt"

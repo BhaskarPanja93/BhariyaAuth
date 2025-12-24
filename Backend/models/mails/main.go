@@ -1,4 +1,4 @@
-package mail
+package mails
 
 type T struct {
 	Subjects  []string
