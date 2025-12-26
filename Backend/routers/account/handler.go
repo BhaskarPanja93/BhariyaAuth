@@ -16,41 +16,27 @@ import (
 )
 
 func ProcessRefresh(ctx fiber.Ctx) error {
-	now := time.Now().UTC()
-	refresh := TokenProcessor.ReadRefreshToken(ctx)
-	if refresh.RefreshID == 0 {
+	now := ctx.Locals("request-start").(time.Time)
+	refresh, ok := TokenProcessor.ReadRefreshToken(ctx)
+	if !ok || !TokenProcessor.MatchCSRF(ctx, refresh) {
 		RateLimitProcessor.Set(ctx)
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
-	if !TokenProcessor.MatchCSRF(ctx, refresh) {
+	if now.After(refresh.RefreshExpiry) || !AccountProcessor.CheckSessionExists(refresh.UserID, refresh.RefreshID) {
+		Logger.IntentionalFailure(fmt.Sprintf("[ProcessRefresh] Expired/Revoked session [UID-%d-RID-%d]", refresh.UserID, refresh.RefreshID))
 		RateLimitProcessor.Set(ctx)
-		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
-	}
-	if now.After(refresh.RefreshExpiry) {
-		Logger.IntentionalFailure(fmt.Sprintf("[ProcessRefresh] Expired session [UID-%d-RID-%d]", refresh.UserID, refresh.RefreshID))
 		ResponseProcessor.DetachAuthCookies(ctx)
-		RateLimitProcessor.Set(ctx)
+		ResponseProcessor.DetachMFACookies(ctx)
+		ResponseProcessor.DetachSSOCookies(ctx)
 		return ctx.Status(fiber.StatusUnauthorized).JSON(ResponseModels.APIResponseT{
-			Success:       false,
-			Notifications: []string{"This session has expired... Please login again"},
+			Notifications: []string{"This session has expired..."},
 		})
 	}
-	if !AccountProcessor.CheckSessionExists(refresh.UserID, refresh.RefreshID) {
-		Logger.IntentionalFailure(fmt.Sprintf("[ProcessRefresh] Revoked session [UID-%d-RID-%d]", refresh.UserID, refresh.RefreshID))
-		ResponseProcessor.DetachAuthCookies(ctx)
-		RateLimitProcessor.Set(ctx)
-		return ctx.Status(fiber.StatusUnauthorized).JSON(ResponseModels.APIResponseT{
-			Success:       false,
-			Notifications: []string{"This session has been revoked... Please login again"},
-		})
-	}
-
 	var currentIndex uint16
 	err := Stores.MySQLClient.QueryRow("SELECT count FROM activities WHERE refresh = ? AND uid = ?", refresh.RefreshID, refresh.UserID).Scan(&currentIndex)
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("[ProcessRefresh] Unable to fetch count for [UID-%d-RID-%d] reason: %s", refresh.UserID, refresh.RefreshID, err.Error()))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Failed to acquire session (DB-read issue)... Retrying"},
 		})
 	}
@@ -60,10 +46,9 @@ func ProcessRefresh(ctx fiber.Ctx) error {
 		RateLimitProcessor.Set(ctx)
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
-	token, ok := TokenProcessor.CreateRenewToken(refresh)
+	token, ok := TokenProcessor.CreateRenewToken(refresh, ctx)
 	if !ok {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Failed to acquire session (Encryptor issue)... Retrying"},
 		})
 	}
@@ -85,12 +70,14 @@ func ProcessRefresh(ctx fiber.Ctx) error {
 }
 
 func ProcessLogout(ctx fiber.Ctx) error {
-	if !TokenProcessor.MatchCSRF(ctx, TokenProcessor.ReadRefreshToken(ctx)) {
+	refresh, ok := TokenProcessor.ReadRefreshToken(ctx)
+	if !ok || !TokenProcessor.MatchCSRF(ctx, refresh) {
 		RateLimitProcessor.Set(ctx)
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
-	ResponseProcessor.DetachMFACookies(ctx)
 	ResponseProcessor.DetachAuthCookies(ctx)
+	ResponseProcessor.DetachMFACookies(ctx)
+	ResponseProcessor.DetachSSOCookies(ctx)
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 		Success:    true,
 		ModifyAuth: true,

@@ -1,13 +1,12 @@
 package register
 
 import (
-	FormModels "BhariyaAuth/models/forms"
 	MailModels "BhariyaAuth/models/mails"
+	FormModels "BhariyaAuth/models/requests"
 	ResponseModels "BhariyaAuth/models/responses"
 	TokenModels "BhariyaAuth/models/tokens"
 	UserTypes "BhariyaAuth/models/users"
 	AccountProcessor "BhariyaAuth/processors/account"
-	Generators "BhariyaAuth/processors/generator"
 	Logger "BhariyaAuth/processors/logs"
 	OTPProcessor "BhariyaAuth/processors/otp"
 	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
@@ -33,15 +32,7 @@ func Step1(ctx fiber.Ctx) error {
 			return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 		}
 	}
-	if !StringProcessor.NameIsValid(form.Name) {
-		RateLimitProcessor.Set(ctx)
-		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
-	}
-	if !StringProcessor.EmailIsValid(form.MailAddress) {
-		RateLimitProcessor.Set(ctx)
-		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
-	}
-	if !StringProcessor.PasswordIsStrong(form.Password) {
+	if !StringProcessor.NameIsValid(form.Name) || !StringProcessor.EmailIsValid(form.MailAddress) || !StringProcessor.PasswordIsStrong(form.Password) {
 		RateLimitProcessor.Set(ctx)
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
@@ -138,23 +129,23 @@ func Step2(ctx fiber.Ctx) error {
 			Notifications: []string{"Incorrect OTP"},
 		})
 	}
-	userID = Generators.UserID()
-	refreshID := Generators.RefreshID()
-	if !AccountProcessor.RecordNewUser(userID, SignUpData.Password, SignUpData.Mail, SignUpData.Name, ctx.IP(), ctx.Get("User-Agent")) {
+	userID, ok = AccountProcessor.RecordNewUser(SignUpData.Password, SignUpData.Mail, SignUpData.Name, ctx)
+	if !ok {
 		Logger.AccidentalFailure(fmt.Sprintf("[Register2] Record New failed for [MAIL-%s]", SignUpData.Mail))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
 			Success:       false,
 			Notifications: []string{"Failed to register (DB-write issue)... Retrying"},
 		})
 	}
-	if !AccountProcessor.RecordReturningUser(SignUpData.Mail, ctx.IP(), ctx.Get("User-Agent"), refreshID, userID, SignUpData.RememberMe, false) {
+	refreshID, ok := AccountProcessor.RecordReturningUser(SignUpData.Mail, ctx.IP(), ctx.Get("User-Agent"), userID, SignUpData.RememberMe, false, ctx)
+	if !ok {
 		Logger.AccidentalFailure(fmt.Sprintf("[Register2] Record Returning failed for [UID-%d]", userID))
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 			Success:       false,
 			Notifications: []string{"Account registered but failed to login. Please login manually"},
 		})
 	}
-	token, ok := TokenProcessor.CreateFreshToken(userID, refreshID, UserTypes.All.Viewer, SignUpData.RememberMe, "email-register")
+	token, ok := TokenProcessor.CreateFreshToken(userID, refreshID, UserTypes.All.Viewer, SignUpData.RememberMe, "email-register", ctx)
 	if !ok {
 		Logger.AccidentalFailure(fmt.Sprintf("[Register2] CreateFreshToken failed for [UID-%d]", userID))
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
@@ -167,7 +158,7 @@ func Step2(ctx fiber.Ctx) error {
 	MFAToken := TokenModels.MFATokenT{
 		Step2Code: SignUpData.Step2Code,
 		UserID:    userID,
-		Creation:  time.Now().UTC(),
+		Creation:  ctx.Locals("request-start").(time.Time),
 		Verified:  true,
 	}
 	data, err = json.Marshal(MFAToken)

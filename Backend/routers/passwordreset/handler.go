@@ -1,8 +1,8 @@
 package passwordreset
 
 import (
-	FormModels "BhariyaAuth/models/forms"
 	MailModels "BhariyaAuth/models/mails"
+	FormModels "BhariyaAuth/models/requests"
 	ResponseModels "BhariyaAuth/models/responses"
 	TokenModels "BhariyaAuth/models/tokens"
 	AccountProcessor "BhariyaAuth/processors/account"
@@ -36,7 +36,6 @@ func Step1(ctx fiber.Ctx) error {
 	if !found {
 		RateLimitProcessor.Set(ctx)
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Account doesn't exist with the email"},
 		})
 	}
@@ -50,7 +49,6 @@ func Step1(ctx fiber.Ctx) error {
 	verification, retry := OTPProcessor.Send(form.MailAddress, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], mailModel.Header, mailModel.Ignorable, ctx.IP())
 	if verification == "" {
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Reply:         retry.Seconds(),
 			Notifications: []string{fmt.Sprintf("Unable to send OTP, please try again after %.1f seconds", retry.Seconds())},
 		})
@@ -60,7 +58,6 @@ func Step1(ctx fiber.Ctx) error {
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("[Reset1] Marshal Failed for [UID-%d] reason: %s", userID, err.Error()))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
 		})
 	}
@@ -68,7 +65,6 @@ func Step1(ctx fiber.Ctx) error {
 	if !ok {
 		Logger.AccidentalFailure(fmt.Sprintf("[Reset1] Encrypt Failed for [UID-%d]", userID))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
 		})
 	}
@@ -98,7 +94,6 @@ func Step2(ctx fiber.Ctx) error {
 	if err != nil {
 		Logger.AccidentalFailure("[Reset2] Unmarshal Failed")
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Failed to read token (Encryptor issue)... Retrying"},
 		})
 	}
@@ -110,36 +105,25 @@ func Step2(ctx fiber.Ctx) error {
 		Logger.IntentionalFailure(fmt.Sprintf("[Reset2] Incorrect OTP for [UID-%d]", ResetData.UserID))
 		RateLimitProcessor.Set(ctx)
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Incorrect OTP"},
 		})
 	}
 	if AccountProcessor.CheckUserIsBlacklisted(ResetData.UserID) {
 		Logger.IntentionalFailure(fmt.Sprintf("[Reset2] Blacklisted account [UID-%d] attempted login", ResetData.UserID))
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Your account is disabled, please contact support"},
 		})
 	}
 	if !AccountProcessor.UpdatePassword(ResetData.UserID, form.NewPassword) {
 		Logger.AccidentalFailure(fmt.Sprintf("[Reset2] Update failed for [UID-%d]", ResetData.UserID))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Failed to reset (DB-write issue)... Retrying"},
 		})
 	}
 	Logger.Success(fmt.Sprintf("[Reset2] Password changed for [UID-%d]", ResetData.UserID))
-	UA := StringProcessor.UAParser.Parse(ctx.Get("User-Agent"))
-	browser := UA.Browser().String()
-	if browser == "" {
-		browser = "Unknown"
-	}
-	device := UA.Device().String()
-	if device == "" {
-		device = "Unknown"
-	}
+	os, device, browser := StringProcessor.ParseUA(ctx.Get("User-Agent"))
 	mailModel := MailModels.PasswordChanged
-	MailNotifier.PasswordReset(ResetData.Mail, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], ctx.IP(), device, browser, 2)
+	MailNotifier.PasswordReset(ResetData.Mail, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], ctx.IP(), os, device, browser, 2)
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 		Success: true,
 	})

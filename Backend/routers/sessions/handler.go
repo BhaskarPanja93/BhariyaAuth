@@ -1,7 +1,7 @@
 package sessions
 
 import (
-	FormModels "BhariyaAuth/models/forms"
+	FormModels "BhariyaAuth/models/requests"
 	ResponseModels "BhariyaAuth/models/responses"
 	AccountProcessor "BhariyaAuth/processors/account"
 	Logger "BhariyaAuth/processors/logs"
@@ -18,27 +18,21 @@ import (
 )
 
 func Fetch(ctx fiber.Ctx) error {
-	now := time.Now().UTC()
-	access := TokenProcessor.ReadAccessToken(ctx)
-	if access.UserID == 0 {
-		RateLimitProcessor.Set(ctx)
+	now := ctx.Locals("request-start").(time.Time)
+	access, ok := TokenProcessor.ReadAccessToken(ctx)
+	if !ok || now.After(access.AccessExpiry) {
 		return ctx.SendStatus(fiber.StatusUnauthorized)
 	}
-	if now.After(access.AccessExpiry) {
-		return ctx.SendStatus(fiber.StatusUnauthorized)
-	}
-	rows, err := Stores.MySQLClient.Query("SELECT refresh, count, remembered, creation, updated, ua FROM activities WHERE uid = ?", access.UserID)
+	rows, err := Stores.MySQLClient.Query("SELECT refresh, count, remembered, creation, updated, os, device, browser FROM activities WHERE uid = ?", access.UserID)
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("[Sessions] Fetch error for [UID-%d] reason: %s", access.UserID, err.Error()))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Failed to fetch data (DB-read issue)... Retrying"},
 		})
 	}
 	defer rows.Close()
 
 	var response ResponseModels.UserActivityResponseT
-	var ok bool
 
 	userbuf := make([]byte, 4)
 	binary.BigEndian.PutUint32(userbuf, access.UserID)
@@ -52,10 +46,9 @@ func Fetch(ctx fiber.Ctx) error {
 	}
 	var success, failure uint
 	for rows.Next() {
-		var UA string
 		var RefreshID uint16
-		var a ResponseModels.SingleUserActivityT
-		err = rows.Scan(&RefreshID, &a.Count, &a.Remembered, &a.Creation, &a.Updated, &UA)
+		var activity ResponseModels.SingleUserActivityT
+		err = rows.Scan(&RefreshID, &activity.Count, &activity.Remembered, &activity.Creation, &activity.Updated, &activity.OS, &activity.Device, &activity.Browser)
 		if err != nil {
 			Logger.AccidentalFailure(fmt.Sprintf("[Sessions] Scan error for [UID-%d] reason: %s", access.UserID, err.Error()))
 			failure++
@@ -63,29 +56,13 @@ func Fetch(ctx fiber.Ctx) error {
 		}
 		ridbuf := make([]byte, 2)
 		binary.BigEndian.PutUint16(ridbuf, RefreshID)
-		a.ID, ok = StringProcessor.Encrypt(ridbuf)
+		activity.ID, ok = StringProcessor.Encrypt(ridbuf)
 		if !ok {
 			Logger.AccidentalFailure(fmt.Sprintf("[Sessions] RID Encrypt error for [UID-%d-RID-%d]", access.UserID, RefreshID))
 			failure++
 			continue
 		}
-		ua := StringProcessor.UAParser.Parse(UA)
-		a.OS = ua.OS().String()
-		a.Device = ua.Device().String()
-		a.Browser = ua.Browser().String()
-		if a.OS == "" {
-			a.OS = "Unknown"
-		}
-		if a.Device == "" {
-			a.Device = "Unknown"
-		}
-		if a.Browser == "" {
-			a.Browser = "Unknown"
-		}
-		if RefreshID == access.RefreshID {
-			response.DeviceID = a.ID
-		}
-		response.Activities = append(response.Activities, a)
+		response.Activities = append(response.Activities, activity)
 		success++
 	}
 	Logger.Success(fmt.Sprintf("[Sessions] Fetched for [UID-%d]", access.UserID))
@@ -97,7 +74,6 @@ func Fetch(ctx fiber.Ctx) error {
 }
 
 func Revoke(ctx fiber.Ctx) error {
-	now := time.Now().UTC()
 	form := new(FormModels.DeviceRevokeForm)
 	if err := ctx.Bind().Form(form); err != nil {
 		if err = ctx.Bind().Body(form); err != nil {
@@ -105,11 +81,7 @@ func Revoke(ctx fiber.Ctx) error {
 			return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 		}
 	}
-	access := TokenProcessor.ReadAccessToken(ctx)
-	if access.UserID == 0 || now.After(access.AccessExpiry) {
-		RateLimitProcessor.Set(ctx)
-		return ctx.SendStatus(fiber.StatusUnauthorized)
-	}
+	access, _ := TokenProcessor.ReadAccessToken(ctx)
 	uidbuf, ok := StringProcessor.Decrypt(form.UserID)
 	if !ok {
 		Logger.AccidentalFailure("[Revoke] UID Decrypt failed")

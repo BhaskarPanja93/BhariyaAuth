@@ -1,8 +1,8 @@
 package mfa
 
 import (
-	FormModels "BhariyaAuth/models/forms"
 	MailModels "BhariyaAuth/models/mails"
+	FormModels "BhariyaAuth/models/requests"
 	ResponseModels "BhariyaAuth/models/responses"
 	TokenModels "BhariyaAuth/models/tokens"
 	AccountProcessor "BhariyaAuth/processors/account"
@@ -23,13 +23,9 @@ import (
 const tokenType = "mfa"
 
 func Step1(ctx fiber.Ctx) error {
-	now := time.Now().UTC()
-	refresh := TokenProcessor.ReadRefreshToken(ctx)
-	if refresh.UserID == 0 {
-		RateLimitProcessor.Set(ctx)
-		return ctx.SendStatus(fiber.StatusUnauthorized)
-	}
-	if !TokenProcessor.MatchCSRF(ctx, refresh) {
+	now := ctx.Locals("request-start").(time.Time)
+	refresh, ok := TokenProcessor.ReadRefreshToken(ctx)
+	if !ok || !TokenProcessor.MatchCSRF(ctx, refresh) {
 		RateLimitProcessor.Set(ctx)
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
@@ -69,8 +65,6 @@ func Step1(ctx fiber.Ctx) error {
 		TokenType: tokenType,
 		Step2Code: verification,
 		UserID:    refresh.UserID,
-		Creation:  time.Now().UTC(),
-		Verified:  false,
 	}
 	data, err := json.Marshal(MFAToken)
 	if err != nil {
@@ -138,7 +132,7 @@ func Step2(ctx fiber.Ctx) error {
 		})
 	}
 	MFAData.Verified = true
-	MFAData.Creation = time.Now().UTC()
+	MFAData.Creation = ctx.Locals("request-start").(time.Time)
 	data, err = json.Marshal(MFAData)
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("[MFA2] Marshal Failed for [UID-%d] reason: %s", MFAData.UserID, err.Error()))

@@ -5,6 +5,7 @@ import (
 	MailModels "BhariyaAuth/models/mails"
 	ResponseModels "BhariyaAuth/models/responses"
 	UserTypes "BhariyaAuth/models/users"
+	StringGenerators "BhariyaAuth/processors/generator"
 	Logger "BhariyaAuth/processors/logs"
 	MailNotifier "BhariyaAuth/processors/mail"
 	StringProcessor "BhariyaAuth/processors/string"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/goccy/go-json"
+	"github.com/gofiber/fiber/v3"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -48,13 +50,11 @@ func BlacklistUser(userID uint32) bool {
 	DeleteAllSessions(userID)
 	_, err := Stores.MySQLClient.Exec("UPDATE users SET blocked = ? WHERE uid = ? LIMIT 1", true, userID)
 	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("[BlacklistUser] failed blocking [UID-%d] reason: %s", userID, err.Error()))
 		return false
 	}
 	var mail string
 	err = Stores.MySQLClient.QueryRow("SELECT email FROM users WHERE uid = ? LIMIT 1", userID).Scan(&mail)
 	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("[BlacklistUser] failed to fetch mail [UID-%d] reason: %s", userID, err.Error()))
 		return false
 	}
 	MailNotifier.AccountBlacklisted(mail, 2)
@@ -88,13 +88,22 @@ func DeleteSession(userID uint32, refreshID uint16) {
 	}
 }
 
-func CheckSessionExists(userID uint32, refreshID uint16) bool {
-	var blocked bool
-	err := Stores.MySQLClient.QueryRow("SELECT EXISTS(SELECT 1 FROM activities WHERE uid = ? AND refresh = ?)", userID, refreshID).Scan(&blocked)
+func CheckUserExists(userID uint32) bool {
+	var exists bool
+	err := Stores.MySQLClient.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE uid = ?)", userID).Scan(&exists)
 	if err != nil {
 		return false
 	}
-	return blocked
+	return exists
+}
+
+func CheckSessionExists(userID uint32, refreshID uint16) bool {
+	var exists bool
+	err := Stores.MySQLClient.QueryRow("SELECT EXISTS(SELECT 1 FROM activities WHERE uid = ? AND refresh = ?)", userID, refreshID).Scan(&exists)
+	if err != nil {
+		return false
+	}
+	return exists
 }
 
 func CheckUserHasPassword(userID uint32) bool {
@@ -128,12 +137,9 @@ func CheckPasswordMatches(userID uint32, password string) bool {
 		var hash string
 		err := Stores.MySQLClient.QueryRow(`SELECT password FROM users WHERE uid = ? LIMIT 1`, userID).Scan(&hash)
 		if err == nil {
-			if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil {
-				return true
-			}
-		} else {
-			Logger.AccidentalFailure(fmt.Sprintf("[CheckPasswordMatches] failed for [UID-%d] reason: %s", userID, err.Error()))
+			return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
 		}
+		Logger.AccidentalFailure(fmt.Sprintf("[CheckPasswordMatches] failed for [UID-%d] reason: %s", userID, err.Error()))
 	}
 	return false
 }
@@ -147,71 +153,67 @@ func hashPassword(password string) (string, bool) {
 	return string(hash), true
 }
 
-func RecordNewUser(userID uint32, password string, mail string, name string, IP string, ua string) bool {
+func RecordNewUser(password string, mail string, name string, ctx fiber.Ctx) (uint32, bool) {
+	IP := ctx.IP()
+	ua := ctx.Get("User-Agent")
+	now := ctx.Locals("request-start").(time.Time)
+	userID := StringGenerators.UserID()
+	for CheckUserExists(userID) {
+		userID = StringGenerators.UserID()
+	}
 	var hash string
 	var ok bool
 	if password != "" {
 		hash, ok = hashPassword(password)
 		if !ok {
-			return false
+			return 0, false
 		}
 	}
-	now := time.Now().UTC()
 	_, err := Stores.MySQLClient.Exec("INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?)",
 		userID, UserTypes.All.Viewer.Short, mail, name, false, hash, now)
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("[RecordNewUser] failed for [UID-%d-MAIL-%s] reason: %s", userID, mail, err.Error()))
-		return false
+		return 0, false
 	}
-	UA := StringProcessor.UAParser.Parse(ua)
-	browser := UA.Browser().String()
-	if browser == "" {
-		browser = "Unknown"
-	}
-	device := UA.Device().String()
-	if device == "" {
-		device = "Unknown"
-	}
+	os, device, browser := StringProcessor.ParseUA(ua)
 	mailModel := MailModels.RegistrationCompleted
-	MailNotifier.NewAccount(mail, name, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], IP, device, browser, 2)
-	return true
+	MailNotifier.NewAccount(mail, name, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], IP, os, device, browser, 2)
+	return userID, true
 }
 
-func RecordReturningUser(mail string, IP string, ua string, refreshID uint16, userID uint32, rememberMe bool, sendMail bool) bool {
-	now := time.Now().UTC()
+func RecordReturningUser(mail string, IP string, ua string, userID uint32, rememberMe bool, sendMail bool, ctx fiber.Ctx) (uint16, bool) {
+	now := ctx.Locals("request-start").(time.Time)
 	var count int
 	err := Stores.MySQLClient.QueryRow("SELECT COUNT(*) FROM activities WHERE uid = ?", userID).Scan(&count)
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("[RecordReturningUser] count query failed for [UID-%d]: %s", userID, err.Error()))
-		return false
+		return 0, false
 	}
 	if count >= Config.MaxUserSessions {
 		_, err = Stores.MySQLClient.Exec(`DELETE FROM activities WHERE uid = ? ORDER BY updated LIMIT 1`, userID)
 		if err != nil {
 			Logger.AccidentalFailure(fmt.Sprintf("[RecordReturningUser] failed deleting oldest session for [UID-%d]: %s", userID, err.Error()))
-			return false
+			return 0, false
 		}
 	}
-	_, err = Stores.MySQLClient.Exec(`INSERT INTO activities (uid, refresh, count, remembered, creation, updated, ua)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`, userID, refreshID, 1, rememberMe, now, now, ua)
+	refreshID := StringGenerators.RefreshID()
+	for CheckSessionExists(userID, refreshID) {
+		refreshID = StringGenerators.RefreshID()
+	}
+	os, device, browser := StringProcessor.ParseUA(ua)
+	_, err = Stores.MySQLClient.Exec(`INSERT INTO activities 
+		(uid, refresh, count, remembered, creation, updated, os, device, browser)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		userID, refreshID, 1, rememberMe, now, now, os, device, browser)
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("[RecordReturningUser] insert failed for [UID-%d-RID-%d]: %s", userID, refreshID, err.Error()))
-		return false
+		return 0, false
 	}
 	if sendMail {
-		UA := StringProcessor.UAParser.Parse(ua)
-		browser := UA.Browser().String()
-		if browser == "" {
-			browser = "Unknown"
-		}
-		device := UA.Device().String()
-		if device == "" {
-			device = "Unknown"
-		}
 		mailModel := MailModels.NewLogin
-		MailNotifier.NewLogin(mail, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], IP, device, browser, 2)
+		MailNotifier.NewLogin(mail, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], IP, os, device, browser, 2)
 	}
-	return true
+	return refreshID, true
 }
 
 func ServeAccountDetails() {
@@ -231,4 +233,8 @@ func ServeAccountDetails() {
 		}
 		Stores.RedisClient.Publish(Stores.Ctx, fmt.Sprintf("%s:%s", Config.AccountDetailsResponseChannel, request.ServerID), response)
 	}
+}
+
+func DatabaseAutoVacuum() {
+
 }

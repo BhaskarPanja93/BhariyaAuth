@@ -32,5 +32,5 @@ var (
 	AccountDetailsRequestChannel  = "auth:account:request"
 	AccountDetailsResponseChannel = "auth:account:response"
 
-	MaxUserSessions = 10
+	MaxUserSessions = 50
 )

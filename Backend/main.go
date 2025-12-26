@@ -53,6 +53,7 @@ func main() {
 	Stores.ConnectMySQL()
 	Stores.ConnectRedis()
 	go AccountProcessor.ServeAccountDetails()
+	go AccountProcessor.DatabaseAutoVacuum()
 
 	MainApp := fiber.New(fiber.Config{
 		AppName:          "BhariyaAuth",

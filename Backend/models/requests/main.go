@@ -1,4 +1,4 @@
-package forms
+package requests
 
 type PasswordResetForm1 struct {
 	MailAddress string `form:"mail_address"`

@@ -73,27 +73,27 @@ func OTP(mail, otp string, subject string, header string, ignorable bool, attemp
 	)
 }
 
-func NewLogin(mail string, subject string, IP string, device string, browser string, attempts uint8) bool {
+func NewLogin(mail string, subject string, IP string, OS string, device string, browser string, attempts uint8) bool {
 	return sendMail(
 		mail,
 		subject,
-		MailTemplates.NewLogin(Config.FrontendURL, device, browser, IP),
+		MailTemplates.NewLogin(Config.FrontendURL, OS, device, browser, IP),
 		attempts)
 }
 
-func NewAccount(mail string, name string, subject string, IP string, device string, browser string, attempts uint8) bool {
+func NewAccount(mail string, name string, subject string, IP string, OS string, device string, browser string, attempts uint8) bool {
 	return sendMail(
 		mail,
 		subject,
-		MailTemplates.NewAccount(Config.FrontendURL, name, device, browser, IP),
+		MailTemplates.NewAccount(Config.FrontendURL, name, OS, device, browser, IP),
 		attempts)
 }
 
-func PasswordReset(mail string, subject string, IP string, device string, browser string, attempts uint8) bool {
+func PasswordReset(mail string, subject string, IP string, OS string, device string, browser string, attempts uint8) bool {
 	return sendMail(
 		mail,
 		subject,
-		MailTemplates.PasswordReset(Config.FrontendURL, device, browser, IP),
+		MailTemplates.PasswordReset(Config.FrontendURL, OS, device, browser, IP),
 		attempts)
 }
 

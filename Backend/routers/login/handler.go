@@ -1,12 +1,11 @@
 package login
 
 import (
-	FormModels "BhariyaAuth/models/forms"
 	MailModels "BhariyaAuth/models/mails"
+	FormModels "BhariyaAuth/models/requests"
 	ResponseModels "BhariyaAuth/models/responses"
 	TokenModels "BhariyaAuth/models/tokens"
 	AccountProcessor "BhariyaAuth/processors/account"
-	Generators "BhariyaAuth/processors/generator"
 	Logger "BhariyaAuth/processors/logs"
 	OTPProcessor "BhariyaAuth/processors/otp"
 	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
@@ -148,15 +147,15 @@ func Step2(ctx fiber.Ctx) error {
 			Notifications: []string{"Your account is disabled, please contact support"},
 		})
 	}
-	refreshID := Generators.RefreshID()
-	if !AccountProcessor.RecordReturningUser(SignInData.Mail, ctx.IP(), ctx.Get("User-Agent"), refreshID, SignInData.UserID, SignInData.RememberMe, true) {
+	refreshID, ok := AccountProcessor.RecordReturningUser(SignInData.Mail, ctx.IP(), ctx.Get("User-Agent"), SignInData.UserID, SignInData.RememberMe, true, ctx)
+	if !ok {
 		Logger.AccidentalFailure(fmt.Sprintf("[Login2] Record Returning failed for [UID-%d]", SignInData.UserID))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
 			Success:       false,
 			Notifications: []string{"Failed to login (DB-write issue)... Retrying"},
 		})
 	}
-	token, ok := TokenProcessor.CreateFreshToken(SignInData.UserID, refreshID, AccountProcessor.GetUserType(SignInData.UserID), SignInData.RememberMe, "email-login")
+	token, ok := TokenProcessor.CreateFreshToken(SignInData.UserID, refreshID, AccountProcessor.GetUserType(SignInData.UserID), SignInData.RememberMe, "email-login", ctx)
 	if !ok {
 		Logger.AccidentalFailure(fmt.Sprintf("[Login2] CreateFreshToken failed for [UID-%d]", SignInData.UserID))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
@@ -171,7 +170,7 @@ func Step2(ctx fiber.Ctx) error {
 		MFAToken := TokenModels.MFATokenT{
 			Step2Code: SignInData.Step2Code,
 			UserID:    SignInData.UserID,
-			Creation:  time.Now().UTC(),
+			Creation:  ctx.Locals("request-start").(time.Time),
 			Verified:  true,
 		}
 		data, err = json.Marshal(MFAToken)

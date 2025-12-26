@@ -16,26 +16,48 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-func CreateFreshToken(userID uint32, refreshID uint16, userType UserTypes.T, remember bool, identifierType string) (TokenModels.NewTokenCombinedT, bool) {
-	now := time.Now().UTC()
+func encryptAccessToken(model TokenModels.AccessTokenT) (string, bool) {
+	atUnEnc, err := json.Marshal(model)
+	if err != nil {
+		Logger.AccidentalFailure(fmt.Sprintf("[CreateRenewToken] Access Marshal failed for [UID-%d] reason: %s", model.UserID, err.Error()))
+		return "", false
+	}
+	atEnc, ok := StringProcessor.Encrypt(atUnEnc)
+	if !ok {
+		Logger.AccidentalFailure(fmt.Sprintf("[CreateRenewToken] Access Encrypt failed for [UID-%d]", model.UserID))
+		return "", false
+	}
+	return atEnc, true
+}
+
+func encryptRefreshToken(model TokenModels.RefreshTokenT) (string, bool) {
+	rtUnEnc, err := json.Marshal(model)
+	if err != nil {
+		Logger.AccidentalFailure(fmt.Sprintf("[FreshToken] Refresh Marshal error for [UID-%d-RID-%d-TYP-%s] reason: %s", model.UserID, model.RefreshID, model.IdentifierType, err.Error()))
+		return "", false
+	}
+	rtEnc, ok := StringProcessor.Encrypt(rtUnEnc)
+	if !ok {
+		Logger.AccidentalFailure(fmt.Sprintf("[FreshToken] Refresh Encrypt error for [UID-%d-RID-%d-TYP-%s]", model.UserID, model.RefreshID, model.IdentifierType))
+		return "", false
+	}
+	return rtEnc, true
+}
+
+func CreateFreshToken(userID uint32, refreshID uint16, userType UserTypes.T, remember bool, identifierType string, ctx fiber.Ctx) (TokenModels.NewTokenCombinedT, bool) {
+	now := ctx.Locals("request-start").(time.Time)
 	csrf := Generators.SafeString(128)
-	atUnEnc, err := json.Marshal(TokenModels.AccessTokenT{
+	atEnc, ok := encryptAccessToken(TokenModels.AccessTokenT{
 		UserID:       userID,
 		RefreshID:    refreshID,
 		UserType:     userType,
 		AccessExpiry: now.Add(Config.AccessTokenExpireDelta),
 		RememberMe:   remember,
 	})
-	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("[FreshToken] Access Marshal failed for [UID-%d-RID-%d-TYP-%s] reason: %s", userID, refreshID, identifierType, err.Error()))
-		return TokenModels.NewTokenCombinedT{}, false
-	}
-	atEnc, ok := StringProcessor.Encrypt(atUnEnc)
 	if !ok {
-		Logger.AccidentalFailure(fmt.Sprintf("[FreshToken] Access Encrypt error for [UID-%d-RID-%d-TYP-%s]", userID, refreshID, identifierType))
 		return TokenModels.NewTokenCombinedT{}, false
 	}
-	rtUnEnc, err := json.Marshal(TokenModels.RefreshTokenT{
+	rtEnc, ok := encryptRefreshToken(TokenModels.RefreshTokenT{
 		UserID:         userID,
 		RefreshID:      refreshID,
 		RefreshIndex:   1,
@@ -47,13 +69,7 @@ func CreateFreshToken(userID uint32, refreshID uint16, userType UserTypes.T, rem
 		RememberMe:     remember,
 		IdentifierType: identifierType,
 	})
-	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("[FreshToken] Refresh Marshal error for [UID-%d-RID-%d-TYP-%s] reason: %s", userID, refreshID, identifierType, err.Error()))
-		return TokenModels.NewTokenCombinedT{}, false
-	}
-	rtEnc, ok := StringProcessor.Encrypt(rtUnEnc)
 	if !ok {
-		Logger.AccidentalFailure(fmt.Sprintf("[FreshToken] Refresh Encrypt error for [UID-%d-RID-%d-TYP-%s]", userID, refreshID, identifierType))
 		return TokenModels.NewTokenCombinedT{}, false
 	}
 	return TokenModels.NewTokenCombinedT{
@@ -64,48 +80,25 @@ func CreateFreshToken(userID uint32, refreshID uint16, userType UserTypes.T, rem
 	}, true
 }
 
-func CreateRenewToken(refresh TokenModels.RefreshTokenT) (TokenModels.NewTokenCombinedT, bool) {
-	now := time.Now().UTC()
+func CreateRenewToken(refresh TokenModels.RefreshTokenT, ctx fiber.Ctx) (TokenModels.NewTokenCombinedT, bool) {
+	now := ctx.Locals("request-start").(time.Time)
 	csrf := Generators.SafeString(128)
-	if refresh.RefreshIndex >= 60000 {
-		refresh.RefreshIndex = 0
-	}
-	refresh.RefreshIndex++
-	atUnEnc, err := json.Marshal(TokenModels.AccessTokenT{
+	atEnc, ok := encryptAccessToken(TokenModels.AccessTokenT{
 		UserID:       refresh.UserID,
 		RefreshID:    refresh.RefreshID,
 		UserType:     refresh.UserType,
 		AccessExpiry: now.Add(Config.AccessTokenExpireDelta),
 		RememberMe:   refresh.RememberMe,
 	})
-	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("[CreateRenewToken] Access Marshal failed for [UID-%d] reason: %s", refresh.UserID, err.Error()))
-		return TokenModels.NewTokenCombinedT{}, false
-	}
-	atEnc, ok := StringProcessor.Encrypt(atUnEnc)
 	if !ok {
-		Logger.AccidentalFailure(fmt.Sprintf("[CreateRenewToken] Access Encrypt failed for [UID-%d]", refresh.UserID))
 		return TokenModels.NewTokenCombinedT{}, false
 	}
-	rtUnEnc, err := json.Marshal(TokenModels.RefreshTokenT{
-		UserID:         refresh.UserID,
-		RefreshID:      refresh.RefreshID,
-		RefreshIndex:   refresh.RefreshIndex,
-		RefreshUpdated: now,
-		RefreshCreated: refresh.RefreshCreated,
-		RefreshExpiry:  now.Add(Config.RefreshTokenExpireDelta),
-		UserType:       refresh.UserType,
-		CSRF:           csrf,
-		RememberMe:     refresh.RememberMe,
-		IdentifierType: refresh.IdentifierType,
-	})
-	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("[CreateRenewToken] Refresh Marshal failed for [UID-%d] reason: %s", refresh.UserID, err.Error()))
-		return TokenModels.NewTokenCombinedT{}, false
-	}
-	rtEnc, ok := StringProcessor.Encrypt(rtUnEnc)
+	refresh.CSRF = csrf
+	refresh.RefreshExpiry = now.Add(Config.RefreshTokenExpireDelta)
+	refresh.RefreshIndex %= 60000
+	refresh.RefreshIndex++
+	rtEnc, ok := encryptRefreshToken(refresh)
 	if !ok {
-		Logger.AccidentalFailure(fmt.Sprintf("[CreateRenewToken] Refresh Encrypt failed for [UID-%d]", refresh.UserID))
 		return TokenModels.NewTokenCombinedT{}, false
 	}
 	return TokenModels.NewTokenCombinedT{
@@ -116,34 +109,30 @@ func CreateRenewToken(refresh TokenModels.RefreshTokenT) (TokenModels.NewTokenCo
 	}, true
 }
 
-func ReadAccessToken(ctx fiber.Ctx) TokenModels.AccessTokenT {
+func ReadAccessToken(ctx fiber.Ctx) (TokenModels.AccessTokenT, bool) {
 	var access TokenModels.AccessTokenT
-	header := strings.TrimSpace(strings.TrimPrefix(ctx.Get(Config.AccessTokenInHeader), "Bearer "))
+	header := strings.TrimPrefix(ctx.Get(Config.AccessTokenInHeader), "Bearer ")
 	dec, ok := StringProcessor.Decrypt(header)
-	if ok {
-		_ = json.Unmarshal(dec, &access)
-	} else {
-		Logger.AccidentalFailure(fmt.Sprintf("[ReadAccessToken] Decrypt failed length: %d", len(header)))
+	if ok && json.Unmarshal(dec, &access) == nil && access.UserID != 0 && access.RefreshID != 0 {
+		return access, true
 	}
-	return access
+	Logger.AccidentalFailure(fmt.Sprintf("[ReadAccessToken] Decrypt failed length: %d", len(header)))
+	return access, false
 }
 
-func ReadRefreshToken(ctx fiber.Ctx) TokenModels.RefreshTokenT {
+func ReadRefreshToken(ctx fiber.Ctx) (TokenModels.RefreshTokenT, bool) {
 	var refresh TokenModels.RefreshTokenT
-	cookie := strings.TrimSpace(ctx.Cookies(Config.RefreshTokenInCookie))
+	cookie := ctx.Cookies(Config.RefreshTokenInCookie)
 	dec, ok := StringProcessor.Decrypt(cookie)
-	if ok {
-		_ = json.Unmarshal(dec, &refresh)
-	} else {
-		Logger.AccidentalFailure(fmt.Sprintf("[ReadRefreshToken] Decrypt failed length: %d", len(cookie)))
+	if ok && json.Unmarshal(dec, &refresh) == nil && refresh.UserID != 0 && refresh.RefreshID != 0 {
+		return refresh, true
 	}
-	return refresh
+	Logger.AccidentalFailure(fmt.Sprintf("[ReadRefreshToken] Decrypt failed length: %d", len(cookie)))
+	return refresh, false
 }
 
 func MatchCSRF(ctx fiber.Ctx, refresh TokenModels.RefreshTokenT) bool {
 	cookie := ctx.Cookies(Config.CSRFInCookie)
 	header := ctx.Get(Config.CSRFInHeader)
-	cookie = strings.TrimSpace(cookie)
-	header = strings.TrimSpace(header)
 	return refresh.CSRF == header && refresh.CSRF == cookie
 }
