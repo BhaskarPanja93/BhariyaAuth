@@ -3,7 +3,7 @@ package mail
 import (
 	Config "BhariyaAuth/constants/config"
 	Secrets "BhariyaAuth/constants/secrets"
-	MailTemplates "BhariyaAuth/models/mails/templates"
+	HTMLTemplates "BhariyaAuth/models/html"
 	Logger "BhariyaAuth/processors/logs"
 	"context"
 	"fmt"
@@ -51,7 +51,7 @@ func sendMail(mail, subject, content string, attempts uint8) bool {
 
 	requestBody := graphusers.NewItemSendMailPostRequestBody()
 	requestBody.SetMessage(message)
-	saveToSentItems := false
+	saveToSentItems := true
 	requestBody.SetSaveToSentItems(&saveToSentItems)
 
 	err := graphClient.Users().ByUserId(Secrets.MicrosoftMailId).SendMail().Post(context.Background(), requestBody, nil)
@@ -68,7 +68,7 @@ func OTP(mail, otp string, subject string, header string, ignorable bool, attemp
 	return sendMail(
 		mail,
 		subject,
-		MailTemplates.OTP(Config.FrontendURL, header, otp, ignorable),
+		HTMLTemplates.OTP(Config.FrontendURL, header, otp, ignorable),
 		attempts,
 	)
 }
@@ -77,7 +77,7 @@ func NewLogin(mail string, subject string, IP string, OS string, device string, 
 	return sendMail(
 		mail,
 		subject,
-		MailTemplates.NewLogin(Config.FrontendURL, OS, device, browser, IP),
+		HTMLTemplates.NewLogin(Config.FrontendURL, OS, device, browser, IP),
 		attempts)
 }
 
@@ -85,7 +85,7 @@ func NewAccount(mail string, name string, subject string, IP string, OS string, 
 	return sendMail(
 		mail,
 		subject,
-		MailTemplates.NewAccount(Config.FrontendURL, name, OS, device, browser, IP),
+		HTMLTemplates.NewAccount(Config.FrontendURL, name, OS, device, browser, IP),
 		attempts)
 }
 
@@ -93,7 +93,7 @@ func PasswordReset(mail string, subject string, IP string, OS string, device str
 	return sendMail(
 		mail,
 		subject,
-		MailTemplates.PasswordReset(Config.FrontendURL, OS, device, browser, IP),
+		HTMLTemplates.PasswordReset(Config.FrontendURL, OS, device, browser, IP),
 		attempts)
 }
 

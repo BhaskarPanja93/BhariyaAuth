@@ -2,51 +2,18 @@ package response
 
 import (
 	Config "BhariyaAuth/constants/config"
+	HTMLTemplates "BhariyaAuth/models/html"
 	TokenModels "BhariyaAuth/models/tokens"
-	"fmt"
 
 	"github.com/gofiber/fiber/v3"
 )
 
 func SSOSuccessPopup(ctx fiber.Ctx, token string) error {
-	return ctx.Type("html").SendString(fmt.Sprintf(`
-<html>
-<head>
-<script>
-function onAuthSuccess() {
-    window._authSuccess = true;
-    window.opener?.postMessage({ success: true, token: '%s'}, window.location.origin);
-    window.close();
-}
-window.addEventListener('beforeunload', () => {
-    if (!window._authSuccess) {
-        window.opener?.postMessage({ success: false }, window.location.origin);
-    }
-});
-</script>
-</head>
-<body onload="onAuthSuccess()">
-<h2>That was easy!</h2>
-</body>
-</html>
-`, token))
+	return ctx.Type("html").SendString(HTMLTemplates.SSOSuccessPopup(token))
 }
 
 func SSOFailurePopup(ctx fiber.Ctx, reason string) error {
-	return ctx.Type("html").SendString(fmt.Sprintf(`
-<html>
-	<script>
-		window.addEventListener('beforeunload', () => {
-			if (!window._authSuccess) {
-				window.opener?.postMessage({ success: false }, window.location.origin);
-			}
-		})
-	</script>
-	<body>
-		<h2>%s</h2>
-	</body>
-</html>
-`, reason))
+	return ctx.Type("html").SendString(HTMLTemplates.SSOFailurePopup(reason))
 }
 
 func AttachAuthCookies(ctx fiber.Ctx, token TokenModels.NewTokenCombinedT) {

@@ -10,11 +10,11 @@ import (
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 
 func EmailIsValid(email string) bool {
-	return len(email) > 0 && len(email) < 51 && emailRegex.MatchString(email)
+	return len(email) > 5 && len(email) <= 50 && emailRegex.MatchString(email)
 }
 
 func NameIsValid(name string) bool {
-	return len(name) > 0 && len(name) < 51
+	return len(name) > 2 && len(name) <= 50
 }
 
 func PasswordIsStrong(pw string) bool {

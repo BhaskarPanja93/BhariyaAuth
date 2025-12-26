@@ -56,7 +56,6 @@ func Step1(ctx fiber.Ctx) error {
 	verification, retry := OTPProcessor.Send(form.MailAddress, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], mailModel.Header, mailModel.Ignorable, ctx.IP())
 	if verification == "" {
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Reply:         retry.Seconds(),
 			Notifications: []string{fmt.Sprintf("Unable to send OTP, please try again after %.1f seconds", retry.Seconds())},
 		})
@@ -66,7 +65,6 @@ func Step1(ctx fiber.Ctx) error {
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("[Register1] Marshal Failed for [MAIL-%s] reason: %s", form.MailAddress, err.Error()))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Failed to acquire token (Parser issue)... Retrying"},
 		})
 	}
@@ -74,7 +72,6 @@ func Step1(ctx fiber.Ctx) error {
 	if !ok {
 		Logger.AccidentalFailure(fmt.Sprintf("[Register1] Encrypt Failed for [MAIL-%s]", form.MailAddress))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
 		})
 	}
@@ -104,7 +101,6 @@ func Step2(ctx fiber.Ctx) error {
 	if err != nil {
 		Logger.AccidentalFailure("[Register2] Unmarshal Failed")
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Failed to read token (Encryptor issue)... Retrying"},
 		})
 	}
@@ -117,7 +113,6 @@ func Step2(ctx fiber.Ctx) error {
 		Logger.IntentionalFailure(fmt.Sprintf("[Register2] Attempted for [UID-%d]", userID))
 		RateLimitProcessor.Set(ctx)
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Account exists with the email"},
 		})
 	}
@@ -125,7 +120,6 @@ func Step2(ctx fiber.Ctx) error {
 		Logger.IntentionalFailure(fmt.Sprintf("[Register2] Incorrect OTP for [MAIL-%s]", SignUpData.Mail))
 		RateLimitProcessor.Set(ctx)
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Incorrect OTP"},
 		})
 	}
@@ -133,7 +127,6 @@ func Step2(ctx fiber.Ctx) error {
 	if !ok {
 		Logger.AccidentalFailure(fmt.Sprintf("[Register2] Record New failed for [MAIL-%s]", SignUpData.Mail))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Failed to register (DB-write issue)... Retrying"},
 		})
 	}
@@ -141,7 +134,6 @@ func Step2(ctx fiber.Ctx) error {
 	if !ok {
 		Logger.AccidentalFailure(fmt.Sprintf("[Register2] Record Returning failed for [UID-%d]", userID))
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Account registered but failed to login. Please login manually"},
 		})
 	}
@@ -149,7 +141,6 @@ func Step2(ctx fiber.Ctx) error {
 	if !ok {
 		Logger.AccidentalFailure(fmt.Sprintf("[Register2] CreateFreshToken failed for [UID-%d]", userID))
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Account registered but failed to login. Please login manually"},
 		})
 	}
@@ -165,7 +156,6 @@ func Step2(ctx fiber.Ctx) error {
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("[Register2MFA] Marshal Failed for [UID-%d] reason: %s", userID, err.Error()))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
 		})
 	}
@@ -173,7 +163,6 @@ func Step2(ctx fiber.Ctx) error {
 	if !ok {
 		Logger.AccidentalFailure(fmt.Sprintf("[Register2MFA] Encrypt Failed for [UID-%d]", userID))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
 		})
 	}

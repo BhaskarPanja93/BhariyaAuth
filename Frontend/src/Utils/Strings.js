@@ -1,13 +1,13 @@
-const emailRegex = /^(?=.{1,50}$)[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+const emailRegex = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
 const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/
 
 
 export function NameIsValid(name) {
-    return name.length > 0 && name.length <= 50;
+    return name.length > 2 && name.length <= 50;
 }
 
 export function EmailIsValid(email) {
-    return emailRegex.test(email);
+    return email.length > 5 && email.length <= 50 && emailRegex.test(email);
 }
 
 export function PasswordIsStrong(password) {

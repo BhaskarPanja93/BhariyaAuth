@@ -62,6 +62,9 @@ func Fetch(ctx fiber.Ctx) error {
 			failure++
 			continue
 		}
+		if RefreshID == access.RefreshID {
+			response.DeviceID = activity.ID
+		}
 		response.Activities = append(response.Activities, activity)
 		success++
 	}

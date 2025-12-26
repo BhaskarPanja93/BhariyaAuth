@@ -49,7 +49,7 @@ func calculateTTL(value int64) time.Duration {
 	return time.Minute * time.Duration(value)
 }
 
-func CheckCanSend(identifier string) (bool, int64, time.Duration) {
+func checkCanSend(identifier string) (bool, int64, time.Duration) {
 	otpStore.Lock()
 	entry, exists := otpStore.data[identifier]
 	otpStore.Unlock()
@@ -74,7 +74,7 @@ func CheckCanSend(identifier string) (bool, int64, time.Duration) {
 	return canSend, value, timeRemaining
 }
 
-func RecordSent(identifier string, value int64) time.Duration {
+func recordSent(identifier string, value int64) time.Duration {
 	now := time.Now()
 	otpStore.Lock()
 	otpStore.data[identifier] = otpEntry{
@@ -87,7 +87,7 @@ func RecordSent(identifier string, value int64) time.Duration {
 
 func Send(mail string, subject string, header string, ignorable bool, identifier string) (string, time.Duration) {
 	rateLimitKey := fmt.Sprintf("%s:%s", mail, identifier)
-	canSend, alreadySentCount, currentDelay := CheckCanSend(rateLimitKey)
+	canSend, alreadySentCount, currentDelay := checkCanSend(rateLimitKey)
 	if canSend {
 		otp := Generators.SafeNumber(6)
 		if success := MailNotifier.OTP(mail, otp, subject, header, ignorable, 2); !success {
@@ -96,7 +96,7 @@ func Send(mail string, subject string, header string, ignorable bool, identifier
 		verification := Generators.SafeString(10)
 		key := fmt.Sprintf("%s:%s", Config.RedisServerOTPVerification, verification)
 		Stores.RedisClient.Set(Stores.Ctx, key, otp, 5*time.Minute)
-		currentDelay = RecordSent(rateLimitKey, alreadySentCount+1)
+		currentDelay = recordSent(rateLimitKey, alreadySentCount+1)
 		return verification, currentDelay
 	}
 	return "", currentDelay

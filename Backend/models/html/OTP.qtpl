@@ -1,4 +1,4 @@
-{% package templates %}
+{% package html %}
 
 {% func OTP(frontendURL string, header string, otp string, isIgnorable bool) %}
 <!DOCTYPE html>

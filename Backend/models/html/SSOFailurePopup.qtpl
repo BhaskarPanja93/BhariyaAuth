@@ -1,0 +1,17 @@
+{% package html %}
+
+{% func SSOFailurePopup(reason string) %}
+<!DOCTYPE html>
+<html lang="en">
+    <script>
+        window.addEventListener('beforeunload', () => {
+            if (!window._authSuccess) {
+                window.opener?.postMessage({ success: false }, window.location.origin);
+            }
+        })
+    </script>
+    <body>
+        <h2>{%s reason %}</h2>
+    </body>
+</html>
+{% endfunc %}

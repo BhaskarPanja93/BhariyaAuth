@@ -34,7 +34,6 @@ func Step1(ctx fiber.Ctx) error {
 		ResponseProcessor.DetachAuthCookies(ctx)
 		RateLimitProcessor.Set(ctx)
 		return ctx.Status(fiber.StatusUnauthorized).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"This session has expired... Please login again"},
 		})
 	}
@@ -43,7 +42,6 @@ func Step1(ctx fiber.Ctx) error {
 		ResponseProcessor.DetachAuthCookies(ctx)
 		RateLimitProcessor.Set(ctx)
 		return ctx.Status(fiber.StatusUnauthorized).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"This session has been revoked... Please login again"},
 		})
 	}
@@ -56,7 +54,6 @@ func Step1(ctx fiber.Ctx) error {
 	verification, retry := OTPProcessor.Send(mail, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], mailModel.Header, mailModel.Ignorable, ctx.IP())
 	if verification == "" {
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Reply:         retry.Seconds(),
 			Notifications: []string{fmt.Sprintf("Unable to send OTP, please try again after %.1f seconds", retry.Seconds())},
 		})
@@ -70,7 +67,6 @@ func Step1(ctx fiber.Ctx) error {
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("[MFA1] Marshal Failed for [UID-%d] reason: %s", refresh.UserID, err.Error()))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
 		})
 	}
@@ -78,7 +74,6 @@ func Step1(ctx fiber.Ctx) error {
 	if !ok {
 		Logger.AccidentalFailure(fmt.Sprintf("[MFA1] Encrypt Failed for [UID-%d]", refresh.UserID))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
 		})
 	}
@@ -108,7 +103,6 @@ func Step2(ctx fiber.Ctx) error {
 	if err != nil {
 		Logger.AccidentalFailure("[MFA2] Unmarshal Failed")
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Failed to read token (Encryptor issue)... Retrying"},
 		})
 	}
@@ -120,14 +114,12 @@ func Step2(ctx fiber.Ctx) error {
 		Logger.IntentionalFailure(fmt.Sprintf("[MFA2] Incorrect OTP for [UID-%d]", MFAData.UserID))
 		RateLimitProcessor.Set(ctx)
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Incorrect OTP"},
 		})
 	}
 	if AccountProcessor.CheckUserIsBlacklisted(MFAData.UserID) {
 		Logger.IntentionalFailure(fmt.Sprintf("[MFA2] Blacklisted account [UID-%d] attempted Mfa", MFAData.UserID))
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Your account is disabled, please contact support"},
 		})
 	}
@@ -137,7 +129,6 @@ func Step2(ctx fiber.Ctx) error {
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("[MFA2] Marshal Failed for [UID-%d] reason: %s", MFAData.UserID, err.Error()))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
 		})
 	}
@@ -145,7 +136,6 @@ func Step2(ctx fiber.Ctx) error {
 	if !ok {
 		Logger.AccidentalFailure(fmt.Sprintf("[MFA2] Encrypt Failed for [UID-%d]", MFAData.UserID))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
 		})
 	}

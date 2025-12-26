@@ -43,6 +43,8 @@ func ProcessRefresh(ctx fiber.Ctx) error {
 	if currentIndex != refresh.RefreshIndex {
 		Logger.IntentionalFailure(fmt.Sprintf("[ProcessRefresh] Used old index [UID-%d-RID-%d]", refresh.UserID, refresh.RefreshID))
 		ResponseProcessor.DetachAuthCookies(ctx)
+		ResponseProcessor.DetachMFACookies(ctx)
+		ResponseProcessor.DetachSSOCookies(ctx)
 		RateLimitProcessor.Set(ctx)
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
@@ -56,7 +58,6 @@ func ProcessRefresh(ctx fiber.Ctx) error {
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("[ProcessRefresh] Failed to update count for [UID-%d-RID-%d] reason: %s", refresh.UserID, refresh.RefreshID, err.Error()))
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Success:       false,
 			Notifications: []string{"Failed to acquire session (DB-write issue)... Retrying"},
 		})
 	}

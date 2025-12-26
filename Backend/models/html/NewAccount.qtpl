@@ -1,6 +1,6 @@
-{% package templates %}
+{% package html %}
 
-{% func NewLogin(frontendURL string, os string, device string, browser string, IP string) %}
+{% func NewAccount(frontendURL string, name string, os string, device string, browser string, IP string) %}
 <!DOCTYPE html>
 <html lang="en">
     <head>
@@ -28,13 +28,25 @@
                             <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px;">
                                 <tr>
                                     <td style="padding: 28px;">
+                                        <p style="margin: 0 0 8px; font-size: 15px; color: #065f46; font-weight: 600;">
+                                            Account created successfully
+                                        </p>
                                         <p style="margin: 0 0 12px; font-size: 15px; color: #374151;">
-                                            <strong>Hey,</strong>
+                                            <strong>Hey, {%s name %}</strong>
                                         </p>
                                         <p style="margin: 0 0 20px; font-size: 15px; color: #374151; line-height: 1.5;">
-                                            There was a new login to your account. We’re letting you know to help keep your account safe.
+                                            Your account is ready. You can now sign in and start with our services.
                                         </p>
-                                        <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #e5e7eb; border-radius: 8px;">
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #d1fae5; border-radius: 8px; background-color: #ecfdf5;">
+                                            <tr>
+                                                <td style="padding: 16px;">
+                                                    <p style="margin:0; font-size:14px; color:#065f46;">
+                                                        <strong>Account created from this device</strong>
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #e5e7eb; border-radius: 8px; margin-top: 14px;">
                                             <tr>
                                                 <td style="padding: 16px; vertical-align: center;" width="56">
                                                     <img src="{%s frontendURL %}/device-icons/{%s device %}.png" />
@@ -58,12 +70,6 @@
                                     </td>
                                 </tr>
                             </table>
-                            <p style="margin: 16px 0 0; font-size: 14px; color: #4b5563;">
-                                To manage your active sessions,
-                                <a href="{%s frontendURL %}" style="color:#5865f2; text-decoration:none; font-weight:500;" target="_blank">
-                                    visit your dashboard
-                                </a>.
-                            </p>
                         </td>
                     </tr>
                     <tr>
@@ -72,9 +78,11 @@
                                 <tr>
                                     <td style="padding: 18px; text-align: center;">
                                         <p style="margin: 0; font-size: 12px; color: #6b7280;">
-                                            If this wasn't you,
+                                            To get more control over your account,
+                                            <a href="{%s frontendURL %}" style="color:#5865f2; text-decoration:none; font-weight:500;" target="_blank">
+                                                visit your dashboard
+                                            </a>.
                                         </p>
-                                        <a href="{%s frontendURL %}/auth/passwordreset" style="margin: 0; font-size: 14px; color: #5865f2;" target="_blank"><b>change your password immediately</b></a>
                                     </td>
                                 </tr>
                             </table>
