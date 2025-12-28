@@ -9,10 +9,7 @@ export default defineConfig({
     plugins: [
         react(),
         tailwindcss(),
-        compression({
-            algorithm: 'gzip', ext: '.gz', threshold: 1024, deleteOriginFile: false
-        }),
-        compression({
-            algorithm: 'brotliCompress', ext: '.br', threshold: 1024, deleteOriginFile: false
-        })],
+        compression({algorithm: 'gzip', ext: '.gz', threshold: 128, deleteOriginFile: false}),
+        compression({algorithm: 'brotliCompress', ext: '.br', threshold: 128, deleteOriginFile: false})
+    ]
 })

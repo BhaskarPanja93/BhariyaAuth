@@ -15,12 +15,12 @@ var (
 
 var (
 	CSRFInHeader         = "csrf"
+	CSRFInCookie         = "csrf"
+	MFATokenInHeader     = "mfa"
+	MFATokenInCookie     = "mfa"
 	AccessTokenInHeader  = "authorization"
-	ServerName           = fmt.Sprintf("%s_%s", ServerFor, ServerRole)
-	MFATokenInCookie     = fmt.Sprintf("%s_mfa", ServerName)
-	CSRFInCookie         = fmt.Sprintf("%s_csrf", ServerName)
-	RefreshTokenInCookie = fmt.Sprintf("%s_refresh", ServerName)
-	SSOStateInCookie     = fmt.Sprintf("%s_sso", ServerName)
+	RefreshTokenInCookie = "refresh"
+	SSOStateInCookie     = "sso"
 
 	AccessTokenExpireDelta  = time.Minute * 10
 	RefreshTokenExpireDelta = time.Hour * 24 * 7

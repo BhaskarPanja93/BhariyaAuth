@@ -72,9 +72,9 @@ func main() {
 
 	AuthApp := MainApp.Group("/auth-backend")
 
+	StatusRouters.AttachRoutes(AuthApp)
 	AccountRouters.AttachRoutes(AuthApp)
 	PasswordResetRouters.AttachRoutes(AuthApp)
-	StatusRouters.AttachRoutes(AuthApp)
 	RegisterRouters.AttachRoutes(AuthApp)
 	LoginRouters.AttachRoutes(AuthApp)
 	SSORouters.AttachRoutes(AuthApp)
