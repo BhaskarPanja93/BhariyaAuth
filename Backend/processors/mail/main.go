@@ -13,11 +13,13 @@ import (
 	graph "github.com/microsoftgraph/msgraph-sdk-go"
 	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
 	graphusers "github.com/microsoftgraph/msgraph-sdk-go/users"
+	"golang.org/x/sync/singleflight"
 )
 
 var (
 	cred        *azidentity.ClientSecretCredential
 	graphClient *graph.GraphServiceClient
+	g           singleflight.Group
 )
 
 func init() {
@@ -26,8 +28,18 @@ func init() {
 }
 
 func refreshCredentials() {
-	graphClient, _ = graph.NewGraphServiceClientWithCredentials(cred, []string{"https://graph.microsoft.com/.default"})
+	_, _, _ = g.Do("refreshCredentials", func() (any, error) {
+		client, err := graph.NewGraphServiceClientWithCredentials(
+			cred,
+			[]string{"https://graph.microsoft.com/.default"},
+		)
+		if err == nil {
+			graphClient = client
+		}
+		return nil, err
+	})
 }
+
 func sendMail(mail, subject, content string, attempts uint8) bool {
 	if attempts <= 0 {
 		return false
