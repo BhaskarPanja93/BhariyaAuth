@@ -246,6 +246,7 @@ export default function ConnectionProvider ({children}) {
         // Rate limited
         else if (status === 429) {
             let retryAfter = data["retry-after"]
+            SendNotification(`Too many requests, retrying automatically after ${retryAfter} seconds`)
             if (!retryAfter || isNaN(retryAfter)) retryAfter = 1
             await Sleep(retryAfter * 1000)
             return await RetryRequest(privateAPI, config)

@@ -3,7 +3,6 @@ package middlewares
 import (
 	ResponseModels "BhariyaAuth/models/responses"
 	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
-	"fmt"
 	"sync"
 	"time"
 
@@ -11,11 +10,11 @@ import (
 )
 
 type window struct {
-	count uint16
+	count uint32
 	end   time.Time
 }
 
-func RouteRateLimiter(limit uint16, period time.Duration, autoVacuumInterval, maxIdleFor time.Duration) fiber.Handler {
+func RouteRateLimiter(limit uint32, period time.Duration, autoVacuumInterval, maxIdleFor time.Duration) fiber.Handler {
 	var mutex sync.Mutex
 	clients := make(map[string]*window)
 
@@ -66,9 +65,7 @@ func RouteRateLimiter(limit uint16, period time.Duration, autoVacuumInterval, ma
 		retryAfter := int(entry.end.Sub(now).Seconds()) + 1
 		return ctx.Status(fiber.StatusTooManyRequests).JSON(
 			ResponseModels.APIResponseT{
-				Success:       false,
-				Notifications: []string{fmt.Sprintf("Too many requests, retrying automatically after %d seconds", retryAfter)},
-				RetryAfter:    retryAfter,
+				RetryAfter: retryAfter,
 			})
 	}
 }
