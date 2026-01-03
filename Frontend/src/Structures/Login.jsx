@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
 import {Link, useNavigate} from "react-router-dom";
-import {BackendURL} from '../Values/Constants.js'
+import {AuthBackendURL} from '../Values/Constants.js'
 import EmailInput from '../Elements/EmailInput.jsx'
 import Step2Toggle from '../Elements/Step2Toggle.jsx'
 import OTPInput from '../Elements/OTPInput.jsx'
@@ -18,7 +18,7 @@ import OTPResendButton from "../Elements/OTPResendButton.jsx";
 export default function LoginPage() {
     const navigate = useNavigate()
     const {SendNotification} = FetchNotificationManager();
-    const {privateAPI} = FetchConnectionManager()
+    const {SendPost} = FetchConnectionManager()
 
     const [uiDisabled, setUiDisabled] = useState(false)
     const [currentStep, setCurrentStep] = useState(1)
@@ -45,15 +45,15 @@ export default function LoginPage() {
         const form = new FormData();
         form.append("mail_address", email);
         form.append("remember_me", remember ? "yes" : "no");
-        privateAPI.post(BackendURL + `/login/step1/${tryOTP ? "otp" : "password"}`, form)
+        SendPost(false, AuthBackendURL, `/login/step1/${tryOTP ? "otp" : "password"}`, form, null)
             .then((data) => {
-                if (data["success"]) {
+                if (data.success) {
                     SendNotification(`Please enter the ${tryOTP?"OTP":"Password"}`)
-                    tokens.current[email][tryOTP] = data["reply"]
+                    tokens.current[email][tryOTP] = data.reply
                     setUseOtp(tryOTP)
                     setCurrentStep(2)
-                } else if (data["reply"]){
-                    Countdown(data["reply"], 0.1, OTPResendTimerID, setOTPDelay).then()
+                } else if (data.reply){
+                    Countdown(data.reply, 0.1, OTPResendTimerID, setOTPDelay).then()
                 }
             })
             .catch((error)=>{console.log("Login Step1 stopped because:", error)})
@@ -74,9 +74,9 @@ export default function LoginPage() {
         const form = new FormData();
         form.append("token", tokens.current[email][useOtp]);
         form.append("verification", verification);
-        privateAPI.post(BackendURL + "/login/step2", form, {forAccessFetch: true})
+        SendPost(true, AuthBackendURL, "/login/step2", form, {allowAccessChange: true})
             .then((data) => {
-                if (data["success"]) {
+                if (data.success) {
                     SendNotification("Logged In Successfully")
                     navigate("/");
                 }

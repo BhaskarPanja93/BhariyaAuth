@@ -1,19 +1,19 @@
 import React, {useEffect, useRef, useState} from "react";
 import {FetchConnectionManager} from "../Contexts/Connection.jsx";
-import {BackendURL} from "../Values/Constants.js";
+import {AuthBackendURL} from "../Values/Constants.js";
 import {FetchNotificationManager} from "../Contexts/Notification.jsx";
 import {Link} from "react-router-dom";
 
 export default function Sessions() {
     const {SendNotification} = FetchNotificationManager();
-    const {privateAPI, EnsureLoggedIn} = FetchConnectionManager()
+    const {SendPost, EnsureLoggedIn} = FetchConnectionManager()
 
     const [uiDisabled, setUiDisabled] = useState(false)
     const [loading, setLoading] = useState(false)
     const userID = useRef("");
     const currentSession = useRef(null);
     const otherSessions = useRef([]);
-    const [_, setSessions] = useState([]);
+    const [sessions, setSessions] = useState([]);
 
     function formatDate(dt) {
         try {
@@ -25,9 +25,10 @@ export default function Sessions() {
 
     const FetchDevices = () => {
         EnsureLoggedIn().then(s=>{
-            if (!s) return SendNotification("You need to be logged in to fetch devices");
+            if (!s)
+                return SendNotification("You need to be logged in to fetch devices");
             setLoading(true);
-            privateAPI.post(BackendURL + "/sessions/fetch")
+            SendPost(true, AuthBackendURL, "/sessions/fetch", null, null)
                 .then((data) => {
                     if (data["success"]) {
                         userID.current = data["reply"]["user_id"]
@@ -67,15 +68,18 @@ export default function Sessions() {
 
     const RevokeDevice = (revokeAll, deviceID) => {
         EnsureLoggedIn().then(s=> {
-            if (!s) return SendNotification("You need to be logged in to revoke a device");
-            if (!userID.current) return SendNotification("Step 1 incomplete. Please refresh page.");
-
+            if (!s)
+                return SendNotification("You need to be logged in to revoke a device");
+            if (!sessions || sessions.length === 0)
+                return SendNotification("No devices visible, please refresh page to recheck");
+            if (!userID.current)
+                return SendNotification("Step 1 incomplete. Please refresh page.");
             setUiDisabled(true)
             const form = new FormData();
             form.append("user_id", userID.current)
             form.append("revoke_all", revokeAll ? "yes" : "no")
             !revokeAll && form.append("device_id", deviceID)
-            privateAPI.post(BackendURL + "/sessions/revoke", form)
+            SendPost(true,AuthBackendURL, "/sessions/revoke", form, null)
                 .then((data) => {
                     if (data["success"]) {
                         if (revokeAll) SendNotification("All sessions have been revoked and will lose access soon")

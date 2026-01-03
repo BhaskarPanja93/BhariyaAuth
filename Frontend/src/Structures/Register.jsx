@@ -8,7 +8,7 @@ import SSOButtons from '../Elements/SSOButtons.jsx'
 import Divider from '../Elements/Divider.jsx'
 import NameInput from '../Elements/NameInput.jsx'
 import OTPInput from "../Elements/OTPInput.jsx";
-import {BackendURL} from "../Values/Constants.js";
+import {AuthBackendURL} from "../Values/Constants.js";
 import {FetchConnectionManager} from "../Contexts/Connection.jsx";
 import {FetchNotificationManager} from "../Contexts/Notification.jsx";
 import {EmailIsValid, NameIsValid, OTPIsValid, PasswordIsStrong} from "../Utils/Strings.js";
@@ -18,7 +18,7 @@ import OTPResendButton from "../Elements/OTPResendButton.jsx";
 export default function RegisterPage() {
     const navigate = useNavigate();
     const {SendNotification} = FetchNotificationManager();
-    const {privateAPI} = FetchConnectionManager()
+    const {SendPost} = FetchConnectionManager()
 
     const [uiDisabled, setUiDisabled] = useState(false)
     const [currentStep, setCurrentStep] = useState(1)
@@ -46,7 +46,7 @@ export default function RegisterPage() {
         form.append("name", name);
         form.append("password", password);
         form.append("remember_me", remember ? "yes" : "no");
-        privateAPI.post(BackendURL + "/register/step1", form)
+        SendPost(false, AuthBackendURL, "/register/step1", form, null)
             .then((data) => {
                 if (data["success"]) {
                     SendNotification("Please enter the OTP sent to your mail")
@@ -70,7 +70,7 @@ export default function RegisterPage() {
         const form = new FormData();
         form.append("token", currentToken.current);
         form.append("verification", verification);
-        privateAPI.post(BackendURL + "/register/step2", form, {forAccessFetch: true})
+        SendPost(true,AuthBackendURL, "/register/step2", form, {allowAccessChange: true})
             .then((data) => {
                 if (data["success"]) {
                     SendNotification("Registered and logged in Successfully")

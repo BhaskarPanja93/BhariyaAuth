@@ -1,9 +1,5 @@
 import React, {createContext, useContext, useRef, useState} from "react";
 
-/**
- * @typedef {Object} NotificationContextType
- * @property {(message: string) => void} SendNotification
- */
 
 /**@type {import('react').Context<NotificationContextType | null>} */
 const NotificationContext = createContext(null)
@@ -12,6 +8,7 @@ export default function NotificationProvider({children}) {
     const [notifications, setNotifications] = useState([]);
     const nextId = useRef(0);
 
+    /** @type SendNotificationT */
     const SendNotification = (message) => {
         const id = nextId.current++;
         setNotifications(prev => {
@@ -50,7 +47,6 @@ export default function NotificationProvider({children}) {
         </NotificationContext.Provider>
     );
 }
-
 
 export const FetchNotificationManager = () => {
     const context = useContext(NotificationContext);

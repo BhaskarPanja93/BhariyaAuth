@@ -2,7 +2,7 @@ import {useEffect, useRef, useState} from 'react'
 import SubmitButton from "../Elements/SubmitButton.jsx";
 import PasswordInput from "../Elements/PasswordInput.jsx";
 import {EmailIsValid, OTPIsValid} from "../Utils/Strings.js";
-import {BackendURL} from "../Values/Constants.js";
+import {AuthBackendURL} from "../Values/Constants.js";
 import {useNavigate} from "react-router-dom";
 import {FetchNotificationManager} from "../Contexts/Notification.jsx";
 import {FetchConnectionManager} from "../Contexts/Connection.jsx";
@@ -14,7 +14,7 @@ import OTPResendButton from "../Elements/OTPResendButton.jsx";
 export default function PasswordReset({disabled}) {
     const navigate = useNavigate();
     const {SendNotification} = FetchNotificationManager();
-    const {privateAPI} = FetchConnectionManager()
+    const {SendPost} = FetchConnectionManager()
 
     const [uiDisabled, setUiDisabled] = useState(false)
     const [currentStep, setCurrentStep] = useState(1)
@@ -32,7 +32,7 @@ export default function PasswordReset({disabled}) {
         setUiDisabled(true);
         const form = new FormData();
         form.append("mail_address", email);
-        privateAPI.post(BackendURL + "/passwordreset/step1/", form)
+        SendPost(false, AuthBackendURL,  "/passwordreset/step1/", form, null)
             .then((data) => {
                 if (data["success"]) {
                     SendNotification("Please enter the OTP sent to your mail")
@@ -58,7 +58,7 @@ export default function PasswordReset({disabled}) {
         form.append("token", currentToken.current);
         form.append("verification", verification);
         form.append("new_password", password);
-        privateAPI.post(BackendURL + "/passwordreset/step2", form)
+        SendPost(false, AuthBackendURL, "/passwordreset/step2", form, null)
             .then((data) => {
                 if (data["success"]) {
                     SendNotification("Password changed successfully")

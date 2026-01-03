@@ -1,7 +1,7 @@
 import OTPInput from '../Elements/OTPInput.jsx'
 import SubmitButton from "../Elements/SubmitButton.jsx";
 import {OTPIsValid} from "../Utils/Strings.js";
-import {BackendURL} from "../Values/Constants.js";
+import {AuthBackendURL} from "../Values/Constants.js";
 import {useNavigate} from "react-router-dom";
 import {FetchNotificationManager} from "../Contexts/Notification.jsx";
 import {FetchConnectionManager} from "../Contexts/Connection.jsx";
@@ -12,7 +12,7 @@ import {Countdown} from "../Utils/Countdown.js";
 export default function Mfa() {
     const navigate = useNavigate();
     const {SendNotification} = FetchNotificationManager();
-    const {privateAPI, EnsureLoggedIn} = FetchConnectionManager()
+    const {SendPost, EnsureLoggedIn} = FetchConnectionManager()
 
     const [uiDisabled, setUiDisabled] = useState(false)
     const [currentStep, setCurrentStep] = useState(1)
@@ -25,7 +25,7 @@ export default function Mfa() {
         EnsureLoggedIn().then(s=> {
             if (!s) return SendNotification("You need to be logged in to send OTP");
             setUiDisabled(true);
-            privateAPI.post(BackendURL + "/mfa/step1", {}, {requiresCSRF: true})
+            SendPost(true,AuthBackendURL, "/mfa/step1", null, {requiresCSRF: true})
                 .then((data) => {
                     if (data["success"]) {
                         SendNotification("Please enter the OTP sent to your mail")
@@ -54,9 +54,9 @@ export default function Mfa() {
             const form = new FormData();
             form.append("token", currentToken.current);
             form.append("verification", verification);
-            privateAPI.post(BackendURL + "/mfa/step2", form, {forMFA: true})
+            SendPost(true, AuthBackendURL, "/mfa/step2", form, {forMFA: true})
                 .then((data) => {
-                    if (data["success"]) {
+                    if (data.success) {
                         SendNotification("Verification complete")
                         navigate("/");
                     }

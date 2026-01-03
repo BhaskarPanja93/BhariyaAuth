@@ -1,12 +1,8 @@
 import React, {createContext, useContext, useEffect, useState} from "react";
 import {SetFavicon} from "../Utils/Favicon.js";
+import {AuthFrontendURL} from "../Values/Constants.js";
 
-/**
- * @typedef {Object} DarkModeContextType
- * @property {boolean} isDarkMode
- */
-
-/**@type {import('react').Context<DarkModeContextType | null>} */
+/** @type {React.Context<DarkModeContextType | null>} */
 const DarkModeContext = createContext(null)
 
 export default function DarkModeProvider({children}) {
@@ -15,7 +11,7 @@ export default function DarkModeProvider({children}) {
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
         const handler = (event) => {
             setIsDarkMode(event.matches);
-            SetFavicon(event.matches ? "/auth/favicons/DarkMode.png" : "/auth/favicons/LightMode.png")
+            SetFavicon(event.matches ? AuthFrontendURL + "/favicons/DarkMode.png" : AuthFrontendURL + "/favicons/LightMode.png")
         };
         mediaQuery.addEventListener('change', handler);
         handler(mediaQuery);

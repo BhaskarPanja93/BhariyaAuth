@@ -1,8 +1,8 @@
-export const BackendDomain = "https://bhariya.ddns.net"
-export const FrontendDomain = BackendDomain
+export const Domain = "bhariya.ddns.net"
+export const Origin = "https://"+Domain
 
-export const BackendURL = BackendDomain + "/auth-backend";
-export const FrontendURL = FrontendDomain + "/auth";
+export const AuthBackendURL = Origin + "/auth-backend";
+export const AuthFrontendURL = Origin + "/auth";
 
 export const CSRFCookiePath = "csrf"
 export const MFACookiePath = "mfa"

@@ -3,17 +3,17 @@ const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/
 
 
 export function NameIsValid(name) {
-    return name.length > 2 && name.length <= 50;
+    return name && name.length > 2 && name.length <= 50;
 }
 
 export function EmailIsValid(email) {
-    return email.length > 5 && email.length <= 50 && emailRegex.test(email);
+    return email && email.length > 5 && email.length <= 50 && emailRegex.test(email);
 }
 
 export function PasswordIsStrong(password) {
-    return passwordRegex.test(password);
+    return password && passwordRegex.test(password);
 }
 
 export function OTPIsValid(otp) {
-    return otp.length === 6;
+    return otp && otp.length === 6;
 }

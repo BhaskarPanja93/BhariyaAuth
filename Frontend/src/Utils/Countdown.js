@@ -1,5 +1,6 @@
 import {Sleep} from "./Sleep.js";
 
+/** @type CountdownT */
 export const Countdown = async (durationS, intervalS, currentCountdownIDRef, setter) => {
     if (isNaN(durationS)) return
     let dummyValue = durationS
