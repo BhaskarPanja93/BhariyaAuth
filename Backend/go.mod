@@ -1,6 +1,6 @@
 module BhariyaAuth
 
-go 1.26rc1
+go 1.26rc2
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.13.1
