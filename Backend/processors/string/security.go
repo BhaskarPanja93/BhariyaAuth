@@ -12,8 +12,10 @@ import (
 )
 
 var aesGCM cipher.AEAD
+var b64 *base64.Encoding
 
 func init() {
+	b64 = base64.RawURLEncoding.Strict()
 	block, err := aes.NewCipher(Secrets.AESGCMKey)
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("NewCipher failed: %s", err.Error()))
@@ -33,11 +35,11 @@ func Encrypt(data []byte) (string, bool) {
 		return "", false
 	}
 	ciphertext := aesGCM.Seal(nonce, nonce, data, nil)
-	return base64.RawURLEncoding.EncodeToString(ciphertext), true
+	return b64.EncodeToString(ciphertext), true
 }
 
 func Decrypt(token string) ([]byte, bool) {
-	ciphertext, err := base64.RawURLEncoding.DecodeString(token)
+	ciphertext, err := b64.DecodeString(token)
 	if err != nil {
 		return nil, false
 	}

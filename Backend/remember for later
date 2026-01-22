@@ -4,7 +4,6 @@ are the route rate limits too harsh??
 
 REMEMBER:
 is x KB enough for body size?
-add a mutex lock for frontend api, so everything is processed in sequence
 
 SUGGESTIONS:
 move OTP verification to in memory too?

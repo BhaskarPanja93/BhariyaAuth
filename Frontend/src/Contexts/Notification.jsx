@@ -1,7 +1,7 @@
 import React, {createContext, useContext, useRef, useState} from "react";
 
 
-/**@type {import('react').Context<NotificationContextType | null>} */
+/** @type {Context<NotificationContextType | null>} */
 const NotificationContext = createContext(null)
 
 export default function NotificationProvider({children}) {
