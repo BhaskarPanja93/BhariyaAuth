@@ -69,7 +69,7 @@ func sendMail(mail, subject, content string, attempts uint8) bool {
 	err := graphClient.Users().ByUserId(Secrets.MicrosoftMailId).SendMail().Post(context.Background(), requestBody, nil)
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("[Mail] SendMail failed for [MAIL-%s]: %s", mail, err.Error()))
-		time.Sleep(time.Second)
+		time.Sleep(time.Second * 5)
 		refreshCredentials()
 		return sendMail(mail, subject, content, attempts-1)
 	}

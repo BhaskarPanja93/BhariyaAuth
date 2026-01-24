@@ -9,7 +9,6 @@ type AccountDetailsRequestT struct {
 
 type AccountDetailsResponseT struct {
 	UserID   uint32    `json:"uid"`
-	Type     string    `json:"typ"`
 	Email    string    `json:"mail"`
 	Name     string    `json:"name"`
 	Creation time.Time `json:"creation"`

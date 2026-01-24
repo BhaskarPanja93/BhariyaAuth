@@ -252,8 +252,7 @@ export default function ConnectionProvider ({children}) {
         // Not authenticated
         if (status === 401) {
             if (config.attachCreds)
-                return Promise.reject("Authentication required")
-            IsLoggedIn.current = false
+                IsLoggedIn.current = false
             if (!config.forTokenRefresh) {
                 if (await EnsureLoggedIn())
                     return await RetryRequest(connection, config)

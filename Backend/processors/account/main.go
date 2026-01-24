@@ -10,12 +10,14 @@ import (
 	MailNotifier "BhariyaAuth/processors/mail"
 	StringProcessor "BhariyaAuth/processors/string"
 	Stores "BhariyaAuth/stores"
+	"errors"
 	"fmt"
 	"math/rand"
 	"time"
 
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v3"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -47,7 +49,9 @@ func GetUserType(userID uint32) UserTypes.T {
 }
 
 func BlacklistUser(userID uint32) bool {
-	DeleteAllSessions(userID)
+	if !DeleteAllSessions(userID) {
+		return false
+	}
 	_, err := Stores.MySQLClient.Exec("UPDATE users SET blocked = ? WHERE uid = ? LIMIT 1", true, userID)
 	if err != nil {
 		return false
@@ -70,8 +74,41 @@ func CheckUserIsBlacklisted(userID uint32) bool {
 	return blocked
 }
 
+func RevokeRefresh(userID uint32, refreshID uint16) bool {
+	key := fmt.Sprintf("%s:%d:%d", Config.RefreshBlocked, userID, refreshID)
+	err := Stores.RedisClient.Set(Stores.Ctx, key, "1", Config.AccessTokenExpireDelta).Err()
+	return err == nil
+}
+
+func CheckRefreshIsRevoked(userID uint32, refreshID uint16) bool {
+	key := fmt.Sprintf("%s:%d:%d", Config.RefreshBlocked, userID, refreshID)
+	val, err := Stores.RedisClient.Get(Stores.Ctx, key).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return false
+		}
+		return true
+	}
+	return val == "1"
+}
+
 func DeleteAllSessions(userID uint32) bool {
-	_, err := Stores.MySQLClient.Exec("DELETE FROM activities WHERE uid = ?", userID)
+	rows, err := Stores.MySQLClient.Query("SELECT refresh FROM activities WHERE uid = ?", userID)
+	if err != nil {
+		Logger.AccidentalFailure(fmt.Sprintf("[DeleteAllSessions] Fetch error for [UID-%d] reason: %s", userID, err.Error()))
+		return false
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var RefreshID uint16
+		err = rows.Scan(&RefreshID)
+		if err != nil {
+			Logger.AccidentalFailure(fmt.Sprintf("[DeleteAllSessions] Scan error for [UID-%d] reason: %s", userID, err.Error()))
+			continue
+		}
+		RevokeRefresh(userID, RefreshID)
+	}
+	_, err = Stores.MySQLClient.Exec("DELETE FROM activities WHERE uid = ?", userID)
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("[DeleteAllSessions] failed [UID-%d] reason: %s", userID, err.Error()))
 		return false
@@ -79,13 +116,21 @@ func DeleteAllSessions(userID uint32) bool {
 	return true
 }
 
-func DeleteSession(userID uint32, refreshID uint16) {
-	_, err := Stores.MySQLClient.Exec("DELETE FROM activities WHERE uid = ? AND refresh = ? LIMIT 1", userID, refreshID)
+func DeleteSession(userID uint32, refreshID uint16) bool {
+	res, err := Stores.MySQLClient.Exec("DELETE FROM activities WHERE uid = ? AND refresh = ? LIMIT 1", userID, refreshID)
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("[DeleteSession] failed [UID-%d-RID-%d] reason: %s", userID, refreshID, err.Error()))
-		DeleteSession(userID, refreshID)
-		return
+		return false
 	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return false
+	}
+	if affected > 0 {
+		RevokeRefresh(userID, refreshID)
+		return true
+	}
+	return false
 }
 
 func CheckUserExists(userID uint32) bool {
@@ -126,7 +171,6 @@ func UpdatePassword(userID uint32, password string) bool {
 			Logger.AccidentalFailure(fmt.Sprintf("[UpdatePassword] failed for [UID-%d] reason: %s", userID, err.Error()))
 			return false
 		}
-		DeleteAllSessions(userID)
 		return true
 	}
 	return false
@@ -225,8 +269,8 @@ func ServeAccountDetails() {
 			continue
 		}
 		var response ResponseModels.AccountDetailsResponseT
-		err := Stores.MySQLClient.QueryRow("SELECT uid, type, email, name, creation FROM users WHERE uid = ? LIMIT 1", request.UserID).
-			Scan(&response.UserID, &response.Type, &response.Email, &response.Name, &response.Creation)
+		err := Stores.MySQLClient.QueryRow("SELECT uid, email, name, creation FROM users WHERE uid = ? LIMIT 1", request.UserID).
+			Scan(&response.UserID, &response.Email, &response.Name, &response.Creation)
 		if err != nil {
 			Logger.AccidentalFailure(fmt.Sprintf("[ServeAccountDetails] Parse from DB failed for [UID-%d-SID-%s]: %s", request.UserID, request.ServerID, err.Error()))
 			continue
@@ -236,5 +280,12 @@ func ServeAccountDetails() {
 }
 
 func DatabaseAutoVacuum() {
-
+	for {
+		expireBefore := time.Now().UTC().Add(-Config.RefreshTokenExpireDelta)
+		_, err := Stores.MySQLClient.Exec("DELETE FROM activities WHERE updated < ?", expireBefore)
+		if err != nil {
+			time.Sleep(time.Minute)
+		}
+		time.Sleep(time.Hour * 24)
+	}
 }

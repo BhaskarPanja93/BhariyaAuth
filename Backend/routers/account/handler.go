@@ -80,6 +80,7 @@ func ProcessLogout(ctx fiber.Ctx) error {
 	ResponseProcessor.DetachAuthCookies(ctx)
 	ResponseProcessor.DetachMFACookies(ctx)
 	ResponseProcessor.DetachSSOCookies(ctx)
+	AccountProcessor.DeleteSession(refresh.UserID, refresh.RefreshID)
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 		Success:    true,
 		ModifyAuth: true,

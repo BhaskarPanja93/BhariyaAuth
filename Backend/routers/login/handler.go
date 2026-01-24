@@ -42,6 +42,12 @@ func Step1(ctx fiber.Ctx) error {
 			Notifications: []string{"Account doesn't exist with the email"},
 		})
 	}
+	if AccountProcessor.CheckUserIsBlacklisted(userID) {
+		Logger.IntentionalFailure(fmt.Sprintf("[Login1] Blacklisted account [UID-%d] attempted login", userID))
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{"Your account is disabled, please contact support"},
+		})
+	}
 	process := ctx.Params("process")
 	SignInData := TokenModels.SignInT{
 		UserID:       userID,

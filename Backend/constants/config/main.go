@@ -29,6 +29,7 @@ var (
 	RedisServerBase            = fmt.Sprintf("%s:%s", ServerFor, ServerRole)
 	RedisServerOTPVerification = fmt.Sprintf("%s:verify", RedisServerBase)
 
+	RefreshBlocked                = "auth:blocked"
 	AccountDetailsRequestChannel  = "auth:account:request"
 	AccountDetailsResponseChannel = "auth:account:response"
 

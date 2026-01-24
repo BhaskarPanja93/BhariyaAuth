@@ -1,26 +1,36 @@
 package otp
 
 import (
-	Config "BhariyaAuth/constants/config"
 	Generators "BhariyaAuth/processors/generator"
 	MailNotifier "BhariyaAuth/processors/mail"
-	Stores "BhariyaAuth/stores"
 	"fmt"
 	"sync"
 	"time"
 )
 
-type otpEntry struct {
-	Value     int64
-	CreatedAt time.Time
+type LimiterEntryT struct {
+	SentCount uint16
+	LastSent  time.Time
+}
+
+type VerificationEntryT struct {
+	OTP     string
+	Expires time.Time
 }
 
 var (
-	otpStore = struct {
+	limiterMap = struct {
 		sync.Mutex
-		data map[string]otpEntry
+		data map[string]LimiterEntryT
 	}{
-		data: make(map[string]otpEntry),
+		data: make(map[string]LimiterEntryT),
+	}
+
+	verificationMap = struct {
+		sync.Mutex
+		data map[string]VerificationEntryT
+	}{
+		data: make(map[string]VerificationEntryT),
 	}
 )
 
@@ -29,40 +39,46 @@ func init() {
 		for {
 			time.Sleep(time.Minute * 10)
 			now := time.Now()
-
-			otpStore.Lock()
-			for k, v := range otpStore.data {
-				if now.Sub(v.CreatedAt) >= calculateTTL(v.Value) {
-					delete(otpStore.data, k)
+			limiterMap.Lock()
+			for k, v := range limiterMap.data {
+				if now.Sub(v.LastSent) >= calculateLimiterEntryTTL(v.SentCount) {
+					delete(limiterMap.data, k)
 				}
 			}
-			otpStore.Unlock()
+			limiterMap.Unlock()
+			verificationMap.Lock()
+			for k, v := range verificationMap.data {
+				if now.After(v.Expires) {
+					delete(verificationMap.data, k)
+				}
+			}
+			verificationMap.Unlock()
 		}
 	}()
 }
 
-func calculateResendDelay(value int64) time.Duration {
-	return 10 * time.Second * time.Duration(value)
+func calculateResendDelay(sentCount uint16) time.Duration {
+	return 10 * time.Second * time.Duration(sentCount)
 }
 
-func calculateTTL(value int64) time.Duration {
-	return time.Minute * time.Duration(value)
+func calculateLimiterEntryTTL(sentCount uint16) time.Duration {
+	return time.Minute * time.Duration(sentCount)
 }
 
-func checkCanSend(identifier string) (bool, int64, time.Duration) {
-	otpStore.Lock()
-	entry, exists := otpStore.data[identifier]
-	otpStore.Unlock()
+func checkCanSend(identifier string) (bool, uint16, time.Duration) {
+	limiterMap.Lock()
+	entry, exists := limiterMap.data[identifier]
+	limiterMap.Unlock()
 	if !exists {
 		return true, 0, 0
 	}
-	value := entry.Value
-	totalTTL := calculateTTL(value)
-	elapsed := time.Since(entry.CreatedAt)
+	value := entry.SentCount
+	totalTTL := calculateLimiterEntryTTL(value)
+	elapsed := time.Since(entry.LastSent)
 	if elapsed >= totalTTL {
-		otpStore.Lock()
-		delete(otpStore.data, identifier)
-		otpStore.Unlock()
+		limiterMap.Lock()
+		delete(limiterMap.data, identifier)
+		limiterMap.Unlock()
 		return true, value, 0
 	}
 	resendDelay := calculateResendDelay(value)
@@ -74,15 +90,21 @@ func checkCanSend(identifier string) (bool, int64, time.Duration) {
 	return canSend, value, timeRemaining
 }
 
-func recordSent(identifier string, value int64) time.Duration {
+func recordSent(identifier string, sentCount uint16, verification, OTP string) time.Duration {
 	now := time.Now()
-	otpStore.Lock()
-	otpStore.data[identifier] = otpEntry{
-		Value:     value,
-		CreatedAt: now,
+	limiterMap.Lock()
+	limiterMap.data[identifier] = LimiterEntryT{
+		SentCount: sentCount,
+		LastSent:  now,
 	}
-	otpStore.Unlock()
-	return calculateResendDelay(value)
+	limiterMap.Unlock()
+	verificationMap.Lock()
+	verificationMap.data[verification] = VerificationEntryT{
+		OTP:     OTP,
+		Expires: now.Add(5 * time.Minute),
+	}
+	verificationMap.Unlock()
+	return calculateResendDelay(sentCount)
 }
 
 func Send(mail string, subject string, header string, ignorable bool, identifier string) (string, time.Duration) {
@@ -94,20 +116,25 @@ func Send(mail string, subject string, header string, ignorable bool, identifier
 			return "", currentDelay
 		}
 		verification := Generators.SafeString(10)
-		key := fmt.Sprintf("%s:%s", Config.RedisServerOTPVerification, verification)
-		Stores.RedisClient.Set(Stores.Ctx, key, otp, 5*time.Minute)
-		currentDelay = recordSent(rateLimitKey, alreadySentCount+1)
+		currentDelay = recordSent(rateLimitKey, alreadySentCount+1, verification, otp)
 		return verification, currentDelay
 	}
 	return "", currentDelay
 }
 
 func Validate(verification, otp string) bool {
-	key := fmt.Sprintf("%s:%s", Config.RedisServerOTPVerification, verification)
-	value, _ := Stores.RedisClient.Get(Stores.Ctx, key).Result()
-	if value == otp && otp != "" {
-		Stores.RedisClient.Del(Stores.Ctx, key)
-		return true
+	now := time.Now().UTC()
+	verificationMap.Lock()
+	entry, exists := verificationMap.data[verification]
+	verificationMap.Unlock()
+	if !exists {
+		return false
 	}
-	return false
+	if otp == "" || entry.OTP != otp || entry.Expires.Before(now) {
+		return false
+	}
+	verificationMap.Lock()
+	delete(verificationMap.data, verification)
+	verificationMap.Unlock()
+	return true
 }

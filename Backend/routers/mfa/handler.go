@@ -29,10 +29,12 @@ func Step1(ctx fiber.Ctx) error {
 		RateLimitProcessor.Set(ctx)
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
-	if now.After(refresh.RefreshExpiry) {
+	if now.After(refresh.RefreshExpiry) || !AccountProcessor.CheckSessionExists(refresh.UserID, refresh.RefreshID) {
 		Logger.IntentionalFailure(fmt.Sprintf("[ProcessRefresh] Expired session [UID-%d-RID-%d]", refresh.UserID, refresh.RefreshID))
-		ResponseProcessor.DetachAuthCookies(ctx)
 		RateLimitProcessor.Set(ctx)
+		ResponseProcessor.DetachAuthCookies(ctx)
+		ResponseProcessor.DetachMFACookies(ctx)
+		ResponseProcessor.DetachSSOCookies(ctx)
 		return ctx.Status(fiber.StatusUnauthorized).JSON(ResponseModels.APIResponseT{
 			Notifications: []string{"This session has expired... Please login again"},
 		})

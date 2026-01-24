@@ -121,6 +121,12 @@ func Step2(ctx fiber.Ctx) error {
 		})
 	}
 	Logger.Success(fmt.Sprintf("[Reset2] Password changed for [UID-%d]", ResetData.UserID))
+	if !AccountProcessor.DeleteAllSessions(ResetData.UserID) {
+		Logger.AccidentalFailure(fmt.Sprintf("[Reset2] Delete sessions failed for [UID-%d]", ResetData.UserID))
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{"Password changed", "Failed to revoke old sessions"},
+		})
+	}
 	os, device, browser := StringProcessor.ParseUA(ctx.Get("User-Agent"))
 	mailModel := MailModels.PasswordChanged
 	MailNotifier.PasswordReset(ResetData.Mail, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], ctx.IP(), os, device, browser, 2)

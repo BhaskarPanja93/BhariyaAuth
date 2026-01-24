@@ -20,9 +20,10 @@ import (
 func Fetch(ctx fiber.Ctx) error {
 	now := ctx.Locals("request-start").(time.Time)
 	access, ok := TokenProcessor.ReadAccessToken(ctx)
-	if !ok || now.After(access.AccessExpiry) {
+	if !ok || now.After(access.AccessExpiry) || AccountProcessor.CheckRefreshIsRevoked(access.UserID, access.RefreshID) {
 		return ctx.SendStatus(fiber.StatusUnauthorized)
 	}
+
 	rows, err := Stores.MySQLClient.Query("SELECT refresh, count, remembered, creation, updated, os, device, browser FROM activities WHERE uid = ?", access.UserID)
 	if err != nil {
 		Logger.AccidentalFailure(fmt.Sprintf("[Sessions] Fetch error for [UID-%d] reason: %s", access.UserID, err.Error()))
@@ -77,6 +78,12 @@ func Fetch(ctx fiber.Ctx) error {
 }
 
 func Revoke(ctx fiber.Ctx) error {
+	now := ctx.Locals("request-start").(time.Time)
+	access, ok := TokenProcessor.ReadAccessToken(ctx)
+	if !ok || now.After(access.AccessExpiry) || AccountProcessor.CheckRefreshIsRevoked(access.UserID, access.RefreshID) {
+		return ctx.SendStatus(fiber.StatusUnauthorized)
+	}
+
 	form := new(FormModels.DeviceRevokeForm)
 	if err := ctx.Bind().Form(form); err != nil {
 		if err = ctx.Bind().Body(form); err != nil {
@@ -84,7 +91,6 @@ func Revoke(ctx fiber.Ctx) error {
 			return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 		}
 	}
-	access, _ := TokenProcessor.ReadAccessToken(ctx)
 	uidbuf, ok := StringProcessor.Decrypt(form.UserID)
 	if !ok {
 		Logger.AccidentalFailure("[Revoke] UID Decrypt failed")
@@ -96,19 +102,25 @@ func Revoke(ctx fiber.Ctx) error {
 		return ctx.SendStatus(fiber.StatusUnauthorized)
 	}
 	if form.RevokeAll == "yes" {
-		AccountProcessor.DeleteAllSessions(access.UserID)
+		if !AccountProcessor.DeleteAllSessions(access.UserID) {
+			Logger.Success(fmt.Sprintf("Sessions failed succeeded for [%d]", access.UserID))
+			return ctx.SendStatus(fiber.StatusInternalServerError)
+		}
 		Logger.Success(fmt.Sprintf("Sessions RevokeAll succeeded for [%d]", access.UserID))
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 			Success: true,
 		})
 	}
-	RefreshID, ok := StringProcessor.Decrypt(form.DeviceID)
+	refreshIdBinary, ok := StringProcessor.Decrypt(form.DeviceID)
 	if !ok {
 		Logger.AccidentalFailure(fmt.Sprintf("RevokeAll RID Decrypt failed [%s]", form.DeviceID))
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
-	AccountProcessor.DeleteSession(access.UserID, binary.BigEndian.Uint16(RefreshID))
-	Logger.Success(fmt.Sprintf("Sessions Revoke succeeded for [%d-%d]", access.UserID, RefreshID))
+	refreshId := binary.BigEndian.Uint16(refreshIdBinary)
+	if !AccountProcessor.DeleteSession(access.UserID, refreshId) {
+		return ctx.SendStatus(fiber.StatusInternalServerError)
+	}
+	Logger.Success(fmt.Sprintf("Sessions Revoke succeeded for [%d-%d]", access.UserID, refreshId))
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 		Success: true,
 	})
