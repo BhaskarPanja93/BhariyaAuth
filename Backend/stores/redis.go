@@ -48,7 +48,7 @@ func ConnectRedis() {
 				Addr:         Secrets.RedisHost + ":" + Secrets.RedisPort,
 				Password:     Secrets.RedisPassword,
 				DB:           0,
-				MinIdleConns: 10,
+				MinIdleConns: 1,
 				PoolSize:     2000,
 				DialTimeout:  5 * time.Second,
 				ReadTimeout:  3 * time.Second,

@@ -10,7 +10,7 @@ require (
 	github.com/gofiber/fiber/v3 v3.0.0-rc.3
 	github.com/markbates/goth v1.82.0
 	github.com/medama-io/go-useragent v1.2.3
-	github.com/microsoftgraph/msgraph-sdk-go v1.93.0
+	github.com/microsoftgraph/msgraph-sdk-go v1.94.0
 	github.com/redis/go-redis/v9 v9.17.2
 	github.com/valyala/quicktemplate v1.8.0
 	golang.org/x/crypto v0.47.0

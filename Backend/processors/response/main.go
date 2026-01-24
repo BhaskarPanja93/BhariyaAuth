@@ -4,12 +4,13 @@ import (
 	Config "BhariyaAuth/constants/config"
 	HTMLTemplates "BhariyaAuth/models/html"
 	TokenModels "BhariyaAuth/models/tokens"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 )
 
-func SSOSuccessPopup(ctx fiber.Ctx, token string) error {
-	return ctx.Type("html").SendString(HTMLTemplates.SSOSuccessPopup(token))
+func SSOSuccessPopup(ctx fiber.Ctx, token string, expires time.Time) error {
+	return ctx.Type("html").SendString(HTMLTemplates.SSOSuccessPopup(token, expires.Format(time.RFC3339)))
 }
 
 func SSOFailurePopup(ctx fiber.Ctx, reason string) error {

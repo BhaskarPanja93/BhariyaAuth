@@ -4,11 +4,11 @@
 <!DOCTYPE html>
 <html lang="en">
     <script>
-        window.addEventListener('beforeunload', () => {
-            if (!window._authSuccess) {
-                window.opener?.postMessage({ success: false }, window.location.origin);
-            }
-        })
+        async function onAuthFailure() {
+            window.opener?.postMessage({ success: false}, window.location.origin);
+            window.close();
+        }
+        window.addEventListener('beforeunload', onAuthFailure)
     </script>
     <body>
         <h2>{%s reason %}</h2>

@@ -8,9 +8,30 @@
  * @typedef {Object} ConnectionContextType
  * @property {SendGetT} SendGet
  * @property {SendPostT} SendPost
+ * @property {GetWebSocketT} GetWebSocket
+ * @property {TryCloseWebSocketT} TryCloseWebSocket
  * @property {OpenPopupT} OpenPopup
  * @property {LogoutT} Logout
  * @property {EnsureLoggedInT} EnsureLoggedIn
+ */
+
+/**
+ * @typedef {
+ * (
+ *     URL: string,
+ *     withCredentials: boolean
+ * ) =>
+ *     Promise<WebSocketWriter>
+ * } GetWebSocketT
+ */
+
+/**
+ * @typedef {
+ * (
+ *     URL: string,
+ * ) =>
+ *     Promise<boolean>
+ * } TryCloseWebSocketT
  */
 
 /**

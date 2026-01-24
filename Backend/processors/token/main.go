@@ -46,12 +46,14 @@ func encryptRefreshToken(model TokenModels.RefreshTokenT) (string, bool) {
 
 func CreateFreshToken(userID uint32, refreshID uint16, userType UserTypes.T, remember bool, identifierType string, ctx fiber.Ctx) (TokenModels.NewTokenCombinedT, bool) {
 	now := ctx.Locals("request-start").(time.Time)
+	accessExpires := now.Add(Config.AccessTokenExpireDelta)
+	refreshExpires := now.Add(Config.RefreshTokenExpireDelta)
 	csrf := Generators.SafeString(128)
 	atEnc, ok := encryptAccessToken(TokenModels.AccessTokenT{
 		UserID:       userID,
 		RefreshID:    refreshID,
 		UserType:     userType,
-		AccessExpiry: now.Add(Config.AccessTokenExpireDelta),
+		AccessExpiry: accessExpires,
 		RememberMe:   remember,
 	})
 	if !ok {
@@ -63,7 +65,7 @@ func CreateFreshToken(userID uint32, refreshID uint16, userType UserTypes.T, rem
 		RefreshIndex:   1,
 		RefreshCreated: now,
 		RefreshUpdated: now,
-		RefreshExpiry:  now.Add(Config.RefreshTokenExpireDelta),
+		RefreshExpiry:  refreshExpires,
 		UserType:       userType,
 		CSRF:           csrf,
 		RememberMe:     remember,
@@ -73,28 +75,31 @@ func CreateFreshToken(userID uint32, refreshID uint16, userType UserTypes.T, rem
 		return TokenModels.NewTokenCombinedT{}, false
 	}
 	return TokenModels.NewTokenCombinedT{
-		AccessToken:  atEnc,
-		RefreshToken: rtEnc,
-		CSRF:         csrf,
-		RememberMe:   remember,
+		AccessToken:   atEnc,
+		RefreshToken:  rtEnc,
+		AccessExpires: accessExpires,
+		CSRF:          csrf,
+		RememberMe:    remember,
 	}, true
 }
 
 func CreateRenewToken(refresh TokenModels.RefreshTokenT, ctx fiber.Ctx) (TokenModels.NewTokenCombinedT, bool) {
 	now := ctx.Locals("request-start").(time.Time)
+	accessExpires := now.Add(Config.AccessTokenExpireDelta)
+	refreshExpires := now.Add(Config.RefreshTokenExpireDelta)
 	csrf := Generators.SafeString(128)
 	atEnc, ok := encryptAccessToken(TokenModels.AccessTokenT{
 		UserID:       refresh.UserID,
 		RefreshID:    refresh.RefreshID,
 		UserType:     refresh.UserType,
-		AccessExpiry: now.Add(Config.AccessTokenExpireDelta),
+		AccessExpiry: accessExpires,
 		RememberMe:   refresh.RememberMe,
 	})
 	if !ok {
 		return TokenModels.NewTokenCombinedT{}, false
 	}
 	refresh.CSRF = csrf
-	refresh.RefreshExpiry = now.Add(Config.RefreshTokenExpireDelta)
+	refresh.RefreshExpiry = refreshExpires
 	refresh.RefreshIndex %= 60000
 	refresh.RefreshIndex++
 	rtEnc, ok := encryptRefreshToken(refresh)
@@ -102,10 +107,11 @@ func CreateRenewToken(refresh TokenModels.RefreshTokenT, ctx fiber.Ctx) (TokenMo
 		return TokenModels.NewTokenCombinedT{}, false
 	}
 	return TokenModels.NewTokenCombinedT{
-		AccessToken:  atEnc,
-		RefreshToken: rtEnc,
-		CSRF:         csrf,
-		RememberMe:   refresh.RememberMe,
+		AccessToken:   atEnc,
+		RefreshToken:  rtEnc,
+		AccessExpires: accessExpires,
+		CSRF:          csrf,
+		RememberMe:    refresh.RememberMe,
 	}, true
 }
 

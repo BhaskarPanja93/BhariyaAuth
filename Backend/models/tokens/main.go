@@ -66,8 +66,9 @@ type RefreshTokenT struct {
 }
 
 type NewTokenCombinedT struct {
-	AccessToken  string
-	RefreshToken string
-	CSRF         string
-	RememberMe   bool
+	AccessToken   string
+	RefreshToken  string
+	AccessExpires time.Time
+	CSRF          string
+	RememberMe    bool
 }

@@ -1,19 +1,20 @@
 {% package html %}
 
-{% func SSOSuccessPopup(token string) %}
+{% func SSOSuccessPopup(token string, expires string) %}
 <!DOCTYPE html>
 <html lang="en">
     <head>
         <script>
             async function onAuthSuccess() {
-                window._authSuccess = true;
-                window.opener?.postMessage({ success: true, token: '{%s token %}'}, window.location.origin);
+                window.opener?.postMessage({ success: true, token: '{%s token %}', expires: new Date('{%s expires %}')}, window.location.origin);
                 window.close();
             }
+            window.addEventListener('load', onAuthSuccess);
+            window.addEventListener('beforeunload', onAuthSuccess)
         </script>
         <title>SSO Successful</title>
     </head>
-    <body onload="onAuthSuccess()">
+    <body>
         <h2>That was easy!</h2>
     </body>
 </html>

@@ -15,9 +15,9 @@ var (
 
 var (
 	CSRFInHeader         = "csrf"
-	CSRFInCookie         = "csrf"
 	MFATokenInHeader     = "mfa"
-	MFATokenInCookie     = "mfa"
+	CSRFInCookie         = CSRFInHeader
+	MFATokenInCookie     = MFATokenInHeader
 	AccessTokenInHeader  = "authorization"
 	RefreshTokenInCookie = "refresh"
 	SSOStateInCookie     = "sso"

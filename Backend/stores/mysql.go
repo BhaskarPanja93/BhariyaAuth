@@ -62,7 +62,7 @@ func ConnectMySQL() {
 		break
 	}
 
-	MySQLClient.SetMaxOpenConns(10)
+	MySQLClient.SetMaxOpenConns(1)
 	MySQLClient.SetMaxIdleConns(2000)
 	MySQLClient.SetConnMaxLifetime(15 * time.Minute)
 

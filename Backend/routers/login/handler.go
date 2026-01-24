@@ -183,5 +183,6 @@ func Step2(ctx fiber.Ctx) error {
 		Success:    true,
 		ModifyAuth: true,
 		NewToken:   token.AccessToken,
+		Reply:      token.AccessExpires.Format(time.RFC3339),
 	})
 }

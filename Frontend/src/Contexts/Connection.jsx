@@ -3,13 +3,14 @@ import axios from "axios";
 import Cookies from "js-cookie";
 import {Sleep} from "../Utils/Sleep.js";
 import {FetchNotificationManager} from "./Notification.jsx";
-import {AuthBackendURL, CSRFCookiePath, Origin, AuthFrontendURL, MFACookiePath} from "../Values/Constants.js";
+import {AuthBackendURL, AuthFrontendURL, CSRFCookiePath, MFACookiePath, Origin} from "../Values/Constants.js";
 
 /** @type {React.Context<ConnectionContextType | null>} */
 const ConnectionContext = createContext(null);
 export default function ConnectionProvider ({children}) {
     const {SendNotification} = FetchNotificationManager();
     const AccessToken = useRef("")
+    const AccessExpiry = useRef(new Date())
     const IsLoggedIn = useRef(false)
 
     /** @type {RefObject<Record<string,number>>} */
@@ -22,6 +23,8 @@ export default function ConnectionProvider ({children}) {
     const currentRefreshes = useRef(null);
     /** @type {RefObject<Promise<boolean>>} */
     const currentLogout = useRef(null);
+    /** @type {RefObject<Record<string, WebSocketWriter>>} */
+    const webSockets = useRef({});
 
     const GetGatewayErrors = (host) => {
         return GatewayErrors.current[host] || 0
@@ -43,7 +46,7 @@ export default function ConnectionProvider ({children}) {
         GatewayErrors.current[host] = 1
     }
 
-    /** @type {SendGetT} */
+    /** @type SendGetT */
     const SendGet = async (attachCreds, backendURL, remainingPath, config) => {
         if (config == null)
             config = {}
@@ -52,7 +55,7 @@ export default function ConnectionProvider ({children}) {
         return connection.get(backendURL+remainingPath, config)
     }
 
-    /** @type {SendPostT} */
+    /** @type SendPostT */
     const SendPost = async (attachCreds, backendURL, remainingPath, data, config) => {
         if (config == null)
             config = {}
@@ -61,19 +64,19 @@ export default function ConnectionProvider ({children}) {
         return connection.post(backendURL+remainingPath, data, config)
     }
 
-    /** @type {EnsureLoggedInT} */
+    /** @type EnsureLoggedInT */
     const EnsureLoggedIn = async () => {
-        return IsLoggedIn.current || await RefreshToken() || await OpenPopup(AuthFrontendURL+"/login")
+        return (IsLoggedIn.current && AccessExpiry.current && (AccessExpiry.current.getTime() - Date.now()) > 0) || await RefreshToken() || await OpenPopup(AuthFrontendURL+"/login")
     }
 
-    /** @type {OpenPopupT} */
+    /** @type OpenPopupT */
     const OpenPopup = async (URL) => {
         if (currentPopups.current[URL] == null) {
             currentPopups.current[URL] = new Promise(async (resolve) => {
                 const popup = window.open(
                     URL,
                     URL,
-                    "width=500,height=750,menubar=no,toolbar=no,location=no,status=no,resizable=no,scrollbars=no"
+                    "width=500,height=750,popup"
                 )
                 if (!popup) {
                     delete currentPopups.current[URL]
@@ -86,9 +89,10 @@ export default function ConnectionProvider ({children}) {
                             window.removeEventListener("message", onMessage);
                             finished = true
                             if (event.data["token"]) AccessToken.current = event.data["token"]
+                            if (event.data["token"]) AccessExpiry.current = event.data["expires"]
                             delete currentPopups.current[URL];
                             if (window.opener) {
-                                window.opener.postMessage({success: true, token: event.data["token"]}, window.location.origin);
+                                window.opener.postMessage({success: true, token: event.data["token"], expires: event.data["expires"]}, window.location.origin);
                                 window.close();
                             }
                             return resolve(true);
@@ -107,7 +111,7 @@ export default function ConnectionProvider ({children}) {
         return currentPopups.current[URL];
     }
 
-    /** @type {LogoutT} */
+    /** @type LogoutT */
     const Logout = async () => {
         if (currentLogout.current == null) {
             currentLogout.current = new Promise((resolve) => {
@@ -140,7 +144,6 @@ export default function ConnectionProvider ({children}) {
                 }).catch(() => {
                     resolve(false)
                 }).finally(async () => {
-                    await Sleep(100)
                     delete currentPings.current[host];
                 })
             })
@@ -215,16 +218,24 @@ export default function ConnectionProvider ({children}) {
 
         if (status === 200) {
             ResetGatewayErrors(config.host)
-            if (config.allowAccessChange && data["modify-auth"]) {
-                AccessToken.current = data["new-token"]
-                IsLoggedIn.current = !!AccessToken.current;
-                if (!config.forTokenRefresh && window.opener) {
-                    window.opener.postMessage({success: true, token: AccessToken.current}, window.location.origin);
-                    window.close();
-                }
-            } else if (config.forMFA && window.opener && data["success"]) {
+            if (config.forMFA && window.opener && data["success"]) {
                 window.opener.postMessage({success: true}, window.location.origin);
                 window.close();
+            } else if (config.allowAccessChange && data["modify-auth"]) {
+                AccessToken.current = data["new-token"]
+                AccessExpiry.current = new Date(data["reply"])
+                Sleep(AccessExpiry.current.getTime() - Date.now() - 30*1000).then(()=>{
+                    if (Object.values(webSockets.current).find(webSocket => webSocket.state() === WebSocket.OPEN && webSocket.authRequired))
+                        RefreshToken();
+                })
+                if (!config.forTokenRefresh && window.opener) {
+                    window.opener.postMessage({success: true, token: AccessToken.current, expiry: AccessExpiry.current}, window.location.origin);
+                    window.close();
+                }
+                IsLoggedIn.current = !!AccessToken.current;
+                Object.values(webSockets.current).forEach(websocket => {
+                    websocket.authenticateIfRequired()
+                });
             }
         }
 
@@ -311,7 +322,46 @@ export default function ConnectionProvider ({children}) {
     connection.interceptors.request.use(RequestFulfilledInterceptor, RequestRejectedInterceptor)
     connection.interceptors.response.use(ResponseFulfilledInterceptor, ResponseRejectedInterceptor)
 
-    return (<ConnectionContext.Provider value={{SendGet, SendPost, OpenPopup, Logout, EnsureLoggedIn}}>
+
+    /** @type GetWebSocketT */
+    const GetWebSocket = async (URL, withCredentials) => {
+        const existing = webSockets.current[URL];
+        if (existing) {
+            const state = existing.state();
+            if (state === WebSocket.OPEN) {
+                return existing;
+            }
+            if (state === WebSocket.CONNECTING) {
+                return existing.openPromise;
+            }
+            delete webSockets.current[URL];
+        }
+        webSockets.current[URL] = new WebSocketWriter(URL, withCredentials ? AccessToken : null, () => TryCloseWebSocket(URL))
+        return webSockets.current[URL].openPromise;
+    }
+
+    /** @type TryCloseWebSocketT */
+    const TryCloseWebSocket = async (URL) => {
+        const existing = webSockets.current[URL];
+        if (existing) {
+            let lastUsed = existing.lastUsed
+            while (true) {
+                if (existing.lastUsed !== lastUsed)
+                    return false
+                let idleFor = Date.now() - existing.lastUsed
+                if (idleFor < 5000) {
+                    await Sleep(5000 - idleFor)
+                    continue
+                }
+                delete webSockets.current[URL]
+                existing.ws.close()
+                return true
+            }
+        }
+        return true
+    }
+
+    return (<ConnectionContext.Provider value={{SendGet, SendPost, GetWebSocket, TryCloseWebSocket, OpenPopup, Logout, EnsureLoggedIn}}>
         {children}
     </ConnectionContext.Provider>)
 }

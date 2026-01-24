@@ -166,7 +166,7 @@ func Step2(ctx fiber.Ctx) error {
 		}
 		ResponseProcessor.AttachAuthCookies(ctx, token)
 		Logger.Success(fmt.Sprintf("[SSO2] Registered: [UID-%d-RID-%d-MAIL-%s]", userID, refreshID, user.Email))
-		return ResponseProcessor.SSOSuccessPopup(ctx, token.AccessToken)
+		return ResponseProcessor.SSOSuccessPopup(ctx, token.AccessToken, token.AccessExpires)
 	}
 	if AccountProcessor.CheckUserIsBlacklisted(userID) {
 		Logger.IntentionalFailure(fmt.Sprintf("[SSO2] Blacklisted account [UID-%d]", userID))
@@ -183,5 +183,5 @@ func Step2(ctx fiber.Ctx) error {
 	}
 	ResponseProcessor.AttachAuthCookies(ctx, token)
 	Logger.Success(fmt.Sprintf("[SSO2] LoggedIn: [UID-%d-RID-%d-MAIL-%s]", userID, refreshID, user.Email))
-	return ResponseProcessor.SSOSuccessPopup(ctx, token.AccessToken)
+	return ResponseProcessor.SSOSuccessPopup(ctx, token.AccessToken, token.AccessExpires)
 }
