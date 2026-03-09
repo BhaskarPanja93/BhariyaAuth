@@ -1,13 +1,12 @@
-package secure
+package string
 
 import (
 	"crypto/rand"
-	"encoding/binary"
 	"io"
 )
 
 const (
-	letters = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~"
 	numbers = "0123456789"
 )
 
@@ -48,31 +47,4 @@ func SafeNumber(n uint16) string {
 	b := make([]byte, n)
 	rejectionSample(b, numbers)
 	return string(b)
-}
-
-func UserID() uint32 {
-	var b [4]byte
-	for {
-		if _, err := rand.Read(b[:3]); err != nil {
-			panic(err)
-		}
-		val := binary.BigEndian.Uint32(b[:])
-		val &= 0x00FFFFFF
-		if val != 0 {
-			return val
-		}
-	}
-}
-
-func RefreshID() uint16 {
-	var b [2]byte
-	for {
-		if _, err := rand.Read(b[:]); err != nil {
-			panic(err)
-		}
-		val := binary.BigEndian.Uint16(b[:])
-		if val != 0 {
-			return val
-		}
-	}
 }
