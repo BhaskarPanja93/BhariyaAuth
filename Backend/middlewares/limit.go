@@ -4,68 +4,59 @@ import (
 	ResponseModels "BhariyaAuth/models/responses"
 	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
 )
 
-type window struct {
-	count uint32
-	end   time.Time
+type rateWindow struct {
+	count   atomic.Uint32
+	expires time.Time
 }
 
-func RouteRateLimiter(limit uint32, period time.Duration, autoVacuumInterval, maxIdleFor time.Duration) fiber.Handler {
-	var mutex sync.Mutex
-	clients := make(map[string]*window)
+func RouteRateLimiter(limit uint32, windowDuration time.Duration, cleanupInterval time.Duration, maxIdleDuration time.Duration) fiber.Handler {
+	var mu sync.Mutex
+	clientWindows := make(map[string]*rateWindow)
 
 	go func() {
-		ticker := time.NewTicker(autoVacuumInterval)
+		ticker := time.NewTicker(cleanupInterval)
 		defer ticker.Stop()
+
 		for range ticker.C {
-			mutex.Lock()
 			now := time.Now()
-			for i, v := range clients {
-				if now.Sub(v.end) > maxIdleFor {
-					delete(clients, i)
+
+			mu.Lock()
+			for ip, window := range clientWindows {
+				if now.After(window.expires.Add(maxIdleDuration)) {
+					delete(clientWindows, ip)
 				}
 			}
-			mutex.Unlock()
+			mu.Unlock()
 		}
 	}()
 
-	return func(ctx fiber.Ctx) error {
-		key := ctx.IP()
+	return func(c fiber.Ctx) error {
+		ip := c.IP()
 		now := time.Now()
-
-		mutex.Lock()
-		entry, exists := clients[key]
-		mutex.Unlock()
-
-		if !exists || now.After(entry.end) {
-			err := ctx.Next()
-			mutex.Lock()
-			if e, ok := clients[key]; ok && now.Before(e.end) {
-				entry = e
-				entry.count += RateLimitProcessor.Get(ctx)
-			} else {
-				clients[key] = &window{count: 1, end: now.Add(period)}
+		mu.Lock()
+		window, exists := clientWindows[ip]
+		if !exists || now.After(window.expires) {
+			window = &rateWindow{
+				count:   atomic.Uint32{},
+				expires: now.Add(windowDuration),
 			}
-			mutex.Unlock()
-			return err
+			clientWindows[ip] = window
 		}
-
-		if entry.count < limit*100 {
-			err := ctx.Next()
-			mutex.Lock()
-			entry.count += RateLimitProcessor.Get(ctx)
-			mutex.Unlock()
-			return err
-		}
-
-		retryAfter := int(entry.end.Sub(now).Seconds()) + 1
-		return ctx.Status(fiber.StatusTooManyRequests).JSON(
-			ResponseModels.APIResponseT{
+		mu.Unlock()
+		if window.count.Load() >= limit {
+			retryAfter := int(window.expires.Sub(now).Seconds()) + 1
+			return c.Status(fiber.StatusTooManyRequests).JSON(ResponseModels.APIResponseT{
 				RetryAfter: retryAfter,
 			})
+		}
+		err := c.Next()
+		window.count.Add(RateLimitProcessor.Get(c))
+		return err
 	}
 }
