@@ -2,14 +2,14 @@ package ratelimit
 
 import "github.com/gofiber/fiber/v3"
 
-const flagKey = "RateLimitValue"
+const flagKey = "rate-limit-value"
 
 func Set(ctx fiber.Ctx) {
-	ctx.Locals(flagKey, true)
+	ctx.Locals(flagKey, 1)
+}
+func Add(ctx fiber.Ctx, value uint32) {
+	ctx.Locals(flagKey, ctx.Locals(flagKey).(uint32)+value)
 }
 func Get(ctx fiber.Ctx) uint32 {
-	if ctx.Locals(flagKey) == true {
-		return 100
-	}
-	return 1
+	return ctx.Locals(flagKey).(uint32)
 }
