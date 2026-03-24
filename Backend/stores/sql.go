@@ -24,11 +24,12 @@ func ConnectSQL() {
 		if useSocket {
 			fmt.Println("Trying SQL via UNIX socket...")
 			dsn = fmt.Sprintf(
-				"postgres://%s:%s@/%s?host=%s&sslmode=disable&TimeZone=UTC",
+				"postgres://%s:%s@/%s?host=%s&port=%s&sslmode=disable&TimeZone=UTC",
 				Secrets.SQLUser,
 				Secrets.SQLPassword,
 				Secrets.SQLDBName,
 				Secrets.SQLSocket,
+				Secrets.SQLPort,
 			)
 		} else {
 			fmt.Println("Trying SQL via TCP/IP...")
@@ -46,11 +47,11 @@ func ConnectSQL() {
 		if err != nil {
 			panic(err)
 		}
-		config.MaxConns = 10
-		config.MinConns = 1
-		config.MaxConnLifetime = 15 * time.Minute
-		config.MaxConnIdleTime = 5 * time.Minute
-		config.HealthCheckPeriod = 1 * time.Minute
+		config.MaxConns = 25
+		config.MinConns = 5
+		config.MaxConnLifetime = 30 * time.Minute
+		config.MaxConnIdleTime = 10 * time.Minute
+		config.HealthCheckPeriod = 30 * time.Second
 
 		SQLClient, err = pgxpool.NewWithConfig(Config.CtxBG, config)
 		if err != nil {
