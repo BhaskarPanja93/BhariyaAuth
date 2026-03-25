@@ -66,6 +66,7 @@ func Step1(ctx fiber.Ctx) error {
 		step2code, retry := OTPProcessor.Send(form.Mail, MailModels.LoginInitiated, ctx.IP())
 		// OTP send failed
 		if step2code == "" {
+			RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
 			return ctx.Status(fiber.StatusOK).JSON(
 				ResponseModels.APIResponseT{
 					Reply:         retry.Seconds(),
@@ -196,11 +197,13 @@ func Step2(ctx fiber.Ctx) error {
 		// Fetch all data at once to prevent DB overloading with multiple requests
 		err = Stores.SQLClient.QueryRow(Config.CtxBG, `SELECT type, blocked FROM users WHERE user_id = $1 LIMIT 1`, SignInData.UserID).Scan(&t, &blocked)
 		if errors.Is(err, pgx.ErrNoRows) {
+			RateLimitProcessor.Add(ctx, 60_000) // 10 mistakes allowed / minute
 			return ctx.Status(fiber.StatusOK).JSON(
 				ResponseModels.APIResponseT{
 					Notifications: []string{Notifications.AccountNotFound},
 				})
 		} else if err != nil {
+			RateLimitProcessor.Add(ctx, 1_000) // 600 mistakes allowed / minute
 			return ctx.Status(fiber.StatusInternalServerError).JSON(
 				ResponseModels.APIResponseT{
 					Notifications: []string{Notifications.DBReadError},
@@ -209,6 +212,7 @@ func Step2(ctx fiber.Ctx) error {
 	}
 	// User account is blocked
 	if blocked {
+		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
 		return ctx.Status(fiber.StatusOK).JSON(
 			ResponseModels.APIResponseT{
 				Notifications: []string{Notifications.AccountBlocked},
@@ -217,6 +221,7 @@ func Step2(ctx fiber.Ctx) error {
 	// Register new device into database
 	deviceID, ok := AccountProcessor.RecordReturningUser(ctx, SignInData.MailAddress, SignInData.UserID, SignInData.RememberMe, true)
 	if !ok {
+		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
 		return ctx.Status(fiber.StatusInternalServerError).JSON(
 			ResponseModels.APIResponseT{
 				Notifications: []string{Notifications.DBWriteError},
@@ -225,6 +230,7 @@ func Step2(ctx fiber.Ctx) error {
 	// Create their access and refresh tokens
 	token, ok := TokenProcessor.CreateFreshToken(ctx, SignInData.UserID, deviceID, UsersTypes.Find(t), SignInData.RememberMe, "email-login")
 	if !ok {
+		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
 			Notifications: []string{Notifications.UnknownError},
 		})
@@ -258,6 +264,6 @@ func Step2(ctx fiber.Ctx) error {
 			Success:    true,
 			ModifyAuth: true,
 			NewToken:   token.AccessToken,
-			Reply:      token.AccessExpires.Format(time.RFC3339),
+			Reply:      token.AccessExpires,
 		})
 }
