@@ -169,7 +169,7 @@ func Step2(ctx fiber.Ctx) error {
 		})
 	}
 	// Create their access and refresh tokens
-	token, ok := TokenProcessor.CreateFreshToken(ctx, userID, deviceID, UserTypes.All.Viewer, SignUpData.RememberMe, "email-register")
+	token, ok := TokenProcessor.CreateFreshToken(ctx, userID, deviceID, UserTypes.All.Viewer.Short, SignUpData.RememberMe, "email-register")
 	if !ok {
 		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{

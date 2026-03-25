@@ -7,7 +7,6 @@ import (
 	FormModels "BhariyaAuth/models/requests"
 	ResponseModels "BhariyaAuth/models/responses"
 	TokenModels "BhariyaAuth/models/tokens"
-	UsersTypes "BhariyaAuth/models/users"
 	AccountProcessor "BhariyaAuth/processors/account"
 	CookieProcessor "BhariyaAuth/processors/cookies"
 	FormProcessor "BhariyaAuth/processors/form"
@@ -228,7 +227,7 @@ func Step2(ctx fiber.Ctx) error {
 			})
 	}
 	// Create their access and refresh tokens
-	token, ok := TokenProcessor.CreateFreshToken(ctx, SignInData.UserID, deviceID, UsersTypes.Find(t), SignInData.RememberMe, "email-login")
+	token, ok := TokenProcessor.CreateFreshToken(ctx, SignInData.UserID, deviceID, t, SignInData.RememberMe, "email-login")
 	if !ok {
 		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
