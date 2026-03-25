@@ -1,178 +1,213 @@
 package register
 
 import (
+	Config "BhariyaAuth/constants/config"
 	MailModels "BhariyaAuth/models/mails"
+	Notifications "BhariyaAuth/models/notifications"
 	FormModels "BhariyaAuth/models/requests"
 	ResponseModels "BhariyaAuth/models/responses"
 	TokenModels "BhariyaAuth/models/tokens"
 	UserTypes "BhariyaAuth/models/users"
 	AccountProcessor "BhariyaAuth/processors/account"
-	Logger "BhariyaAuth/processors/logs"
+	CookieProcessor "BhariyaAuth/processors/cookies"
+	FormProcessor "BhariyaAuth/processors/form"
 	OTPProcessor "BhariyaAuth/processors/otp"
 	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
-	ResponseProcessor "BhariyaAuth/processors/response"
 	StringProcessor "BhariyaAuth/processors/string"
 	TokenProcessor "BhariyaAuth/processors/token"
-	"math/rand"
+	Stores "BhariyaAuth/stores"
 	"time"
-
-	"fmt"
 
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v3"
 )
 
-const tokenType = "Register"
-
 func Step1(ctx fiber.Ctx) error {
+	// Read the form else return 422
 	form := new(FormModels.RegisterForm1)
-	if err := ctx.Bind().Form(form); err != nil {
-		if err = ctx.Bind().Body(form); err != nil {
-			RateLimitProcessor.Set(ctx)
-			return ctx.SendStatus(fiber.StatusUnprocessableEntity)
-		}
-	}
-	if !StringProcessor.NameIsValid(form.Name) || !StringProcessor.EmailIsValid(form.MailAddress) || !StringProcessor.PasswordIsStrong(form.Password) {
-		RateLimitProcessor.Set(ctx)
+	if !FormProcessor.ReadFormData(ctx, form) || !StringProcessor.NameIsValid(form.Name) || !StringProcessor.EmailIsValid(form.Mail) || !StringProcessor.PasswordIsStrong(form.Password) {
+		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
-	userID, found := AccountProcessor.GetIDFromMail(form.MailAddress)
-	if found {
-		Logger.IntentionalFailure(fmt.Sprintf("[Register1] Attempted for [UID-%d]", userID))
-		RateLimitProcessor.Set(ctx)
-		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Success:       false,
-			Notifications: []string{"Account exists with the email"},
-		})
+	// Check if account exists with the provided email
+	var exists bool
+	err := Stores.SQLClient.QueryRow(Config.CtxBG, `SELECT EXISTS(SELECT 1 FROM users WHERE user_id = $1 )`, form.Mail).Scan(&exists)
+	if err != nil { // Any DB error
+		RateLimitProcessor.Add(ctx, 1_000) // 600 mistakes allowed / minute
+		return ctx.Status(fiber.StatusInternalServerError).JSON(
+			ResponseModels.APIResponseT{
+				Notifications: []string{Notifications.DBReadError},
+			})
 	}
-	SignUpData := TokenModels.SignUpT{
-		TokenType:  tokenType,
-		Mail:       form.MailAddress,
-		RememberMe: form.RememberMe == "yes",
-		Name:       form.Name,
-		Password:   form.Password,
+	// Deny processing if account exists
+	if exists {
+		RateLimitProcessor.Add(ctx, 60_000) // 10 mistakes allowed / minute
+		return ctx.Status(fiber.StatusOK).JSON(
+			ResponseModels.APIResponseT{
+				Notifications: []string{Notifications.AccountPresent},
+			})
 	}
-	mailModel := MailModels.RegisterInitiated
-	verification, retry := OTPProcessor.Send(form.MailAddress, mailModel.Subjects[rand.Intn(len(mailModel.Subjects))], mailModel.Header, mailModel.Ignorable, ctx.IP())
+	// OTP verification string for step 2
+	verification, retry := OTPProcessor.Send(form.Mail, MailModels.RegisterInitiated, ctx.IP())
+	// OTP send failed
 	if verification == "" {
-		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Reply:         retry.Seconds(),
-			Notifications: []string{fmt.Sprintf("Unable to send OTP, please try again after %.1f seconds", retry.Seconds())},
-		})
+		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
+		return ctx.Status(fiber.StatusOK).JSON(
+			ResponseModels.APIResponseT{
+				Reply:         retry.Seconds(),
+				Notifications: []string{Notifications.OTPSendFailed},
+			})
 	}
-	SignUpData.Step2Code = verification
+	// Create a struct with all data required for step 2
+	// Client is responsible to bring the struct when requesting step2
+	SignUpData := TokenModels.SignUpT{
+		TokenType:   tokenType,
+		MailAddress: form.Mail,
+		RememberMe:  form.Remember == "yes",
+		Name:        form.Name,
+		Password:    form.Password,
+		Step2Code:   verification,
+	}
 	data, err := json.Marshal(SignUpData)
 	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("[Register1] Marshal Failed for [MAIL-%s] reason: %s", form.MailAddress, err.Error()))
-		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Notifications: []string{"Failed to acquire token (Parser issue)... Retrying"},
-		})
+		// Struck marshaling failed
+		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
+		return ctx.Status(fiber.StatusInternalServerError).JSON(
+			ResponseModels.APIResponseT{
+				Notifications: []string{Notifications.MarshalError},
+			})
 	}
 	token, ok := StringProcessor.Encrypt(data)
 	if !ok {
-		Logger.AccidentalFailure(fmt.Sprintf("[Register1] Encrypt Failed for [MAIL-%s]", form.MailAddress))
-		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
-		})
+		// Struck marshal encryption failed
+		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
+		return ctx.Status(fiber.StatusInternalServerError).JSON(
+			ResponseModels.APIResponseT{
+				Notifications: []string{Notifications.EncryptorError},
+			})
 	}
-	Logger.Success(fmt.Sprintf("[Register1] Token Generated for [MAIL-%s]", form.MailAddress))
-	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-		Success: true,
-		Reply:   token,
-	})
+	// Return the processed encrypted string that user needs to bring for step 2 along with otp
+	return ctx.Status(fiber.StatusOK).JSON(
+		ResponseModels.APIResponseT{
+			Success: true,
+			Reply:   token,
+		})
 }
 
 func Step2(ctx fiber.Ctx) error {
+	// Read the form else return 422
 	form := new(FormModels.RegisterForm2)
-	var SignUpData TokenModels.SignUpT
-	if err := ctx.Bind().Form(form); err != nil {
-		if err = ctx.Bind().Body(form); err != nil {
-			RateLimitProcessor.Set(ctx)
-			return ctx.SendStatus(fiber.StatusUnprocessableEntity)
-		}
+	if !FormProcessor.ReadFormData(ctx, form) {
+		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
+		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
 	data, ok := StringProcessor.Decrypt(form.Token)
 	if !ok {
-		Logger.AccidentalFailure("[Register2] Decrypt Failed")
-		RateLimitProcessor.Set(ctx)
-		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
+		// Decrypt failed
+		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
+		return ctx.Status(fiber.StatusInternalServerError).JSON(
+			ResponseModels.APIResponseT{
+				Notifications: []string{Notifications.EncryptorError},
+			})
 	}
+	var SignUpData TokenModels.SignUpT
 	err := json.Unmarshal(data, &SignUpData)
 	if err != nil {
-		Logger.AccidentalFailure("[Register2] Unmarshal Failed")
-		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Notifications: []string{"Failed to read token (Encryptor issue)... Retrying"},
-		})
+		// Bytes Unmarshal failed
+		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
+		return ctx.Status(fiber.StatusInternalServerError).JSON(
+			ResponseModels.APIResponseT{
+				Notifications: []string{Notifications.MarshalError},
+			})
 	}
 	if SignUpData.TokenType != tokenType {
-		RateLimitProcessor.Set(ctx)
+		// Token belongs to some other purpose and not login
+		RateLimitProcessor.Add(ctx, 30_000) // 20 mistakes allowed / minute
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
-	userID, found := AccountProcessor.GetIDFromMail(SignUpData.Mail)
-	if found {
-		Logger.IntentionalFailure(fmt.Sprintf("[Register2] Attempted for [UID-%d]", userID))
-		RateLimitProcessor.Set(ctx)
-		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Notifications: []string{"Account exists with the email"},
-		})
+	// Check if account exists with the provided email
+	var exists bool
+	err = Stores.SQLClient.QueryRow(Config.CtxBG, `SELECT EXISTS(SELECT 1 FROM users WHERE user_id = $1 )`, SignUpData.MailAddress).Scan(&exists)
+	if err != nil { // Any DB error
+		RateLimitProcessor.Add(ctx, 1_000) // 600 mistakes allowed / minute
+		return ctx.Status(fiber.StatusInternalServerError).JSON(
+			ResponseModels.APIResponseT{
+				Notifications: []string{Notifications.DBReadError},
+			})
 	}
+	// Deny processing if account exists
+	if exists {
+		RateLimitProcessor.Add(ctx, 60_000) // 10 mistakes allowed / minute
+		return ctx.Status(fiber.StatusOK).JSON(
+			ResponseModels.APIResponseT{
+				Notifications: []string{Notifications.AccountPresent},
+			})
+	}
+	// Check otp validity
 	if !OTPProcessor.Validate(SignUpData.Step2Code, form.Verification) {
-		Logger.IntentionalFailure(fmt.Sprintf("[Register2] Incorrect OTP for [MAIL-%s]", SignUpData.Mail))
-		RateLimitProcessor.Set(ctx)
-		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Notifications: []string{"Incorrect OTP"},
-		})
+		RateLimitProcessor.Add(ctx, 20_000) // 30 mistakes allowed / minute
+		return ctx.Status(fiber.StatusOK).JSON(
+			ResponseModels.APIResponseT{
+				Notifications: []string{Notifications.OTPIncorrect},
+			})
 	}
-	userID, ok = AccountProcessor.RecordNewUser(SignUpData.Password, SignUpData.Mail, SignUpData.Name, ctx)
+	// Register new account into database
+	userID, ok := AccountProcessor.RecordNewUser(ctx, SignUpData.Password, SignUpData.MailAddress, SignUpData.Name)
 	if !ok {
-		Logger.AccidentalFailure(fmt.Sprintf("[Register2] Record New failed for [MAIL-%s]", SignUpData.Mail))
-		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Notifications: []string{"Failed to register (DB-write issue)... Retrying"},
-		})
+		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
+		return ctx.Status(fiber.StatusInternalServerError).JSON(
+			ResponseModels.APIResponseT{
+				Notifications: []string{Notifications.DBWriteError},
+			})
 	}
-	refreshID, ok := AccountProcessor.RecordReturningUser(SignUpData.Mail, ctx.IP(), ctx.Get("User-Agent"), userID, SignUpData.RememberMe, false, ctx)
+	// Register new device into database
+	deviceID, ok := AccountProcessor.RecordReturningUser(ctx, SignUpData.MailAddress, userID, SignUpData.RememberMe, false)
 	if !ok {
-		Logger.AccidentalFailure(fmt.Sprintf("[Register2] Record Returning failed for [UID-%d]", userID))
+		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Notifications: []string{"Account registered but failed to login. Please login manually"},
+			Notifications: []string{Notifications.AccountCreated},
 		})
 	}
-	token, ok := TokenProcessor.CreateFreshToken(userID, refreshID, UserTypes.All.Viewer, SignUpData.RememberMe, "email-register", ctx)
+	// Create their access and refresh tokens
+	token, ok := TokenProcessor.CreateFreshToken(ctx, userID, deviceID, UserTypes.All.Viewer, SignUpData.RememberMe, "email-register")
 	if !ok {
-		Logger.AccidentalFailure(fmt.Sprintf("[Register2] CreateFreshToken failed for [UID-%d]", userID))
+		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-			Notifications: []string{"Account registered but failed to login. Please login manually"},
+			Notifications: []string{Notifications.AccountCreated},
 		})
 	}
-	ResponseProcessor.AttachAuthCookies(ctx, token)
-	var mfatoken string
+	CookieProcessor.AttachAuthCookies(ctx, token)
+	// For registrations providing mfa is compulsory as user used otp to create account
 	MFAToken := TokenModels.MFATokenT{
 		Step2Code: SignUpData.Step2Code,
 		UserID:    userID,
-		Creation:  ctx.Locals("request-start").(time.Time),
+		DeviceID:  deviceID,
+		Created:   ctx.Locals("request-start").(time.Time),
 		Verified:  true,
 	}
 	data, err = json.Marshal(MFAToken)
 	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("[Register2MFA] Marshal Failed for [UID-%d] reason: %s", userID, err.Error()))
-		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
-		})
+		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
+		return ctx.Status(fiber.StatusInternalServerError).JSON(
+			ResponseModels.APIResponseT{
+				Notifications: []string{Notifications.AccountCreated},
+			})
 	}
-	mfatoken, ok = StringProcessor.Encrypt(data)
+	mfaToken, ok := StringProcessor.Encrypt(data)
 	if !ok {
-		Logger.AccidentalFailure(fmt.Sprintf("[Register2MFA] Encrypt Failed for [UID-%d]", userID))
-		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
-			Notifications: []string{"Failed to acquire token (Encryptor issue)... Retrying"},
-		})
+		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
+		return ctx.Status(fiber.StatusInternalServerError).JSON(
+			ResponseModels.APIResponseT{
+				Notifications: []string{Notifications.AccountCreated},
+			})
 	}
-	ResponseProcessor.DetachMFACookies(ctx)
-	ResponseProcessor.AttachMFACookie(ctx, mfatoken)
-	Logger.Success(fmt.Sprintf("[Register2] Created: [UID-%d-RID-%d-MAIL-%s]", userID, refreshID, SignUpData.Mail))
-	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
-		Success:    true,
-		ModifyAuth: true,
-		NewToken:   token.AccessToken,
-		Reply:      token.AccessExpires.Format(time.RFC3339),
-	})
+	CookieProcessor.AttachMFACookie(ctx, mfaToken)
+	// Return the access token and its expiry
+	return ctx.Status(fiber.StatusOK).JSON(
+		ResponseModels.APIResponseT{
+			Success:    true,
+			ModifyAuth: true,
+			NewToken:   token.AccessToken,
+			Reply:      token.AccessExpires,
+		})
 }
