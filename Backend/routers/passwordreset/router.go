@@ -7,9 +7,8 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-func AttachRoutes(authApp fiber.Router) {
-	ForgotRouter := authApp.Group("/passwordreset")
-
-	ForgotRouter.Post("/step2", Middlewares.RouteRateLimiter(10, time.Minute, 3*time.Minute, 10*time.Minute), Step2)
-	ForgotRouter.Post("/step1", Middlewares.RouteRateLimiter(10, time.Minute, 3*time.Minute, 10*time.Minute), Step1)
+func AttachRoutes(APIGroup fiber.Router) {
+	ForgotRouter := APIGroup.Group("/passwordreset")
+	ForgotRouter.Post("/step1", Middlewares.RouteRateLimiter(600_000, time.Minute, 2*time.Minute), Step1)
+	ForgotRouter.Post("/step2", Middlewares.RouteRateLimiter(600_000, time.Minute, 2*time.Minute), Step2)
 }
