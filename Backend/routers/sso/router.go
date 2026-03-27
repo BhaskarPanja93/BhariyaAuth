@@ -4,9 +4,8 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-func AttachRoutes(authApp fiber.Router) {
-	SSORouter := authApp.Group("/sso")
-
+func AttachRoutes(APIGroup fiber.Router) {
+	SSORouter := APIGroup.Group("/sso")
+	SSORouter.Get("/:"+ProcessorParam, Step1)
 	SSORouter.Get("/callback", Step2)
-	SSORouter.Get("/:processor", Step1)
 }
