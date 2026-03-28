@@ -22,6 +22,10 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
+// Step1 takes in a form with a valid name, mail address, password and remember (as 'yes' or 'no').
+// Check the provided email if it already exists in self database, and if so, reject the request.
+// If the entry is new, a struct with all the values is serialized and returned to the user that the user needs to bring in
+// while submitting the form in Step2 along with OTP for verifying the email actually exists, is active and owned by the user.
 func Step1(ctx fiber.Ctx) error {
 	// Read the form else return 422
 	form := new(FormModels.RegisterForm1)
@@ -31,7 +35,7 @@ func Step1(ctx fiber.Ctx) error {
 	}
 	// Check if account exists with the provided email
 	var exists bool
-	err := Stores.SQLClient.QueryRow(Config.CtxBG, `SELECT EXISTS(SELECT 1 FROM users WHERE user_id = $1 )`, form.Mail).Scan(&exists)
+	err := Stores.SQLClient.QueryRow(Config.CtxBG, `SELECT EXISTS(SELECT 1 FROM users WHERE mail = $1)`, form.Mail).Scan(&exists)
 	if err != nil { // Any DB error
 		RateLimitProcessor.Add(ctx, 1_000) // 600 mistakes allowed / minute
 		return ctx.Status(fiber.StatusInternalServerError).JSON(
@@ -48,13 +52,13 @@ func Step1(ctx fiber.Ctx) error {
 			})
 	}
 	// OTP verification string for step 2
-	verification, retry := OTPProcessor.Send(form.Mail, MailModels.RegisterInitiated, ctx.IP())
+	step2code, retryAfter := OTPProcessor.Send(form.Mail, MailModels.RegisterInitiated, ctx.IP())
 	// OTP send failed
-	if verification == "" {
+	if step2code == "" {
 		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
 		return ctx.Status(fiber.StatusOK).JSON(
 			ResponseModels.APIResponseT{
-				Reply:         retry.Seconds(),
+				Reply:         retryAfter.Seconds(),
 				Notifications: []string{Notifications.OTPSendFailed},
 			})
 	}
@@ -66,12 +70,12 @@ func Step1(ctx fiber.Ctx) error {
 		RememberMe:  form.Remember == "yes",
 		Name:        form.Name,
 		Password:    form.Password,
-		Step2Code:   verification,
+		Step2Code:   step2code,
 	}
 	data, err := json.Marshal(SignUpData)
 	if err != nil {
 		// Struck marshaling failed
-		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
+		RateLimitProcessor.Add(ctx, 1_000) // 600 mistakes allowed / minute
 		return ctx.Status(fiber.StatusInternalServerError).JSON(
 			ResponseModels.APIResponseT{
 				Notifications: []string{Notifications.MarshalError},
@@ -80,7 +84,7 @@ func Step1(ctx fiber.Ctx) error {
 	token, ok := StringProcessor.Encrypt(data)
 	if !ok {
 		// Struck marshal encryption failed
-		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
+		RateLimitProcessor.Add(ctx, 1_000) // 600 mistakes allowed / minute
 		return ctx.Status(fiber.StatusInternalServerError).JSON(
 			ResponseModels.APIResponseT{
 				Notifications: []string{Notifications.EncryptorError},
@@ -94,6 +98,11 @@ func Step1(ctx fiber.Ctx) error {
 		})
 }
 
+// Step2 requires a form with the token received from Step1 along with verification which would be the OTP received in their email.
+// The token is decrypted, unmarshalled and that would provide Step1's form data including email.
+// The email will be rechecked for account in self database (to prevent someone creating the account after completing Step1 and retrying Step2)
+// OTP gets validated and on success, new account gets created, also the user device gets logged in at the same time.
+// On success, new Auth and Refresh tokens are created and sent back as response and cookie respectively.
 func Step2(ctx fiber.Ctx) error {
 	// Read the form else return 422
 	form := new(FormModels.RegisterForm2)
@@ -121,13 +130,13 @@ func Step2(ctx fiber.Ctx) error {
 			})
 	}
 	if SignUpData.TokenType != tokenType {
-		// Token belongs to some other purpose and not login
-		RateLimitProcessor.Add(ctx, 30_000) // 20 mistakes allowed / minute
+		// Token belongs to some other purpose and not registration
+		RateLimitProcessor.Add(ctx, 60_000) // 10 mistakes allowed / minute
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
 	// Check if account exists with the provided email
 	var exists bool
-	err = Stores.SQLClient.QueryRow(Config.CtxBG, `SELECT EXISTS(SELECT 1 FROM users WHERE user_id = $1 )`, SignUpData.MailAddress).Scan(&exists)
+	err = Stores.SQLClient.QueryRow(Config.CtxBG, `SELECT EXISTS(SELECT 1 FROM users WHERE user_id = $1)`, SignUpData.MailAddress).Scan(&exists)
 	if err != nil { // Any DB error
 		RateLimitProcessor.Add(ctx, 1_000) // 600 mistakes allowed / minute
 		return ctx.Status(fiber.StatusInternalServerError).JSON(
@@ -145,14 +154,15 @@ func Step2(ctx fiber.Ctx) error {
 	}
 	// Check otp validity
 	if !OTPProcessor.Validate(SignUpData.Step2Code, form.Verification) {
-		RateLimitProcessor.Add(ctx, 20_000) // 30 mistakes allowed / minute
+		RateLimitProcessor.Add(ctx, 60_000) // 10 mistakes allowed / minute
 		return ctx.Status(fiber.StatusOK).JSON(
 			ResponseModels.APIResponseT{
 				Notifications: []string{Notifications.OTPIncorrect},
 			})
 	}
+	userType := UserTypes.All.Viewer.Short
 	// Register new account into database
-	userID, ok := AccountProcessor.RecordNewUser(ctx, SignUpData.Password, SignUpData.MailAddress, SignUpData.Name)
+	userID, ok := AccountProcessor.RecordNewUser(ctx, userType, SignUpData.Password, SignUpData.MailAddress, SignUpData.Name)
 	if !ok {
 		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
 		return ctx.Status(fiber.StatusInternalServerError).JSON(
@@ -169,7 +179,7 @@ func Step2(ctx fiber.Ctx) error {
 		})
 	}
 	// Create their access and refresh tokens
-	token, ok := TokenProcessor.CreateFreshToken(ctx, userID, deviceID, UserTypes.All.Viewer.Short, SignUpData.RememberMe, "email-register")
+	token, ok := TokenProcessor.CreateFreshToken(ctx, userID, deviceID, userType, SignUpData.RememberMe, "email-register")
 	if !ok {
 		RateLimitProcessor.Add(ctx, 10_000) // 60 mistakes allowed / minute
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
