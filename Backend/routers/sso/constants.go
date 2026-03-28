@@ -14,15 +14,12 @@ const (
 	StateMarshalFailed   = "StateMarshalFailed"
 	StateUnMarshalFailed = "StateUnMarshalFailed"
 
-	StateMissing = "StateMissing"
-
 	SessionEncryptFailed = "SessionEncryptFailed"
 	SessionDecryptFailed = "SessionDecryptFailed"
 
 	SessionMarshalFailed   = "SessionMarshalFailed"
 	SessionUnmarshalFailed = "SessionUnmarshalFailed"
 
-	SessionMissing = "SessionMissing"
 	SessionInvalid = "SessionInvalid"
 	SessionExpired = "SessionExpired"
 
@@ -30,5 +27,5 @@ const (
 	LoginFailed         = "LoginFailed"
 	AccountBlocked      = "AccountBlocked"
 
-	ProcessorParam = "processor"
+	ProviderParam = "processor"
 )
