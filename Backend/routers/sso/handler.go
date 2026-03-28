@@ -45,7 +45,7 @@ func init() {
 	)
 }
 
-// Step1 takes in the required SSO provider as URL segment `/sso/google`.
+// Step1 takes in the required SSO provider as URL segment `/sso/provider` and a remember query as `yes` or `no`.
 // It then creates a struct with provider name, a supplied expiry and if the session should be remembered.
 // This prepared struct (after marshal and encryption) will serve as state for the entire SSO flow.
 // The state is packed into goth session which is then serialized and attached nto the request as SSO session cookie
@@ -196,7 +196,7 @@ func Step2(ctx fiber.Ctx) error {
 	var userID int32
 	var deviceID int16
 	// Prefetch all data in a single query to prevent DB overloading with multiple requests
-	err = Stores.SQLClient.QueryRow(Config.CtxBG, "SELECT users.user_id, blocked, type from users where mail = $1", user.Email).Scan(&userID, &blocked, &userType)
+	err = Stores.SQLClient.QueryRow(Config.CtxBG, "SELECT users.user_id, blocked, type from users where mail = $1 LIMIT 1", user.Email).Scan(&userID, &blocked, &userType)
 	if errors.Is(err, sql.ErrNoRows) { // Account doesn't exist
 		exists = false
 	} else if err != nil { // Other DB error
