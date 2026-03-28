@@ -25,39 +25,44 @@ import (
 )
 
 func init() {
-	// Initialise all providers usable for SSO
+	// Initialize all providers usable for SSO
 	goth.UseProviders(
 		google.New(
 			Secrets.GoogleClientId,
 			Secrets.GoogleClientSecret,
-			Config.ServerSSOCallbackURL,
+			Config.ServerSSOCallbackURL+"/google",
 			"profile", "email"),
 		discord.New(
 			Secrets.DiscordClientId,
 			Secrets.DiscordClientSecret,
-			Config.ServerSSOCallbackURL,
+			Config.ServerSSOCallbackURL+"/discord",
 			"identify", "email", "openid"),
 		microsoftonline.New(
 			Secrets.MicrosoftClientId,
 			Secrets.MicrosoftClientSecret,
-			Config.ServerSSOCallbackURL,
+			Config.ServerSSOCallbackURL+"/microsoftonline",
 			"user.read"),
 	)
 }
 
+// Step1 takes in the required SSO provider as URL segment `/sso/google`.
+// It then creates a struct with provider name, a supplied expiry and if the session should be remembered.
+// This prepared struct (after marshal and encryption) will serve as state for the entire SSO flow.
+// The state is packed into goth session which is then serialized and attached nto the request as SSO session cookie
+// before redirecting the request to the goth provided URL
 func Step1(ctx fiber.Ctx) error {
 	now := ctx.Locals("request-start").(time.Time)
 	// Processor names must match the ones in goth
-	processor := ctx.Params(ProcessorParam)
+	providerName := ctx.Params(ProviderParam)
 	// Fetch provider from goth
-	provider, err := goth.GetProvider(processor)
+	provider, err := goth.GetProvider(providerName)
 	if err != nil {
 		// Provider not found
 		return ResponseProcessor.SSOFailurePopup(ctx, UnknownProvider)
 	}
-	// State string for the SSO flow
+	// State struct for the SSO flow
 	state := TokenModels.SSOStateT{
-		Provider:   processor,
+		Provider:   providerName,
 		Expiry:     now.Add(Config.SSOCookieExpireDelta),
 		RememberMe: ctx.Query("remember", "no") == "yes",
 	}
@@ -72,23 +77,23 @@ func Step1(ctx fiber.Ctx) error {
 		return ResponseProcessor.SSOFailurePopup(ctx, StateEncryptFailed)
 	}
 	// Create SSO session in goth that will be attached to cookie
-	sess, err := provider.BeginAuth(encryptedState)
+	session, err := provider.BeginAuth(encryptedState)
 	if err != nil {
 		// Session creation failed
 		return ResponseProcessor.SSOFailurePopup(ctx, BeginFailed)
 	}
 	// Fetch URL to forward to
-	sendURL, err := sess.GetAuthURL()
+	sendURL, err := session.GetAuthURL()
 	if err != nil {
 		// URL fetch failed
 		return ResponseProcessor.SSOFailurePopup(ctx, AuthURLNotFound)
 	}
-	marshal, err := json.Marshal(sess)
+	sessionMarshal, err := json.Marshal(session)
 	if err != nil {
 		// Session marshaling failed
 		return ResponseProcessor.SSOFailurePopup(ctx, SessionMarshalFailed)
 	}
-	enc, ok := StringProcessor.Encrypt(marshal)
+	enc, ok := StringProcessor.Encrypt(sessionMarshal)
 	if !ok {
 		// Session marshal encrypting failed
 		return ResponseProcessor.SSOFailurePopup(ctx, SessionEncryptFailed)
@@ -98,55 +103,39 @@ func Step1(ctx fiber.Ctx) error {
 	return ctx.Redirect().To(sendURL)
 }
 
+// Step2 receives the state and provider name as provided by the auth provider as well as the cookie present in the request.
+// The session from cookie is first decrypted and the embedded state is matched against the state received in URL.
+// Only then the URL string is unmarshalled, checked for staleness and used to authorize and fetch the user details using goth.
+// After a valid email is received, the same is checked in self databases for existing user.
+// If no user matches the email, a new one is created, else old account is used to log in.
+// On success, the auth token, its expiry is passed into the embedded HTML that `should` have acted as a popup,
+// passing on the values using JavaScript postMessage
 func Step2(ctx fiber.Ctx) error {
 	now := ctx.Locals("request-start").(time.Time)
-	// Fetch received state and session values
+	// Fetch provider name, state and session values from URL and cookie
 	stateString := ctx.Query("state")
 	sessionString := ctx.Cookies(Config.SSOStateInCookie)
+	providerName := ctx.Params(ProviderParam)
+	// Fetch the provider from the URL
+	provider, err := goth.GetProvider(providerName)
+	if err != nil {
+		// Provider fetch failed
+		return ResponseProcessor.SSOFailurePopup(ctx, UnknownProvider)
+	}
 	CookieProcessor.DetachSSOCookies(ctx)
-	if stateString == "" {
-		// State missing
-		return ResponseProcessor.SSOFailurePopup(ctx, StateMissing)
-	}
-	if sessionString == "" {
-		// Session Missing
-		return ResponseProcessor.SSOFailurePopup(ctx, SessionMissing)
-	}
-	// Decrypt received state
-	stateDec, ok := StringProcessor.Decrypt(stateString)
-	if !ok {
-		// State Decrypt failed
-		return ResponseProcessor.SSOFailurePopup(ctx, StateDecryptFailed)
-	}
 	// Decrypt received session
 	sessDec, ok := StringProcessor.Decrypt(sessionString)
 	if !ok {
 		// Session Decrypt failed
 		return ResponseProcessor.SSOFailurePopup(ctx, SessionDecryptFailed)
 	}
-	state := TokenModels.SSOStateT{}
-	err := json.Unmarshal(stateDec, &state)
-	if err != nil {
-		// State Unmarshalling failed
-		return ResponseProcessor.SSOFailurePopup(ctx, StateUnMarshalFailed)
-	}
-	// Check if the state is fresh
-	if now.After(state.Expiry) {
-		return ResponseProcessor.SSOFailurePopup(ctx, SessionExpired)
-	}
-	// Fetch the provider from the state struct
-	provider, err := goth.GetProvider(state.Provider)
-	if err != nil {
-		// Provider fetch failed
-		return ResponseProcessor.SSOFailurePopup(ctx, UnknownProvider)
-	}
-	// Decrypt received session
+	// Unmarshal received session
 	sess, err := provider.UnmarshalSession(string(sessDec))
 	if err != nil {
 		// Session Unmarshalling failed
 		return ResponseProcessor.SSOFailurePopup(ctx, SessionUnmarshalFailed)
 	}
-	// Fetch the Redirect URL from step 1
+	// Fetch the Redirect URL from session cookie
 	rawAuthURL, err := sess.GetAuthURL()
 	if err != nil {
 		// URL fetch failed
@@ -158,10 +147,26 @@ func Step2(ctx fiber.Ctx) error {
 		// URL parse failed
 		return ResponseProcessor.SSOFailurePopup(ctx, URLParseFailed)
 	}
-	// Session state should match the state received as URL param
+	// State embedded in session must match the state received as URL param
 	originalState := authURL.Query().Get("state")
 	if originalState != stateString {
 		return ResponseProcessor.SSOFailurePopup(ctx, SessionInvalid)
+	}
+	// Decrypt received state
+	stateDec, ok := StringProcessor.Decrypt(stateString)
+	if !ok {
+		// State Decrypt failed
+		return ResponseProcessor.SSOFailurePopup(ctx, StateDecryptFailed)
+	}
+	state := TokenModels.SSOStateT{}
+	err = json.Unmarshal(stateDec, &state)
+	if err != nil {
+		// State Unmarshalling failed
+		return ResponseProcessor.SSOFailurePopup(ctx, StateUnMarshalFailed)
+	}
+	// Check if the state is fresh
+	if now.After(state.Expiry) {
+		return ResponseProcessor.SSOFailurePopup(ctx, SessionExpired)
 	}
 	// Fetch all URL params received from the provider
 	values := url.Values{}
@@ -200,7 +205,7 @@ func Step2(ctx fiber.Ctx) error {
 	// Create new account, same as register handler
 	if !exists {
 		action = "register"
-		userID, ok = AccountProcessor.RecordNewUser(ctx, "", user.Email, user.Name)
+		userID, ok = AccountProcessor.RecordNewUser(ctx, userType, "", user.Email, user.Name)
 		if !ok {
 			// Registration failed
 			return ResponseProcessor.SSOFailurePopup(ctx, AccountCreateFailed)
