@@ -1,5 +1,7 @@
 package users
 
+// User types allowed
+
 type T struct {
 	Short  string   `json:"short"`
 	Claims []string `json:"claims"`

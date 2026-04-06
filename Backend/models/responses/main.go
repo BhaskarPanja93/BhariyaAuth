@@ -2,6 +2,8 @@ package responses
 
 import "time"
 
+// All response types
+
 type AccountDetailsRequestT struct {
 	ServerID string `json:"sid"`
 	UserID   int32  `json:"uid"`

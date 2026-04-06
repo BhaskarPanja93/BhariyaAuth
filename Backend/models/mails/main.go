@@ -1,5 +1,8 @@
 package mails
 
+// T is the type of one purpose of mail sending.
+// Subjects contains a list instead of a single one, this prevents mail inboxes from merging multiple instances of the same mail purpose for better UX.
+// Ignorable decides if a password reset link be provided at the end of the mail.
 type T struct {
 	Subjects  []string
 	Header    string
@@ -21,22 +24,7 @@ var (
 		Header: "Enter the OTP below to verify your session and continue:",
 	}
 
-	PasswordResetInitiated = T{
-		Subjects: []string{
-			"Reset your password securely",
-			"Your password reset code",
-			"Let’s set a new password",
-			"Password reset",
-			"Finish resetting your password",
-			"Your account recovery code",
-			"Reset your password — one quick step left",
-			"Secure your new password",
-			"Confirm your password reset",
-		},
-		Header: "Enter the OTP below to reset password:",
-	}
-
-	LoginInitiated = T{
+	SignInStarted = T{
 		Subjects: []string{
 			"Confirm your login",
 			"Logging in? Verify here",
@@ -50,7 +38,21 @@ var (
 		Header: "Enter the OTP below to login:",
 	}
 
-	RegisterInitiated = T{
+	SignInComplete = T{
+		Subjects: []string{
+			"New device signed in to your account",
+			"A new device just accessed your account",
+			"New login",
+			"Your account was accessed from a new device",
+			"New device activity detected",
+			"Was this you? New device login",
+			"Security alert: new device sign-in",
+			"New device connected to your account",
+			"Account access from a new device",
+		},
+	}
+
+	SignUpStarted = T{
 		Subjects: []string{
 			"Welcome! Let’s verify your email",
 			"Complete your registration",
@@ -66,21 +68,7 @@ var (
 		Header: "Enter the OTP below to verify your email:",
 	}
 
-	NewLogin = T{
-		Subjects: []string{
-			"New device signed in to your account",
-			"A new device just accessed your account",
-			"New login",
-			"Your account was accessed from a new device",
-			"New device activity detected",
-			"Was this you? New device login",
-			"Security alert: new device sign-in",
-			"New device connected to your account",
-			"Account access from a new device",
-		},
-	}
-
-	RegistrationCompleted = T{
+	SignUpComplete = T{
 		Subjects: []string{
 			"Welcome! Your account has been created",
 			"Your new account is ready",
@@ -92,7 +80,22 @@ var (
 		},
 	}
 
-	PasswordChanged = T{
+	PasswordResetStarted = T{
+		Subjects: []string{
+			"Reset your password securely",
+			"Your password reset code",
+			"Let’s set a new password",
+			"Password reset",
+			"Finish resetting your password",
+			"Your account recovery code",
+			"Reset your password — one quick step left",
+			"Secure your new password",
+			"Confirm your password reset",
+		},
+		Header: "Enter the OTP below to reset password:",
+	}
+
+	PasswordResetComplete = T{
 		Subjects: []string{
 			"Your password was changed successfully",
 			"Password updated",

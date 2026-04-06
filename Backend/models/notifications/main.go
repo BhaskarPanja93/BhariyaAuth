@@ -1,13 +1,15 @@
 package notifications
 
+// Contains each notification contents
+
 const (
 	SessionExpired = "Current Session Expired. Please re-login"
 	SessionRevoked = "Current Session Revoked. Please re-login"
 
 	DBReadError    = "DB Read error. Retrying"
 	DBWriteError   = "DB Write error. Retrying"
-	MarshalError   = "Marshal error. Retrying"
 	EncryptorError = "Encryption error. Retrying"
+	UnknownError   = "Unknown error. Retrying"
 
 	AccountNotFound = "Account not found"
 	AccountCreated  = "Account created"

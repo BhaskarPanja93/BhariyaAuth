@@ -1,5 +1,7 @@
 package requests
 
+// All form types
+
 type PasswordResetForm1 struct {
 	Mail string `form:"mail"`
 }
@@ -10,24 +12,24 @@ type PasswordResetForm2 struct {
 	Password     string `form:"password"`
 }
 
-type LoginForm1 struct {
+type SignInForm1 struct {
 	Mail     string `form:"mail"`
 	Remember string `form:"remember"`
 }
 
-type LoginForm2 struct {
+type SignInForm2 struct {
 	Token        string `form:"token"`
 	Verification string `form:"verification"`
 }
 
-type RegisterForm1 struct {
+type SignUpForm1 struct {
 	Mail     string `form:"mail"`
 	Name     string `form:"name"`
 	Password string `form:"password"`
 	Remember string `form:"remember"`
 }
 
-type RegisterForm2 struct {
+type SignUpForm2 struct {
 	Token        string `form:"token"`
 	Verification string `form:"verification"`
 }
