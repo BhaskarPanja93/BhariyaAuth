@@ -1,0 +1,49 @@
+SURVEY:
+are the route rate limits too harsh??
+
+
+REMEMBER:
+is 10KB enough for body size?
+
+
+200: (ok, soft reject or accept)
+401: (reject, user not authenticated)
+403: (reject, user needs mfa completed)
+422: (reject, incomplete body, frontend code error)
+429: (reject, rate limited)
+500: (server internal error)
+502/504: (server unavailable)
+
+
+ISSUES:
+websocket buffer infinite
+
+
+REFACTORS:
+refresh to device
+login to signin
+register to signup
+
+FUTURE:
+add graceful shutdown to all services
+add service start and stop and update features
+separate functionality into different files
+instead of sending token in sso popup, send token that can be exchanged for access (by the main page)
+change all bool based functions to error based functions
+for revoke, instead of using encrypted device id, use struct with user id to verify it belongs to the same user
+remove fmt wherever possible
+Try CookieSameSiteStrictMode instead of CookieSameSiteLaxMode for SSO
+Look at sync.Pool
+Decide RWMutex over Mutex
+Shard all limiters and mutex locks
+Admin page, mail send (individual/grouped/all), block/unblock account, block refresh id, entry update.
+Shorten/Cleanup backend log texts.
+Offload logs storage to external custom servers.
+Cancellable background CTX??
+Variable Rate limit counts
+Fix DB indexes
+Process mfa using access token instead of refresh token (will make it easier to check if session is blocked because access tokens revoke faster)
+Instead of auto-retry on 429, make it manual with client based retry-after checking
+Add support for frontend state in SSO flow
+FEATURE FLAGS PLEASEEEEEEE
+device fingerprinting, to prevent one bad IP user denying service for all innocent users of same IP
