@@ -8,11 +8,11 @@ import (
 	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
 	TokenProcessor "BhariyaAuth/processors/token"
 	Stores "BhariyaAuth/stores"
-	"database/sql"
 	"errors"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/jackc/pgx/v5"
 )
 
 // Refresh issues a new access token and rotates the refresh token
@@ -87,7 +87,7 @@ func Refresh(ctx fiber.Ctx) error {
 	// Fetch current session version (visits) with row-level lock
 	var visits int16
 	err = tx.QueryRow(Config.CtxBG, "SELECT visits FROM devices where user_id = $1 AND device_id = $2 LIMIT 1 FOR UPDATE", refresh.UserID, refresh.DeviceID).Scan(&visits)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) {
 		// Session does not exist → revoked or invalid
 		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
 
