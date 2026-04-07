@@ -12,11 +12,11 @@ import (
 	StringProcessor "BhariyaAuth/processors/string"
 	TokenProcessor "BhariyaAuth/processors/token"
 	Stores "BhariyaAuth/stores"
-	"database/sql"
 	"errors"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/jackc/pgx/v5"
 )
 
 // Step2 completes the Multi-Factor Authentication (MFA) process by verifying the OTP
@@ -84,7 +84,7 @@ func Step2(ctx fiber.Ctx) error {
 	// Verify user account status
 	var blocked bool
 	err = Stores.SQLClient.QueryRow(Config.CtxBG, "SELECT blocked FROM users WHERE user_id = $1 LIMIT 1", data.UserID).Scan(&blocked)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) {
 		// Account does not exist (edge case)
 		RateLimitProcessor.Add(ctx, 60_000) // 10 invalid attempts/minute
 

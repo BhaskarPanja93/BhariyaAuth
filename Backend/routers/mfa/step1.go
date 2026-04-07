@@ -10,10 +10,10 @@ import (
 	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
 	TokenProcessor "BhariyaAuth/processors/token"
 	Stores "BhariyaAuth/stores"
-	"database/sql"
 	"errors"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/jackc/pgx/v5"
 )
 
 // Step1 initiates a Multi-Factor Authentication (MFA) challenge for an already authenticated session.
@@ -90,7 +90,7 @@ func Step1(ctx fiber.Ctx) error {
 	var mail string
 	var blocked bool
 	err = Stores.SQLClient.QueryRow(Config.CtxBG, `SELECT mail, blocked FROM users WHERE user_id = $1 LIMIT 1`, refresh.UserID).Scan(&mail, &blocked)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) {
 		// Account does not exist (edge case)
 		RateLimitProcessor.Add(ctx, 60_000) // 10 invalid attempts/minute
 
