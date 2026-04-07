@@ -1,140 +1,183 @@
 package otp
 
 import (
-	Generators "BhariyaAuth/processors/generator"
-	MailNotifier "BhariyaAuth/processors/mail"
-	"fmt"
+	"math"
 	"sync"
 	"time"
 )
 
-type LimiterEntryT struct {
-	SentCount uint16
-	LastSent  time.Time
+// limiterEntry tracks rate-limiting state per user (key).
+//
+// Fields:
+// - sentCount: number of OTPs sent in current backoff progression.
+// - lastSent: timestamp of last OTP dispatch.
+// - mu: protects concurrent access to entry fields.
+type limiterEntry struct {
+	mu        sync.Mutex
+	sentCount uint32
+	lastSent  time.Time
 }
 
-type VerificationEntryT struct {
-	OTP     string
-	Expires time.Time
+// otpEntry represents a single OTP instance.
+//
+// Fields:
+// - otp: generated OTP value.
+// - expires: expiration timestamp after which OTP becomes invalid.
+type otpEntry struct {
+	otp     string
+	expires time.Time
 }
 
-var (
-	limiterMap = struct {
-		sync.Mutex
-		data map[string]LimiterEntryT
-	}{
-		data: make(map[string]LimiterEntryT),
-	}
+// Global stores:
+// - limiterStore: per-user rate limiting state.
+// - otpStore: active OTPs indexed by verification token.
+var limiterStore sync.Map // map[string]*limiterEntry
+var otpStore sync.Map     // map[string]*otpEntry
 
-	verificationMap = struct {
-		sync.Mutex
-		data map[string]VerificationEntryT
-	}{
-		data: make(map[string]VerificationEntryT),
-	}
-)
-
+// init starts background cleanup routine for expired OTPs and stale limiter entries.
 func init() {
-	go func() {
-		for {
-			time.Sleep(time.Minute * 10)
-			now := time.Now()
-			limiterMap.Lock()
-			for k, v := range limiterMap.data {
-				if now.Sub(v.LastSent) >= calculateLimiterEntryTTL(v.SentCount) {
-					delete(limiterMap.data, k)
-				}
-			}
-			limiterMap.Unlock()
-			verificationMap.Lock()
-			for k, v := range verificationMap.data {
-				if now.After(v.Expires) {
-					delete(verificationMap.data, k)
-				}
-			}
-			verificationMap.Unlock()
-		}
-	}()
+	go cleanupLoop()
 }
 
-func calculateResendDelay(sentCount uint16) time.Duration {
-	return 10 * time.Second * time.Duration(sentCount)
+// calculateDelay computes exponential backoff delay based on send count.
+//
+// Formula:
+//
+//	delay = baseDelay * 2^(sentCount-1)
+//
+// Behavior:
+// - First send → no delay.
+// - Subsequent sends → exponentially increasing delay.
+// - Delay is capped at maxDelay.
+//
+// Purpose:
+// - Prevent OTP abuse/spamming.
+// - Gradually penalize repeated requests.
+func calculateDelay(sentCount uint32) time.Duration {
+	if sentCount == 0 {
+		return 0
+	}
+
+	exp := math.Pow(2, float64(sentCount-1))
+	delay := time.Duration(exp) * baseDelay
+
+	if delay > maxDelay {
+		delay = maxDelay
+	}
+
+	return delay
 }
 
-func calculateLimiterEntryTTL(sentCount uint16) time.Duration {
-	return time.Minute * time.Duration(sentCount)
-}
-
-func checkCanSend(identifier string) (bool, uint16, time.Duration) {
-	limiterMap.Lock()
-	entry, exists := limiterMap.data[identifier]
-	limiterMap.Unlock()
-	if !exists {
+// checkCanSend determines whether an OTP can be sent for a given key.
+//
+// Flow:
+//
+//	load limiter entry → calculate delay → compare elapsed time
+//
+// Returns:
+// - canSend: whether OTP can be sent now.
+// - sentCount: previous send count.
+// - wait: remaining delay before next allowed send.
+//
+// Concurrency:
+// - Entry-level mutex ensures safe reads/writes.
+func checkCanSend(key string) (bool, uint32, time.Duration) {
+	val, ok := limiterStore.Load(key)
+	if !ok {
 		return true, 0, 0
 	}
-	value := entry.SentCount
-	totalTTL := calculateLimiterEntryTTL(value)
-	elapsed := time.Since(entry.LastSent)
-	if elapsed >= totalTTL {
-		limiterMap.Lock()
-		delete(limiterMap.data, identifier)
-		limiterMap.Unlock()
-		return true, value, 0
+
+	entry := val.(*limiterEntry)
+
+	entry.mu.Lock()
+	defer entry.mu.Unlock()
+
+	delay := calculateDelay(entry.sentCount)
+	elapsed := time.Since(entry.lastSent)
+
+	if elapsed >= delay {
+		return true, entry.sentCount, 0
 	}
-	resendDelay := calculateResendDelay(value)
-	timeRemaining := resendDelay - elapsed
-	canSend := timeRemaining <= 0
-	if canSend {
-		timeRemaining = 0
-	}
-	return canSend, value, timeRemaining
+
+	return false, entry.sentCount, delay - elapsed
 }
 
-func recordSent(identifier string, sentCount uint16, verification, OTP string) time.Duration {
+// recordSend updates limiter state and stores OTP for verification.
+//
+// Flow:
+//
+//	update limiter → increment count → store OTP with TTL
+//
+// Parameters:
+// - key: rate limit identifier (user/IP/etc).
+// - verification: unique token for OTP lookup.
+// - otp: generated OTP value.
+// - prevCount: previous send count.
+//
+// Returns:
+// - next delay duration based on updated count.
+func recordSend(key, verification, otp string, prevCount uint32) time.Duration {
 	now := time.Now()
-	limiterMap.Lock()
-	limiterMap.data[identifier] = LimiterEntryT{
-		SentCount: sentCount,
-		LastSent:  now,
-	}
-	limiterMap.Unlock()
-	verificationMap.Lock()
-	verificationMap.data[verification] = VerificationEntryT{
-		OTP:     OTP,
-		Expires: now.Add(5 * time.Minute),
-	}
-	verificationMap.Unlock()
-	return calculateResendDelay(sentCount)
+
+	// Ensure limiter entry exists
+	val, _ := limiterStore.LoadOrStore(key, &limiterEntry{})
+	entry := val.(*limiterEntry)
+
+	// Ensure limiter entry exists
+	entry.mu.Lock()
+	entry.sentCount = prevCount + 1
+	entry.lastSent = now
+	newCount := entry.sentCount
+	entry.mu.Unlock()
+
+	// Store OTP with expiration
+	otpStore.Store(verification, &otpEntry{
+		otp:     otp,
+		expires: now.Add(otpTTL),
+	})
+
+	return calculateDelay(newCount)
 }
 
-func Send(mail string, subject string, header string, ignorable bool, identifier string) (string, time.Duration) {
-	rateLimitKey := fmt.Sprintf("%s:%s", mail, identifier)
-	canSend, alreadySentCount, currentDelay := checkCanSend(rateLimitKey)
-	if canSend {
-		otp := Generators.SafeNumber(6)
-		if success := MailNotifier.OTP(mail, otp, subject, header, ignorable, 2); !success {
-			return "", currentDelay
-		}
-		verification := Generators.SafeString(10)
-		currentDelay = recordSent(rateLimitKey, alreadySentCount+1, verification, otp)
-		return verification, currentDelay
-	}
-	return "", currentDelay
-}
+// cleanupLoop periodically removes expired OTPs and inactive limiter entries.
+//
+// Behavior:
+// - Runs every cleanupInterval.
+// - Deletes:
+//   - expired OTP entries.
+//   - limiter entries inactive longer than maxDelay.
+//
+// Purpose:
+// - Prevent memory leaks.
+// - Keep stores bounded over time.
+func cleanupLoop() {
+	ticker := time.NewTicker(cleanupInterval)
+	defer ticker.Stop()
 
-func Validate(verification, otp string) bool {
-	now := time.Now().UTC()
-	verificationMap.Lock()
-	entry, exists := verificationMap.data[verification]
-	verificationMap.Unlock()
-	if !exists {
-		return false
+	for range ticker.C {
+		now := time.Now()
+
+		// Clean expired OTPs
+		otpStore.Range(func(key, value any) bool {
+			entry := value.(*otpEntry)
+			if now.After(entry.expires) {
+				otpStore.Delete(key)
+			}
+			return true
+		})
+
+		// Clean inactive limiter entries
+		limiterStore.Range(func(key, value any) bool {
+			entry := value.(*limiterEntry)
+
+			entry.mu.Lock()
+			inactive := now.Sub(entry.lastSent) > maxDelay
+			entry.mu.Unlock()
+
+			if inactive {
+				limiterStore.Delete(key)
+			}
+			return true
+		})
 	}
-	if otp == "" || entry.OTP != otp || entry.Expires.Before(now) {
-		return false
-	}
-	verificationMap.Lock()
-	delete(verificationMap.data, verification)
-	verificationMap.Unlock()
-	return true
 }
