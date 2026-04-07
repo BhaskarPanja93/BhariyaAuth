@@ -1,30 +1,24 @@
 package sso
 
 const (
-	UnknownProvider = "UnknownProvider"
-	BeginFailed     = "BeginFailed"
-	URLParseFailed  = "URLParseFailed"
-	AuthoriseFailed = "AuthoriseFailed"
-	FetchUserFailed = "FetchUserFailed"
-	AuthURLNotFound = "AuthURLNotFound"
+	UnknownProvider     = "UnknownProvider"
+	SessionCreateFailed = "SessionCreateFailed"
+	URLParseFailed      = "URLParseFailed"
+	AuthoriseFailed     = "AuthoriseFailed"
+	FetchUserFailed     = "FetchUserFailed"
+	AuthURLNotFound     = "AuthURLNotFound"
 
+	StateInvalid       = "StateInvalid"
 	StateEncryptFailed = "StateEncryptFailed"
-	StateDecryptFailed = "StateDecryptFailed"
-
-	StateMarshalFailed   = "StateMarshalFailed"
-	StateUnMarshalFailed = "StateUnMarshalFailed"
 
 	SessionEncryptFailed = "SessionEncryptFailed"
 	SessionDecryptFailed = "SessionDecryptFailed"
-
-	SessionMarshalFailed   = "SessionMarshalFailed"
-	SessionUnmarshalFailed = "SessionUnmarshalFailed"
 
 	SessionInvalid = "SessionInvalid"
 	SessionExpired = "SessionExpired"
 
 	AccountCreateFailed = "AccountCreateFailed"
-	LoginFailed         = "LoginFailed"
+	SignInFailed        = "SignInFailed"
 	AccountBlocked      = "AccountBlocked"
 
 	ProviderParam = "processor"
