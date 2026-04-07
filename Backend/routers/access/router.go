@@ -1,4 +1,4 @@
-package account
+package access
 
 import (
 	Middlewares "BhariyaAuth/middlewares"
@@ -8,7 +8,7 @@ import (
 )
 
 func AttachRoutes(APIGroup fiber.Router) {
-	AccountRouter := APIGroup.Group("/account")
+	AccountRouter := APIGroup.Group("/access")
 	AccountRouter.Post("/logout", Logout)
-	AccountRouter.Post("/refresh", Middlewares.RouteRateLimiter(60_000, time.Minute, 2*time.Minute), Refresh)
+	AccountRouter.Post("/refresh", Middlewares.RouteRateLimiter(600_000, time.Minute, 2*time.Minute), Refresh)
 }
