@@ -1,115 +1,38 @@
 package mail
 
 import (
-	Config "BhariyaAuth/constants/config"
 	Secrets "BhariyaAuth/constants/secrets"
-	HTMLTemplates "BhariyaAuth/models/html"
-	Logger "BhariyaAuth/processors/logs"
-	"context"
-	"fmt"
-	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	graph "github.com/microsoftgraph/msgraph-sdk-go"
-	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
-	graphusers "github.com/microsoftgraph/msgraph-sdk-go/users"
 	"golang.org/x/sync/singleflight"
 )
 
+// Package-level variables for Microsoft Graph mail client and credential handling.
+//
+// credential: Azure client credential used for authentication.
+// client: Microsoft Graph client used for sending emails.
+// group: singleflight group to prevent duplicate credential refresh calls.
 var (
-	cred        *azidentity.ClientSecretCredential
-	graphClient *graph.GraphServiceClient
-	g           singleflight.Group
+	credential *azidentity.ClientSecretCredential
+	client     *graph.GraphServiceClient
+	group      singleflight.Group
 )
 
+// init initializes the Azure credential and prepares the Graph client.
+//
+// - Creates a client credential using tenant/client secrets.
+// - Immediately initializes the Graph client via refreshCredentials.
+//
+// Note:
+// - Errors are currently ignored (should be handled in production).
 func init() {
-	cred, _ = azidentity.NewClientSecretCredential(Secrets.MicrosoftTenantId, Secrets.MicrosoftClientId, Secrets.MicrosoftClientSecret, nil)
-	refreshCredentials()
-}
-
-func refreshCredentials() {
-	_, _, _ = g.Do("refreshCredentials", func() (any, error) {
-		client, err := graph.NewGraphServiceClientWithCredentials(
-			cred,
-			[]string{"https://graph.microsoft.com/.default"},
-		)
-		if err == nil {
-			graphClient = client
-		}
-		return nil, err
-	})
-}
-
-func sendMail(mail, subject, content string, attempts uint8) bool {
-	if attempts <= 0 {
-		return false
-	}
-
-	body := graphmodels.NewItemBody()
-	contentType := graphmodels.HTML_BODYTYPE
-	body.SetContentType(&contentType)
-	body.SetContent(&content)
-
-	message := graphmodels.NewMessage()
-	message.SetSubject(&subject)
-	message.SetBody(body)
-
-	recipient := graphmodels.NewRecipient()
-	emailAddress := graphmodels.NewEmailAddress()
-	emailAddress.SetAddress(&mail)
-	recipient.SetEmailAddress(emailAddress)
-
-	message.SetToRecipients([]graphmodels.Recipientable{recipient})
-
-	requestBody := graphusers.NewItemSendMailPostRequestBody()
-	requestBody.SetMessage(message)
-	saveToSentItems := true
-	requestBody.SetSaveToSentItems(&saveToSentItems)
-
-	err := graphClient.Users().ByUserId(Secrets.MicrosoftMailId).SendMail().Post(context.Background(), requestBody, nil)
-	if err != nil {
-		Logger.AccidentalFailure(fmt.Sprintf("[Mail] SendMail failed for [MAIL-%s]: %s", mail, err.Error()))
-		time.Sleep(time.Second * 5)
-		refreshCredentials()
-		return sendMail(mail, subject, content, attempts-1)
-	}
-	return true
-}
-
-func OTP(mail, otp string, subject string, header string, ignorable bool, attempts uint8) bool {
-	return sendMail(
-		mail,
-		subject,
-		HTMLTemplates.OTP(Config.FrontendURL, header, otp, ignorable),
-		attempts,
+	credential, _ = azidentity.NewClientSecretCredential(
+		Secrets.MicrosoftTenantId,
+		Secrets.MicrosoftClientId,
+		Secrets.MicrosoftClientSecret,
+		nil,
 	)
-}
 
-func NewLogin(mail string, subject string, IP string, OS string, device string, browser string, attempts uint8) bool {
-	return sendMail(
-		mail,
-		subject,
-		HTMLTemplates.NewLogin(Config.FrontendURL, OS, device, browser, IP),
-		attempts)
-}
-
-func NewAccount(mail string, name string, subject string, IP string, OS string, device string, browser string, attempts uint8) bool {
-	return sendMail(
-		mail,
-		subject,
-		HTMLTemplates.NewAccount(Config.FrontendURL, name, OS, device, browser, IP),
-		attempts)
-}
-
-func PasswordReset(mail string, subject string, IP string, OS string, device string, browser string, attempts uint8) bool {
-	return sendMail(
-		mail,
-		subject,
-		HTMLTemplates.PasswordReset(Config.FrontendURL, OS, device, browser, IP),
-		attempts)
-}
-
-func AccountBlacklisted(mail string, attempts uint8) bool {
-	content := `Your account has been flagged. All future actions will be blocked. Contact support ASAP if you think this is a mistake.`
-	return sendMail(mail, "Account Blacklisted", content, attempts)
+	refreshCredentials()
 }
