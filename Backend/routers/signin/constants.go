@@ -1,7 +1,6 @@
-package login
+package signin
 
 const (
-	tokenType       = "Login"
 	OTPProcess      = "otp"
 	PasswordProcess = "password"
 	ProcessParam    = "process"
