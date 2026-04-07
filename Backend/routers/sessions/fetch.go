@@ -1,6 +1,7 @@
 package sessions
 
 import (
+	Config "BhariyaAuth/constants/config"
 	Notifications "BhariyaAuth/models/notifications"
 	ResponseModels "BhariyaAuth/models/responses"
 	AccountProcessor "BhariyaAuth/processors/account"
