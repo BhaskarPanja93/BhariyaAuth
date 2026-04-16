@@ -6,6 +6,7 @@ import (
 	MailNotifier "BhariyaAuth/processors/mail"
 	StringProcessor "BhariyaAuth/processors/string"
 	Stores "BhariyaAuth/stores"
+	"errors"
 
 	"github.com/gofiber/fiber/v3"
 )
@@ -20,7 +21,7 @@ func RecordNewUser(ctx fiber.Ctx, userType string, password string, mail string,
 	if password != "" {
 		hashBytes, err = StringProcessor.HashPassword(password)
 		if err != nil {
-			return userID, err
+			return userID, errors.New("Record new user: " + err.Error())
 		}
 		hash = string(hashBytes)
 	}
@@ -29,7 +30,7 @@ func RecordNewUser(ctx fiber.Ctx, userType string, password string, mail string,
 		userType, mail, name, false, hash).
 		Scan(&userID)
 	if err != nil {
-		return 0, err
+		return 0, errors.New("Record new user - SQL query: " + err.Error())
 	}
 	os, device, browser := StringProcessor.ParseUA(ua)
 	MailNotifier.SignUp(mail, name, MailModels.SignUpComplete, IP, os, device, browser, 2)
@@ -46,7 +47,7 @@ func RecordReturningUser(ctx fiber.Ctx, mail string, userID int32, rememberMe bo
 		userID, rememberMe, os, device, browser).
 		Scan(&deviceID)
 	if err != nil {
-		return deviceID, err
+		return deviceID, errors.New("Record returning user - SQL query: " + err.Error())
 	}
 	if sendMail {
 		MailNotifier.SignIn(mail, MailModels.SignInComplete, IP, os, device, browser, 2)

@@ -7,16 +7,20 @@ import (
 	FormModels "BhariyaAuth/models/requests"
 	ResponseModels "BhariyaAuth/models/responses"
 	FormProcessor "BhariyaAuth/processors/form"
+	Logs "BhariyaAuth/processors/logs"
 	OTPProcessor "BhariyaAuth/processors/otp"
-	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
+	RequestProcessor "BhariyaAuth/processors/request"
 	StringProcessor "BhariyaAuth/processors/string"
 	TokenProcessor "BhariyaAuth/processors/token"
 	Stores "BhariyaAuth/stores"
 	"errors"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5"
 )
+
+const step1FileName = "routers/signin/step1"
 
 // Step1 initiates the signin process by validating user identity
 // and preparing authentication data for Step2 (OTP or Password verification).
@@ -63,14 +67,25 @@ func Step1(ctx fiber.Ctx) error {
 	// Validate:
 	// - form parsing success
 	// - email format correctness
-	if !FormProcessor.ReadFormData(ctx, form) ||
-		!StringProcessor.EmailIsValid(form.Mail) {
+	if FormProcessor.ReadFormData(ctx, form) != nil {
+		Logs.RootLogger.Add(Logs.Blocked, step1FileName, RequestProcessor.GetRequestId(ctx), "Form read failed")
 
 		// Penalize malformed input
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
+
+	validEmail := StringProcessor.EmailIsValid(form.Mail)
+	if !validEmail {
+		Logs.RootLogger.Add(Logs.Blocked, step1FileName, RequestProcessor.GetRequestId(ctx), "Form values invalid: "+form.Mail)
+
+		// Penalize invalid attempts (moderate penalty)
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute allowed
+
+		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
+	}
+	Logs.RootLogger.Add(Logs.Intent, step1FileName, RequestProcessor.GetRequestId(ctx), "Requested account: "+form.Mail+" "+form.Process)
 
 	// Fetch user metadata in a single query (optimized DB access)
 	var userID int32
@@ -78,87 +93,94 @@ func Step1(ctx fiber.Ctx) error {
 	var hasPassword bool
 	err := Stores.SQLClient.QueryRow(Config.CtxBG, `SELECT user_id, blocked, pw_hash IS NOT NULL AND pw_hash <> '' FROM users WHERE mail = $1 LIMIT 1`, form.Mail).Scan(&userID, &blocked, &hasPassword)
 	if errors.Is(err, pgx.ErrNoRows) {
+		Logs.RootLogger.Add(Logs.Blocked, step1FileName, RequestProcessor.GetRequestId(ctx), "Account doesnt exist: "+form.Mail)
+
 		// Account does not exist (high penalty to prevent enumeration abuse)
-		RateLimitProcessor.Add(ctx, 60_000) // 10 invalid attempts/minute
+		RequestProcessor.AddRateLimitWeight(ctx, 60_000) // 10 invalid attempts/minute
 
-		return ctx.Status(fiber.StatusOK).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.AccountNotFound},
-			})
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.AccountNotFound},
+		})
 	} else if err != nil {
-		// Unexpected DB error
-		RateLimitProcessor.Add(ctx, 1_000) // 600 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, step1FileName, RequestProcessor.GetRequestId(ctx), "Account existence check failed - SQL query: "+err.Error())
 
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.DBReadError},
-			})
+		// Unexpected DB error
+		RequestProcessor.AddRateLimitWeight(ctx, 1_000) // 600 invalid attempts/minute
+
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.DBReadError},
+		})
 	}
 
 	// Prevent signin if account is blocked
 	if blocked {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Blocked, step1FileName, RequestProcessor.GetRequestId(ctx), "Account blocked")
 
-		return ctx.Status(fiber.StatusOK).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.AccountBlocked},
-			})
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
+
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.AccountBlocked},
+		})
 	}
 
-	// Determine authentication method from route parameter
-	process := ctx.Params(ProcessParam)
-
 	// OTP reference (used only for OTP flow)
-	step2code := ""
-	if process == OTPProcess {
+	var step2code string
+	var retry time.Duration
+	if form.Process == OTPProcess {
 
 		// Initiate OTP-based signin
-		step2code, retry := OTPProcessor.Send(form.Mail, MailModels.SignInStarted, ctx.IP())
+		step2code, retry, err = OTPProcessor.Send(form.Mail, MailModels.SignInStarted, ctx.IP())
 		if step2code == "" {
-			// OTP dispatch failure (rate-limited or provider issue)
-			RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+			Logs.RootLogger.Add(Logs.Error, step1FileName, RequestProcessor.GetRequestId(ctx), "Step2 code empty: "+err.Error())
 
-			return ctx.Status(fiber.StatusOK).JSON(
-				ResponseModels.APIResponseT{
-					Reply:         retry.Seconds(),
-					Notifications: []string{Notifications.OTPSendFailed},
-				})
+			// OTP dispatch failure (rate-limited or provider issue)
+			RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
+
+			return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+				Reply:         retry.Seconds(),
+				Notifications: []string{Notifications.OTPSendFailed},
+			})
 		}
-	} else if process == PasswordProcess {
+	} else if form.Process == PasswordProcess {
 
 		// Ensure password-based signin is allowed
 		if !hasPassword {
-			// Prevent signin if password was never set (e.g., SSO-only account)
-			RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+			Logs.RootLogger.Add(Logs.Blocked, step1FileName, RequestProcessor.GetRequestId(ctx), "Account doesnt have password")
 
-			return ctx.Status(fiber.StatusOK).JSON(
-				ResponseModels.APIResponseT{
-					Notifications: []string{Notifications.PasswordNotSet},
-				})
+			// Prevent signin if password was never set (e.g., SSO-only account)
+			RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
+
+			return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+				Notifications: []string{Notifications.PasswordNotSet},
+			})
 		}
 	} else {
+		Logs.RootLogger.Add(Logs.Blocked, step1FileName, RequestProcessor.GetRequestId(ctx), "Unknown process: "+form.Process)
+
 		// Invalid authentication mode
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
 
 	// Construct payload for Step2 authentication
-	token, err := TokenProcessor.CreateSignInToken(form, userID, process, step2code)
+	token, err := TokenProcessor.CreateSignInToken(form, userID, form.Process, step2code)
 	if err != nil {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, step1FileName, RequestProcessor.GetRequestId(ctx), "Token creation failed: "+err.Error())
 
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.EncryptorError},
-			})
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
+
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.EncryptorError},
+		})
 	}
+
+	Logs.RootLogger.Add(Logs.Info, step1FileName, RequestProcessor.GetRequestId(ctx), "Completed request")
 
 	// Return encrypted token to client.
 	// Client must use this token in Step2 along with password or OTP
-	return ctx.Status(fiber.StatusOK).JSON(
-		ResponseModels.APIResponseT{
-			Success: true,
-			Reply:   token,
-		})
+	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+		Success: true,
+		Reply:   token,
+	})
 }

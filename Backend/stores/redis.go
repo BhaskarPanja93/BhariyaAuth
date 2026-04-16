@@ -2,13 +2,15 @@ package stores
 
 import (
 	Config "BhariyaAuth/constants/config"
-	"fmt"
+	Logs "BhariyaAuth/processors/logs"
 	"time"
 
 	Secrets "BhariyaAuth/constants/secrets"
 
 	"github.com/redis/go-redis/v9"
 )
+
+const redisFileName = "stores/redis"
 
 // RedisClient is a global Redis client instance.
 //
@@ -44,6 +46,7 @@ var RedisClient *redis.Client
 // Important:
 // - This function blocks indefinitely until Redis is reachable.
 func ConnectRedis() {
+	Logs.RootLogger.Add(Logs.Intent, sqlFileName, "", "Connecting Redis")
 
 	// Prevent re-initialization if already connected
 	if RedisClient != nil {
@@ -55,7 +58,7 @@ func ConnectRedis() {
 	for {
 
 		if useSocket {
-			fmt.Println("Trying Redis via UNIX socket...")
+			Logs.RootLogger.Add(Logs.Intent, redisFileName, "", "Redis using unix socket")
 
 			RedisClient = redis.NewClient(&redis.Options{
 				Network:      "unix",
@@ -70,7 +73,7 @@ func ConnectRedis() {
 			})
 
 		} else {
-			fmt.Println("Trying Redis via TCP/IP...")
+			Logs.RootLogger.Add(Logs.Intent, redisFileName, "", "Redis using TCP")
 
 			RedisClient = redis.NewClient(&redis.Options{
 				Network:      "tcp",
@@ -88,9 +91,7 @@ func ConnectRedis() {
 		_, err := RedisClient.Ping(Config.CtxBG).Result()
 
 		if err != nil {
-
-			// Connection failed → cleanup and retry
-			fmt.Println("Redis connection failed:", err.Error())
+			Logs.RootLogger.Add(Logs.Error, redisFileName, "", "Redis ping error: "+err.Error())
 
 			_ = RedisClient.Close()
 
@@ -102,10 +103,9 @@ func ConnectRedis() {
 
 			continue
 		}
+		Logs.RootLogger.Add(Logs.Info, redisFileName, "", "Redis Connected and Pinged")
 
 		// Successful connection
 		break
 	}
-
-	fmt.Println("Redis connection established successfully")
 }

@@ -4,9 +4,10 @@ import (
 	Config "BhariyaAuth/constants/config"
 	FormModels "BhariyaAuth/models/requests"
 	TokenModels "BhariyaAuth/models/tokens"
+	RequestProcessor "BhariyaAuth/processors/request"
 	StringProcessor "BhariyaAuth/processors/string"
+	"errors"
 	"math"
-	"time"
 
 	"github.com/gofiber/fiber/v3"
 )
@@ -41,14 +42,14 @@ func CreateFreshToken(
 	identifierType string,
 ) (TokenModels.NewTokenCombined, error) {
 
-	now := ctx.Locals("request-start").(time.Time)
+	now := RequestProcessor.GetRequestTime(ctx)
 
 	var combined TokenModels.NewTokenCombined
 	var err error
 
 	combined.AccessExpires = now.Add(Config.AccessTokenExpireDelta)
 
-	combined.AccessToken, err = StringProcessor.EncryptInterfaceToString(
+	combined.AccessToken, err = StringProcessor.EncryptInterfaceToB64(
 		TokenModels.AccessToken{
 			TokenType: accessTokenType,
 			UserID:    userID,
@@ -59,7 +60,7 @@ func CreateFreshToken(
 		},
 	)
 	if err != nil {
-		return combined, err
+		return combined, errors.New("Create renew token - access: " + err.Error())
 	}
 
 	combined.RememberMe = remember
@@ -67,7 +68,7 @@ func CreateFreshToken(
 	// CSRF token bound to refresh token
 	combined.CSRF = StringProcessor.SafeString(128)
 
-	combined.RefreshToken, err = StringProcessor.EncryptInterfaceToString(
+	combined.RefreshToken, err = StringProcessor.EncryptInterfaceToB64(
 		TokenModels.RefreshToken{
 			TokenType:      refreshTokenType,
 			UserID:         userID,
@@ -83,10 +84,10 @@ func CreateFreshToken(
 		},
 	)
 
-	return combined, err
+	return combined, errors.New("Create renew token - refresh: " + err.Error())
 }
 
-// CreateRenewToken generates a new access + refresh token from an existing refresh token.
+// CreateRenewToken generates a new access and refresh token from an existing refresh token.
 //
 // This function is used during token refresh flow.
 // It:
@@ -105,12 +106,12 @@ func CreateRenewToken(
 	refresh TokenModels.RefreshToken,
 ) (TokenModels.NewTokenCombined, error) {
 
-	now := ctx.Locals("request-start").(time.Time)
+	now := RequestProcessor.GetRequestTime(ctx)
 
 	var combined TokenModels.NewTokenCombined
 	var err error
 
-	combined.AccessToken, err = StringProcessor.EncryptInterfaceToString(
+	combined.AccessToken, err = StringProcessor.EncryptInterfaceToB64(
 		TokenModels.AccessToken{
 			TokenType: accessTokenType,
 			UserID:    refresh.UserID,
@@ -121,7 +122,7 @@ func CreateRenewToken(
 		},
 	)
 	if err != nil {
-		return combined, err
+		return combined, errors.New("Create renew token - access: " + err.Error())
 	}
 
 	refresh.CSRF = StringProcessor.SafeString(128)
@@ -131,9 +132,12 @@ func CreateRenewToken(
 	combined.CSRF = refresh.CSRF
 	combined.RememberMe = refresh.Remember
 
-	combined.RefreshToken, err = StringProcessor.EncryptInterfaceToString(refresh)
+	combined.RefreshToken, err = StringProcessor.EncryptInterfaceToB64(refresh)
 
-	return combined, err
+	if err != nil {
+		return combined, errors.New("Create renew token - refresh: " + err.Error())
+	}
+	return combined, nil
 }
 
 // CreateMFAToken generates a token for MFA verification flow.
@@ -148,13 +152,13 @@ func CreateRenewToken(
 // - Verified flag
 func CreateMFAToken(ctx fiber.Ctx, userID int32, deviceID int16, step2code string) (string, error) {
 
-	return StringProcessor.EncryptInterfaceToString(
+	return StringProcessor.EncryptInterfaceToB64(
 		TokenModels.MFAToken{
 			TokenType: mfaTokenType,
 			Step2Code: step2code,
 			UserID:    userID,
 			DeviceID:  deviceID,
-			Created:   ctx.Locals("request-start").(time.Time),
+			Created:   RequestProcessor.GetRequestTime(ctx),
 			Verified:  true,
 		},
 	)
@@ -168,15 +172,15 @@ func CreateMFAToken(ctx fiber.Ctx, userID int32, deviceID int16, step2code strin
 //
 // Used in:
 // - SSO initiation → callback validation.
-func CreateSSOToken(ctx fiber.Ctx, provider string) (string, error) {
+func CreateSSOToken(ctx fiber.Ctx, provider string, state string, remember bool) (string, error) {
 
-	return StringProcessor.EncryptInterfaceToString(
+	return StringProcessor.EncryptInterfaceToB64(
 		TokenModels.SSOState{
 			TokenType: ssoTokenType,
 			Provider:  provider,
-			Expiry: ctx.Locals("request-start").(time.Time).
-				Add(Config.SSOCookieExpireDelta),
-			Remember: ctx.Query("remember", "no") == "yes",
+			State:     state,
+			Expiry:    RequestProcessor.GetRequestTime(ctx).Add(Config.SSOCookieExpireDelta),
+			Remember:  remember,
 		},
 	)
 }
@@ -192,7 +196,7 @@ func CreateSSOToken(ctx fiber.Ctx, provider string) (string, error) {
 // - Step1 → Step2 password reset verification.
 func CreatePasswordResetToken(mail string, userID int32, step2code string) (string, error) {
 
-	return StringProcessor.EncryptInterfaceToString(
+	return StringProcessor.EncryptInterfaceToB64(
 		TokenModels.PasswordReset{
 			TokenType:   passwordResetTokenType,
 			MailAddress: mail,
@@ -219,7 +223,7 @@ func CreateSignInToken(
 	step2code string,
 ) (string, error) {
 
-	return StringProcessor.EncryptInterfaceToString(
+	return StringProcessor.EncryptInterfaceToB64(
 		TokenModels.SignIn{
 			TokenType:    signInTokenType,
 			UserID:       userID,
@@ -242,7 +246,7 @@ func CreateSignInToken(
 // - Signup Step1 → Step2
 func CreateSignUpToken(form *FormModels.SignUpForm1, step2code string) (string, error) {
 
-	return StringProcessor.EncryptInterfaceToString(
+	return StringProcessor.EncryptInterfaceToB64(
 		TokenModels.SignUp{
 			TokenType:   signUpTokenType,
 			MailAddress: form.Mail,

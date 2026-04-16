@@ -4,7 +4,7 @@ import (
 	MailModels "BhariyaAuth/models/mails"
 	MailNotifier "BhariyaAuth/processors/mail"
 	StringProcessor "BhariyaAuth/processors/string"
-	"fmt"
+	"errors"
 	"time"
 )
 
@@ -26,13 +26,13 @@ import (
 // Notes:
 // - verification token is separate from OTP (prevents brute-force guessing).
 // - OTP is stored server-side and never exposed directly.
-func Send(address string, model MailModels.T, identifier string) (string, time.Duration) {
-	key := fmt.Sprintf("%s:%s", address, identifier)
+func Send(address string, model MailModels.T, identifier string) (string, time.Duration, error) {
+	key := address + ":" + identifier
 
 	// Check rate limit
 	canSend, count, wait := checkCanSend(key)
 	if !canSend {
-		return "", wait
+		return "", wait, errors.New("otp resend rate limited")
 	}
 
 	// Generate OTP (numeric)
@@ -45,11 +45,11 @@ func Send(address string, model MailModels.T, identifier string) (string, time.D
 	delay := recordSend(key, verification, otp, count)
 
 	// Send email
-	if ok := MailNotifier.OTP(address, otp, model, 2); !ok {
-		return "", wait
+	if err := MailNotifier.OTP(address, otp, model, 2); err != nil {
+		return "", wait, errors.New("otp send failed: " + err.Error())
 	}
 
-	return verification, delay
+	return verification, delay, nil
 }
 
 // Validate verifies the OTP against stored value.
@@ -77,7 +77,7 @@ func Validate(verification, otp string) bool {
 
 	entry := val.(*otpEntry)
 
-	// Enforce single-use OTP
+	// Enforce OTP validity
 	if time.Now().After(entry.expires) || otp != entry.otp {
 		return false
 	}

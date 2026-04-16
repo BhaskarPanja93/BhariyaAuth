@@ -1,12 +1,12 @@
 {% package html %}
 
-{% func SSOSuccessPopup(token string, expires string) %}
+{% func SSOSuccessPopup(token string, expires string, state string) %}
 <!DOCTYPE html>
 <html lang="en">
     <head>
         <script>
             async function onAuthSuccess() {
-                window.opener?.postMessage({ success: true, token: '{%s token %}', expires: new Date('{%s expires %}')}, window.location.origin);
+                window.opener?.postMessage({ success: true, token: '{%s token %}', expires: new Date('{%s expires %}'), state: '{%s state %}', }, window.location.origin);
                 window.close();
             }
             window.addEventListener('load', onAuthSuccess);

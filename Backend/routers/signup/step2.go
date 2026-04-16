@@ -9,13 +9,17 @@ import (
 	AccountProcessor "BhariyaAuth/processors/account"
 	CookieProcessor "BhariyaAuth/processors/cookies"
 	FormProcessor "BhariyaAuth/processors/form"
+	Logs "BhariyaAuth/processors/logs"
 	OTPProcessor "BhariyaAuth/processors/otp"
-	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
+	RequestProcessor "BhariyaAuth/processors/request"
 	TokenProcessor "BhariyaAuth/processors/token"
 	Stores "BhariyaAuth/stores"
+	"strconv"
 
 	"github.com/gofiber/fiber/v3"
 )
+
+const step2FileName = "routers/signup/step2"
 
 // Step2 completes the user registration process using OTP verification.
 //
@@ -51,11 +55,14 @@ import (
 // - 500 for system failures
 func Step2(ctx fiber.Ctx) error {
 
-	// Parse incoming form data (token + OTP)
 	form := new(FormModels.SignUpForm2)
-	if !FormProcessor.ReadFormData(ctx, form) {
+
+	// Parse incoming form data (token + OTP)
+	if FormProcessor.ReadFormData(ctx, form) != nil {
+		Logs.RootLogger.Add(Logs.Blocked, step2FileName, RequestProcessor.GetRequestId(ctx), "Form read failed")
+
 		// Penalize malformed input
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
@@ -63,46 +70,52 @@ func Step2(ctx fiber.Ctx) error {
 	// Reconstruct original Step1 payload
 	data, err := TokenProcessor.ReadSignUpToken(form.Token)
 	if err != nil {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, step2FileName, RequestProcessor.GetRequestId(ctx), "Token read failed: "+err.Error())
 
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.EncryptorError},
-			})
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
+
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.EncryptorError},
+		})
 	}
+
+	Logs.RootLogger.Add(Logs.Intent, step2FileName, RequestProcessor.GetRequestId(ctx), "Requested account: "+data.MailAddress)
 
 	// Re-check if account already exists (race condition protection)
 	var exists bool
 	err = Stores.SQLClient.QueryRow(Config.CtxBG, `SELECT EXISTS(SELECT 1 FROM users WHERE mail = $1)`, data.MailAddress).Scan(&exists)
 	if err != nil {
-		// Database read failure
-		RateLimitProcessor.Add(ctx, 1_000) // 600 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, step2FileName, RequestProcessor.GetRequestId(ctx), "Account existence check failed - SQL query: "+err.Error())
 
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.DBReadError},
-			})
+		// Database read failure
+		RequestProcessor.AddRateLimitWeight(ctx, 1_000) // 600 invalid attempts/minute
+
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.DBReadError},
+		})
 	}
 
 	// Abort if account was created after Step1
 	if exists {
-		RateLimitProcessor.Add(ctx, 60_000) // 10 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, step2FileName, RequestProcessor.GetRequestId(ctx), "Account exists during step2")
 
-		return ctx.Status(fiber.StatusOK).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.AccountPresent},
-			})
+		RequestProcessor.AddRateLimitWeight(ctx, 60_000) // 10 invalid attempts/minute
+
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.AccountPresent},
+		})
 	}
 
 	// Validate OTP provided by user
 	if !OTPProcessor.Validate(data.Step2Code, form.Verification) {
-		// High penalty to prevent OTP brute-force attempts
-		RateLimitProcessor.Add(ctx, 60_000) // 10 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Blocked, step2FileName, RequestProcessor.GetRequestId(ctx), "Incorrect OTP")
 
-		return ctx.Status(fiber.StatusOK).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.OTPIncorrect},
-			})
+		// High penalty to prevent OTP brute-force attempts
+		RequestProcessor.AddRateLimitWeight(ctx, 60_000) // 10 invalid attempts/minute
+
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.OTPIncorrect},
+		})
 	}
 
 	// Default user type assignment
@@ -111,30 +124,37 @@ func Step2(ctx fiber.Ctx) error {
 	// Create new user account in database
 	userID, err := AccountProcessor.RecordNewUser(ctx, userType, data.Password, data.MailAddress, data.Name)
 	if err != nil {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, step2FileName, RequestProcessor.GetRequestId(ctx), "SignUp failed: "+err.Error())
 
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.DBWriteError},
-			})
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
+
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.DBWriteError},
+		})
 	}
+	Logs.RootLogger.Add(Logs.Info, step2FileName, RequestProcessor.GetRequestId(ctx), "Signed Up: "+data.MailAddress+" "+strconv.Itoa(int(userID)))
 
 	// Register user device/session
 	deviceID, err := AccountProcessor.RecordReturningUser(ctx, data.MailAddress, userID, data.Remember, false)
 	if err != nil {
+		Logs.RootLogger.Add(Logs.Error, step2FileName, RequestProcessor.GetRequestId(ctx), "SignIn failed: "+err.Error())
+
 		// Account created but signin partially failed
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 			Notifications: []string{Notifications.AccountCreated},
 		})
 	}
+	Logs.RootLogger.Add(Logs.Info, step2FileName, RequestProcessor.GetRequestId(ctx), "Signed In: "+strconv.Itoa(int(userID)))
 
 	// Generate authentication tokens (access + refresh)
 	token, err := TokenProcessor.CreateFreshToken(ctx, userID, deviceID, userType, data.Remember, "email-signup")
 	if err != nil {
+		Logs.RootLogger.Add(Logs.Error, step2FileName, RequestProcessor.GetRequestId(ctx), "Access creation failed: "+err.Error())
+
 		// Account exists but token issuance failed
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 			Notifications: []string{Notifications.AccountCreated},
@@ -147,23 +167,17 @@ func Step2(ctx fiber.Ctx) error {
 	// Initialize MFA token (OTP already verified → mark as verified)
 	mfaToken, err := TokenProcessor.CreateMFAToken(ctx, userID, deviceID, data.Step2Code)
 	if err != nil {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
-
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.AccountCreated},
-			})
+		Logs.RootLogger.Add(Logs.Warn, step2FileName, RequestProcessor.GetRequestId(ctx), "MFA creation failed: "+err.Error())
 	}
-
 	// Attach MFA cookie
 	CookieProcessor.AttachMFACookie(ctx, mfaToken)
 
+	Logs.RootLogger.Add(Logs.Info, step2FileName, RequestProcessor.GetRequestId(ctx), "Completed request: "+strconv.Itoa(int(userID))+" "+strconv.Itoa(int(deviceID)))
 	// Return access token and expiry to client
-	return ctx.Status(fiber.StatusOK).JSON(
-		ResponseModels.APIResponseT{
-			Success:    true,
-			ModifyAuth: true,
-			NewToken:   token.AccessToken,
-			Reply:      token.AccessExpires,
-		})
+	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+		Success:    true,
+		ModifyAuth: true,
+		NewToken:   token.AccessToken,
+		Reply:      token.AccessExpires,
+	})
 }

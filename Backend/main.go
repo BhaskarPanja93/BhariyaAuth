@@ -3,6 +3,7 @@ package main
 import (
 	Middlewares "BhariyaAuth/middlewares"
 	AccountProcessor "BhariyaAuth/processors/account"
+	Logs "BhariyaAuth/processors/logs"
 	AccountRouters "BhariyaAuth/routers/access"
 	MFARouters "BhariyaAuth/routers/mfa"
 	PasswordResetRouters "BhariyaAuth/routers/passwordreset"
@@ -13,10 +14,9 @@ import (
 	StatusRouters "BhariyaAuth/routers/status"
 	Stores "BhariyaAuth/stores"
 	"flag"
-	"fmt"
 	"time"
 
-	"github.com/goccy/go-json"
+	"github.com/bytedance/sonic"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -35,8 +35,10 @@ import (
 func ReceiveCLIFlags(MainApp *fiber.App) {
 	unixSocket := flag.String("bind", "", "Unix socket path (optional)")
 	flag.Parse()
+
+	Logs.RootLogger.Add(Logs.Info, "main", "", "Unix socket path received: "+*unixSocket)
 	if *unixSocket == "" {
-		fmt.Println("No unix socket path provided. Fallback to port 3000.")
+		Logs.RootLogger.Add(Logs.Warn, "main", "", "Unix socket path missing. Falling back to TCP")
 		StartOnPort(MainApp)
 	} else {
 		StartOnSocket(MainApp, *unixSocket)
@@ -55,12 +57,13 @@ func ReceiveCLIFlags(MainApp *fiber.App) {
 // Parameters:
 // - unixSocket: filesystem path to socket file.
 func StartOnSocket(MainApp *fiber.App, unixSocket string) {
+	Logs.RootLogger.Add(Logs.Intent, "main", "", "Attempting run on unix socket")
 	err := MainApp.Listen(unixSocket, fiber.ListenConfig{
 		ListenerNetwork:    fiber.NetworkUnix,
 		UnixSocketFileMode: 0760,
 	})
 	if err != nil {
-		fmt.Println("Unable to start on network socket:", err.Error())
+		Logs.RootLogger.Add(Logs.Error, "main", "", "Unix socket app start failed with error: "+err.Error())
 		StartOnPort(MainApp)
 	}
 }
@@ -71,9 +74,10 @@ func StartOnSocket(MainApp *fiber.App, unixSocket string) {
 // - Default fallback when no socket is provided.
 // - Logs startup attempt and failure if any.
 func StartOnPort(MainApp *fiber.App) {
-	fmt.Println("Attempt listen on port 3000")
+	Logs.RootLogger.Add(Logs.Intent, "main", "", "Attempting run on port 3000")
 	if err := MainApp.Listen(":3000"); err != nil {
-		fmt.Println("Unable to start on port 3000:", err.Error())
+		Logs.RootLogger.Add(Logs.Error, "main", "", "TCP app start failed with error: "+err.Error())
+		Logs.RootLogger.Add(Logs.Error, "main", "", "No Other Methods remaining")
 	}
 }
 
@@ -89,14 +93,15 @@ func StartOnPort(MainApp *fiber.App) {
 //
 // Concurrency:
 // - Background workers run as goroutines.
-// - HTTP server runs in main thread.
+// - HTTP server runs in the main thread.
 func main() {
-
+	Logs.RootLogger.Add(Logs.Info, "main", "", "Server startup")
 	Stores.ConnectSQL()   // blocking until DB is available
 	Stores.ConnectRedis() // blocking until Redis is available
 
 	go AccountProcessor.ServeAccountDetails() // async worker
 	go AccountProcessor.DatabaseAutoVacuum()  // periodic DB cleanup
+	SSORouters.AttachProviders()
 
 	MainApp := fiber.New(fiber.Config{
 
@@ -116,15 +121,17 @@ func main() {
 
 		BodyLimit: 10 * 1024, // max request body size (10 KB)
 
-		JSONEncoder: json.Marshal,
-		JSONDecoder: json.Unmarshal,
+		JSONEncoder: sonic.Marshal,
+		JSONDecoder: sonic.Unmarshal,
 	})
 
 	APIGroup := MainApp.Group("/auth/api")
 
 	// Global middleware for API routes
+	Logs.RootLogger.Add(Logs.Intent, "main", "", "Attaching Profiling Middleware")
 	APIGroup.Use(Middlewares.ProfilingMiddleware())
 
+	Logs.RootLogger.Add(Logs.Intent, "main", "", "Attaching Routers")
 	StatusRouters.AttachRoutes(APIGroup)
 	AccountRouters.AttachRoutes(APIGroup)
 	PasswordResetRouters.AttachRoutes(APIGroup)
@@ -137,5 +144,8 @@ func main() {
 	// WSGroup := MainApp.Group("/auth/ws")
 	// ChatRouters.AttachRoutes(WSGroup)
 
+	Logs.RootLogger.Add(Logs.Intent, "main", "", "Reading app run parameters")
 	ReceiveCLIFlags(MainApp)
+
+	Logs.RootLogger.Add(Logs.Info, "main", "", "Shutting down server")
 }

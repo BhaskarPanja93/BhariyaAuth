@@ -1,0 +1,102 @@
+create sequence users_uid_seq
+    minvalue -2147483648;
+
+alter sequence users_uid_seq owner to bhariya_auth;
+
+create table users
+(
+    user_id        integer generated always as identity (minvalue -2147483648)
+        constraint "primary-uid"
+            primary key,
+    type           char                                               not null,
+    mail           varchar(50)
+        constraint "unique-email"
+            unique,
+    name           varchar(50),
+    blocked        boolean,
+    pw_hash        varchar(256),
+    created        timestamp with time zone default now(),
+    last_device_id smallint                 default '32767'::smallint not null
+);
+
+alter table users
+    owner to bhariya_auth;
+
+alter sequence users_uid_seq owned by users.user_id;
+
+create table devices
+(
+    user_id    integer  not null
+        constraint "foreign-uid"
+            references users,
+    device_id  smallint not null,
+    visits     smallint                 default '-32768'::smallint,
+    remembered boolean,
+    created    timestamp with time zone default now(),
+    updated    timestamp with time zone default now(),
+    os         varchar(30),
+    device     varchar(30),
+    browser    varchar(30),
+    constraint "primary-uid-refresh"
+        primary key (user_id, device_id)
+);
+
+alter table devices
+    owner to bhariya_auth;
+
+create index "uid-refresh-updated"
+    on devices (updated);
+
+comment on index "uid-refresh-updated" is 'to find devices to delete';
+
+create function set_device_id() returns trigger
+    language plpgsql
+as
+$$
+BEGIN
+    IF NEW.device_id IS NULL THEN
+        UPDATE users
+        SET last_device_id =
+            CASE
+                WHEN last_device_id = 32767 THEN -32768
+                ELSE last_device_id + 1
+                END
+        WHERE user_id = NEW.user_id
+        RETURNING last_device_id INTO NEW.device_id;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+alter function set_device_id() owner to bhariya_auth;
+
+create trigger trg_set_refresh
+    before insert
+    on devices
+    for each row
+execute procedure set_device_id();
+
+create function limit_devices() returns trigger
+    language plpgsql
+as
+$$
+BEGIN
+    IF EXISTS (SELECT 1 FROM devices WHERE user_id = NEW.user_id LIMIT 1 OFFSET 49) THEN
+        DELETE
+        FROM devices
+        WHERE user_id = NEW.user_id
+          AND device_id =
+              (SELECT device_id FROM devices WHERE user_id = NEW.user_id ORDER BY device_id LIMIT 1);
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+alter function limit_devices() owner to bhariya_auth;
+
+create trigger trg_limit_devices
+    before insert
+    on devices
+    for each row
+execute procedure limit_devices();
+

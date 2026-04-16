@@ -6,12 +6,16 @@ import (
 	ResponseModels "BhariyaAuth/models/responses"
 	AccountProcessor "BhariyaAuth/processors/account"
 	FormProcessor "BhariyaAuth/processors/form"
-	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
+	Logs "BhariyaAuth/processors/logs"
+	RequestProcessor "BhariyaAuth/processors/request"
 	StringProcessor "BhariyaAuth/processors/string"
 	TokenProcessor "BhariyaAuth/processors/token"
+	"strconv"
 
 	"github.com/gofiber/fiber/v3"
 )
+
+const revokeFileName = "routers/sessions/revoke"
 
 // Revoke invalidates one or more user sessions (devices) by preventing
 // their refresh tokens from being used for renewal.
@@ -52,82 +56,95 @@ func Revoke(ctx fiber.Ctx) error {
 	// Extract and validate access token
 	access, err := TokenProcessor.ReadAccessToken(ctx)
 	if err != nil || !TokenProcessor.AccessIsFresh(ctx, access) {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Blocked, revokeFileName, RequestProcessor.GetRequestId(ctx), "Access invalid/expired")
+
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
 		return ctx.SendStatus(fiber.StatusUnauthorized)
 	}
+	Logs.RootLogger.Add(Logs.Intent, revokeFileName, RequestProcessor.GetRequestId(ctx), "Requested by: "+strconv.Itoa(int(access.UserID))+strconv.Itoa(int(access.DeviceID)))
 
 	// Ensure current device/session is not blocked
-	blocked, err := AccountProcessor.CheckDeviceAccessDenied(access.UserID, access.DeviceID)
+	revoked, err := AccountProcessor.CheckDeviceAccessDenied(access.UserID, access.DeviceID)
 	if err != nil {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, revokeFileName, RequestProcessor.GetRequestId(ctx), "Access revoke check failed: "+err.Error())
+
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
 			Notifications: []string{Notifications.DBReadError},
 		})
 	}
-	if blocked {
-		RateLimitProcessor.Add(ctx, 60_000) // 10 invalid attempts/minute
+	if revoked {
+		Logs.RootLogger.Add(Logs.Blocked, revokeFileName, RequestProcessor.GetRequestId(ctx), "Access revoked")
+		RequestProcessor.AddRateLimitWeight(ctx, 60_000) // 10 invalid attempts/minute
 
 		return ctx.SendStatus(fiber.StatusUnauthorized)
 	}
 
 	// Parse request payload
 	form := new(FormModels.DeviceRevokeForm)
-	if !FormProcessor.ReadFormData(ctx, form) {
-		RateLimitProcessor.Add(ctx, 20_000) // 30 invalid attempts/minute
+	if FormProcessor.ReadFormData(ctx, form) != nil {
+		Logs.RootLogger.Add(Logs.Blocked, revokeFileName, RequestProcessor.GetRequestId(ctx), "Invalid form")
+
+		RequestProcessor.AddRateLimitWeight(ctx, 20_000) // 30 invalid attempts/minute
 
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
 
+	var device ResponseModels.SingleDeviceT
 	// Decrypt user identifier from request
-	userID, err := StringProcessor.DecryptUserID(form.User)
+	err = StringProcessor.DecryptInterfaceFromB64(form.Device, &device)
 	if err != nil {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, revokeFileName, RequestProcessor.GetRequestId(ctx), "Device decrypt failed: "+err.Error())
+
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
 		return ctx.SendStatus(fiber.StatusInternalServerError)
 	}
 
-	// Ensure user can only revoke their own sessions
-	if access.UserID != userID {
-		RateLimitProcessor.Add(ctx, 60_000) // 10 invalid attempts/minute
-
-		return ctx.SendStatus(fiber.StatusUnauthorized)
-	}
 	if form.All == "yes" {
+		Logs.RootLogger.Add(Logs.Intent, revokeFileName, RequestProcessor.GetRequestId(ctx), "Requested to revoke all devices")
 
 		// Prevent all devices from renewing (global logout)
-		err = AccountProcessor.DenyAllDevicesFromRenewing(userID)
+		err = AccountProcessor.DenyAllDevicesFromRenewing(access.UserID)
 		if err != nil {
-			RateLimitProcessor.Add(ctx, 60_000) // 10 invalid attempts/minute
+			Logs.RootLogger.Add(Logs.Error, revokeFileName, RequestProcessor.GetRequestId(ctx), "Revoke failed: "+err.Error())
+
+			RequestProcessor.AddRateLimitWeight(ctx, 60_000) // 10 invalid attempts/minute
 
 			return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 		}
-		return ctx.Status(fiber.StatusOK).JSON(
-			ResponseModels.APIResponseT{
-				Success: true,
-			})
+		Logs.RootLogger.Add(Logs.Info, revokeFileName, RequestProcessor.GetRequestId(ctx), "Completed request")
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Success: true,
+		})
 	}
 
-	// Decrypt device identifier
-	deviceID, err := StringProcessor.DecryptDeviceID(form.Refresh)
-	if err != nil {
-		RateLimitProcessor.Add(ctx, 60_000) // 10 invalid attempts/minute
+	// Ensure user can only revoke their own sessions
+	if access.UserID != device.UserID {
+		Logs.RootLogger.Add(Logs.Blocked, revokeFileName, RequestProcessor.GetRequestId(ctx), "Data belongs to different user")
 
-		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
+		RequestProcessor.AddRateLimitWeight(ctx, 60_000) // 10 invalid attempts/minute
+
+		return ctx.SendStatus(fiber.StatusUnauthorized)
 	}
+
+	Logs.RootLogger.Add(Logs.Intent, revokeFileName, RequestProcessor.GetRequestId(ctx), "Requested to revoke: "+strconv.Itoa(int(device.DeviceID)))
 
 	// Revoke specific device/session
-	err = AccountProcessor.DenySingleDeviceFromRenewing(userID, deviceID)
+	err = AccountProcessor.DenySingleDeviceFromRenewing(device.UserID, device.DeviceID)
 	if err != nil {
-		RateLimitProcessor.Add(ctx, 60_000) // 10 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, revokeFileName, RequestProcessor.GetRequestId(ctx), "Revoke failed: "+err.Error())
+
+		RequestProcessor.AddRateLimitWeight(ctx, 60_000) // 10 invalid attempts/minute
 
 		return ctx.SendStatus(fiber.StatusInternalServerError)
 	}
 
+	Logs.RootLogger.Add(Logs.Info, revokeFileName, RequestProcessor.GetRequestId(ctx), "Completed request")
 	// Return success response
-	return ctx.Status(fiber.StatusOK).JSON(
-		ResponseModels.APIResponseT{
-			Success: true,
-		})
+	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+		Success: true,
+	})
 }

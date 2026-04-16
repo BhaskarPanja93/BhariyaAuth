@@ -22,4 +22,5 @@ const (
 	AccountBlocked      = "AccountBlocked"
 
 	ProviderParam = "processor"
+	StateQuery    = "state"
 )

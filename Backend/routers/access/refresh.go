@@ -5,15 +5,18 @@ import (
 	Notifications "BhariyaAuth/models/notifications"
 	ResponseModels "BhariyaAuth/models/responses"
 	CookieProcessor "BhariyaAuth/processors/cookies"
-	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
+	Logs "BhariyaAuth/processors/logs"
+	RequestProcessor "BhariyaAuth/processors/request"
 	TokenProcessor "BhariyaAuth/processors/token"
 	Stores "BhariyaAuth/stores"
 	"errors"
-	"time"
+	"strconv"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5"
 )
+
+const refreshFileName = "routers/access/refresh"
 
 // Refresh issues a new access token and rotates the refresh token
 // for an existing authenticated session.
@@ -49,33 +52,24 @@ import (
 // - 500 Internal Server Error (DB or system failure)
 func Refresh(ctx fiber.Ctx) error {
 
-	// Capture request start time for consistent validation
-	now := ctx.Locals("request-start").(time.Time)
-
 	// Extract refresh token from request
 	refresh, err := TokenProcessor.ReadRefreshToken(ctx)
 
 	// Validate presence and CSRF protection
-	if err != nil || !TokenProcessor.VerifyCSRF(ctx, refresh) {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+	if err != nil || !TokenProcessor.VerifyCSRF(ctx, refresh) || !TokenProcessor.RefreshIsFresh(ctx, refresh) {
+		Logs.RootLogger.Add(Logs.Blocked, refreshFileName, RequestProcessor.GetRequestId(ctx), "Refresh invalid/expired/CSRF incorrect")
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
 		return ctx.SendStatus(fiber.StatusUnauthorized)
 	}
 
-	// Ensure refresh token is still active
-	if now.After(refresh.Expiry) {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
-
-		return ctx.Status(fiber.StatusUnauthorized).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.SessionExpired},
-			})
-	}
+	Logs.RootLogger.Add(Logs.Intent, refreshFileName, RequestProcessor.GetRequestId(ctx), "Request for: "+strconv.Itoa(int(refresh.UserID))+" "+strconv.Itoa(int(refresh.DeviceID)))
 
 	// Begin transaction to ensure atomic read-modify-write
 	tx, err := Stores.SQLClient.Begin(Config.CtxBG)
 	if err != nil {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, refreshFileName, RequestProcessor.GetRequestId(ctx), "Transaction create failed - SQL Begin: "+err.Error())
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
 		return ctx.Status(fiber.StatusInternalServerError).JSON(
 			ResponseModels.APIResponseT{
@@ -88,15 +82,17 @@ func Refresh(ctx fiber.Ctx) error {
 	var visits int16
 	err = tx.QueryRow(Config.CtxBG, "SELECT visits FROM devices where user_id = $1 AND device_id = $2 LIMIT 1 FOR UPDATE", refresh.UserID, refresh.DeviceID).Scan(&visits)
 	if errors.Is(err, pgx.ErrNoRows) {
+		Logs.RootLogger.Add(Logs.Blocked, refreshFileName, RequestProcessor.GetRequestId(ctx), "Account not found")
 		// Session does not exist → revoked or invalid
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
 		return ctx.Status(fiber.StatusUnauthorized).JSON(
 			ResponseModels.APIResponseT{
 				Notifications: []string{Notifications.SessionRevoked},
 			})
 	} else if err != nil {
-		RateLimitProcessor.Add(ctx, 1_000) // 600 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, refreshFileName, RequestProcessor.GetRequestId(ctx), "Account data fetch failed")
+		RequestProcessor.AddRateLimitWeight(ctx, 1_000) // 600 invalid attempts/minute
 
 		return ctx.Status(fiber.StatusInternalServerError).JSON(
 			ResponseModels.APIResponseT{
@@ -107,7 +103,8 @@ func Refresh(ctx fiber.Ctx) error {
 	// Ensure token version matches latest DB version
 	// Prevents replay of old refresh tokens
 	if visits != refresh.Visits {
-		RateLimitProcessor.Add(ctx, 60_000) // 10 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Blocked, refreshFileName, RequestProcessor.GetRequestId(ctx), "Incorrect visit count: received "+strconv.Itoa(int(refresh.Visits))+" expected "+strconv.Itoa(int(visits)))
+		RequestProcessor.AddRateLimitWeight(ctx, 60_000) // 10 invalid attempts/minute
 
 		return ctx.Status(fiber.StatusUnauthorized).JSON(
 			ResponseModels.APIResponseT{
@@ -116,9 +113,11 @@ func Refresh(ctx fiber.Ctx) error {
 	}
 
 	// Increment session version to invalidate previous refresh token
-	_, err = tx.Exec(Config.CtxBG, "UPDATE devices SET visits = $1, updated = $2 WHERE device_id = $3 AND user_id = $4", refresh.Visits+1, now, refresh.DeviceID, refresh.UserID)
+	_, err = tx.Exec(Config.CtxBG, "UPDATE devices SET visits = $1, updated = $2 WHERE device_id = $3 AND user_id = $4", refresh.Visits+1, RequestProcessor.GetRequestTime(ctx), refresh.DeviceID, refresh.UserID)
 	if err != nil {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, refreshFileName, RequestProcessor.GetRequestId(ctx), "Visit increment failed - SQL Exec: "+err.Error())
+
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
 		return ctx.Status(fiber.StatusInternalServerError).JSON(
 			ResponseModels.APIResponseT{
@@ -129,7 +128,9 @@ func Refresh(ctx fiber.Ctx) error {
 	// Commit transaction (finalize rotation)
 	err = tx.Commit(Config.CtxBG)
 	if err != nil {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, refreshFileName, RequestProcessor.GetRequestId(ctx), "Commit failed - SQL Commit: "+err.Error())
+
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
 		return ctx.Status(fiber.StatusInternalServerError).JSON(
 			ResponseModels.APIResponseT{
@@ -140,7 +141,9 @@ func Refresh(ctx fiber.Ctx) error {
 	// Generate new access + refresh tokens
 	token, err := TokenProcessor.CreateRenewToken(ctx, refresh)
 	if err != nil {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, refreshFileName, RequestProcessor.GetRequestId(ctx), "Access create failed: "+err.Error())
+
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
 		return ctx.Status(fiber.StatusInternalServerError).JSON(
 			ResponseModels.APIResponseT{
@@ -151,6 +154,7 @@ func Refresh(ctx fiber.Ctx) error {
 	// Attach new refresh + CSRF cookies
 	CookieProcessor.AttachAuthCookies(ctx, token)
 
+	Logs.RootLogger.Add(Logs.Error, refreshFileName, RequestProcessor.GetRequestId(ctx), "Request complete")
 	// Return new access token and expiry
 	return ctx.Status(fiber.StatusOK).JSON(
 		ResponseModels.APIResponseT{

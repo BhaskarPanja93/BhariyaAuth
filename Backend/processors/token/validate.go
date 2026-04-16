@@ -2,7 +2,7 @@ package token
 
 import (
 	TokenModels "BhariyaAuth/models/tokens"
-	"time"
+	RequestProcessor "BhariyaAuth/processors/request"
 
 	"github.com/gofiber/fiber/v3"
 )
@@ -55,9 +55,7 @@ func VerifyCSRF(ctx fiber.Ctx, refresh TokenModels.RefreshToken) bool {
 // - false if expired.
 func AccessIsFresh(ctx fiber.Ctx, access TokenModels.AccessToken) bool {
 
-	start := ctx.Locals("request-start").(time.Time)
-
-	return start.Before(access.Expiry)
+	return RequestProcessor.GetRequestTime(ctx).Before(access.Expiry)
 }
 
 // RefreshIsFresh checks whether refresh token is still valid (not expired).
@@ -71,7 +69,5 @@ func AccessIsFresh(ctx fiber.Ctx, access TokenModels.AccessToken) bool {
 // - false if expired.
 func RefreshIsFresh(ctx fiber.Ctx, refresh TokenModels.RefreshToken) bool {
 
-	start := ctx.Locals("request-start").(time.Time)
-
-	return start.Before(refresh.Expiry)
+	return RequestProcessor.GetRequestTime(ctx).Before(refresh.Expiry)
 }

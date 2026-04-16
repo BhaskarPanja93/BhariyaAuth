@@ -3,6 +3,8 @@ package mail
 import (
 	Config "BhariyaAuth/constants/config"
 	Secrets "BhariyaAuth/constants/secrets"
+	Logs "BhariyaAuth/processors/logs"
+	"errors"
 	"time"
 
 	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
@@ -36,11 +38,11 @@ import (
 // Security Considerations:
 // - Uses application-level credentials (client secret).
 // - Does not expose sensitive data externally.
-func sendMail(mail, subject, content string, attempts uint8) bool {
+func sendMail(mail, subject, content string, attempts uint8) error {
 
 	// Stop retrying if attempts exhausted
 	if attempts <= 0 {
-		return false
+		return errors.New("send mail - retries exhausted")
 	}
 
 	// Construct email body (HTML)
@@ -74,6 +76,7 @@ func sendMail(mail, subject, content string, attempts uint8) bool {
 		Post(Config.CtxBG, requestBody, nil)
 
 	if err != nil {
+		Logs.RootLogger.Add(Logs.Error, "processors/mail/sender", "", "Send mail failed: "+err.Error())
 		// On failure:
 		// - wait
 		// - refresh credentials
@@ -84,5 +87,5 @@ func sendMail(mail, subject, content string, attempts uint8) bool {
 		return sendMail(mail, subject, content, attempts-1)
 	}
 
-	return true
+	return nil
 }

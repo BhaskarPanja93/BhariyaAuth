@@ -23,6 +23,7 @@ import (
 // Parameters:
 // - token: authentication token generated after successful SSO.
 // - expires: expiration time of the token.
+// - state: state parameter passed during SSO signin.
 //
 // Response:
 // - Content-Type: text/html
@@ -38,7 +39,7 @@ import (
 //
 // Returns:
 // - HTML response to client.
-func SuccessPopup(ctx fiber.Ctx, token string, expires time.Time) error {
+func SuccessPopup(ctx fiber.Ctx, token string, expires time.Time, state string) error {
 
 	return ctx.
 		Type("html").
@@ -46,6 +47,7 @@ func SuccessPopup(ctx fiber.Ctx, token string, expires time.Time) error {
 			HTMLTemplates.SSOSuccessPopup(
 				token,
 				expires.Format(time.RFC3339),
+				state,
 			),
 		)
 }

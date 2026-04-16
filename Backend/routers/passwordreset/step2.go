@@ -8,17 +8,21 @@ import (
 	ResponseModels "BhariyaAuth/models/responses"
 	AccountProcessor "BhariyaAuth/processors/account"
 	FormProcessor "BhariyaAuth/processors/form"
+	Logs "BhariyaAuth/processors/logs"
 	MailNotifier "BhariyaAuth/processors/mail"
 	OTPProcessor "BhariyaAuth/processors/otp"
-	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
+	RequestProcessor "BhariyaAuth/processors/request"
 	StringProcessor "BhariyaAuth/processors/string"
 	TokenProcessor "BhariyaAuth/processors/token"
 	Stores "BhariyaAuth/stores"
 	"errors"
+	"strconv"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5"
 )
+
+const step2FileName = "routers/passwordreset/step2"
 
 // Step2 completes the password reset process by validating the OTP
 // and updating the user's password securely.
@@ -62,11 +66,20 @@ func Step2(ctx fiber.Ctx) error {
 	// Validate:
 	// - form parsing success
 	// - password strength
-	if !FormProcessor.ReadFormData(ctx, form) ||
-		!StringProcessor.PasswordIsStrong(form.Password) {
+	if FormProcessor.ReadFormData(ctx, form) != nil {
+		Logs.RootLogger.Add(Logs.Blocked, step2FileName, RequestProcessor.GetRequestId(ctx), "Invalid form")
 
 		// Penalize invalid input attempts
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
+
+		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
+	}
+
+	if !StringProcessor.PasswordIsStrong(form.Password) {
+		Logs.RootLogger.Add(Logs.Blocked, step2FileName, RequestProcessor.GetRequestId(ctx), "New password weak")
+
+		// Penalize invalid input attempts
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
@@ -74,96 +87,111 @@ func Step2(ctx fiber.Ctx) error {
 	// Reconstruct reset payload
 	data, err := TokenProcessor.ReadPasswordResetToken(form.Token)
 	if err != nil {
-		RateLimitProcessor.Add(ctx, 60_000) // 10 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Blocked, step2FileName, RequestProcessor.GetRequestId(ctx), "Token read failed: "+err.Error())
+
+		RequestProcessor.AddRateLimitWeight(ctx, 60_000) // 10 invalid attempts/minute
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
 
+	Logs.RootLogger.Add(Logs.Intent, step2FileName, RequestProcessor.GetRequestId(ctx), "Requested by: "+strconv.Itoa(int(data.UserID)))
+
 	// Validate OTP provided by user
 	if !OTPProcessor.Validate(data.Step2Code, form.Verification) {
-		// High penalty to prevent brute-force OTP attacks
-		RateLimitProcessor.Add(ctx, 60_000) // 10 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Blocked, step2FileName, RequestProcessor.GetRequestId(ctx), "Incorrect OTP")
 
-		return ctx.Status(fiber.StatusOK).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.OTPIncorrect},
-			})
+		// High penalty to prevent brute-force OTP attacks
+		RequestProcessor.AddRateLimitWeight(ctx, 60_000) // 10 invalid attempts/minute
+
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.OTPIncorrect},
+		})
 	}
 
 	// Fetch account status (ensure account still exists and is usable)
 	var blocked bool
-	err = Stores.SQLClient.QueryRow(Config.CtxBG, "SELECT blocked FROM users WHERE user_id = $1 AND mail = $2 LIMIT 1", data.UserID, data.MailAddress).Scan(&blocked)
+	err = Stores.SQLClient.QueryRow(Config.CtxBG, "SELECT blocked FROM users WHERE user_id = $1 LIMIT 1", data.UserID, data.MailAddress).Scan(&blocked)
 	if errors.Is(err, pgx.ErrNoRows) {
+		Logs.RootLogger.Add(Logs.Blocked, step2FileName, RequestProcessor.GetRequestId(ctx), "Account does not exist")
+
 		// Account no longer exists (edge case)
-		RateLimitProcessor.Add(ctx, 20_000) // 30 invalid attempts/minute
+		RequestProcessor.AddRateLimitWeight(ctx, 20_000) // 30 invalid attempts/minute
 
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.AccountNotFound},
-			})
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.AccountNotFound},
+		})
 	} else if err != nil {
-		// Unexpected DB error
-		RateLimitProcessor.Add(ctx, 1_000) // 600 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, step2FileName, RequestProcessor.GetRequestId(ctx), "Account block check failed - SQL fetch: "+err.Error())
 
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.DBReadError},
-			})
+		// Unexpected DB error
+		RequestProcessor.AddRateLimitWeight(ctx, 1_000) // 600 invalid attempts/minute
+
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.DBReadError},
+		})
 	}
 
 	// Prevent password reset for blocked accounts
 	if blocked {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Blocked, step2FileName, RequestProcessor.GetRequestId(ctx), "Account is blocked")
 
-		return ctx.Status(fiber.StatusOK).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.AccountBlocked},
-			})
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
+
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.AccountBlocked},
+		})
 	}
 
 	// Hash the new password before storing
 	hash, err := StringProcessor.HashPassword(form.Password)
 	if err != nil {
-		// Hashing failure
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, step2FileName, RequestProcessor.GetRequestId(ctx), "Password hashing failed: "+err.Error())
 
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.EncryptorError},
-			})
+		// Hashing failure
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
+
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.EncryptorError},
+		})
 	}
 
 	// Update password hash in database
 	_, err = Stores.SQLClient.Exec(Config.CtxBG, `UPDATE users SET pw_hash = $1 WHERE user_id = $2`, hash, data.UserID)
 	if err != nil {
-		// DB write failure
-		RateLimitProcessor.Add(ctx, 1_000) // 600 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, step2FileName, RequestProcessor.GetRequestId(ctx), "Update password hash failed - SQL Exec: "+err.Error())
 
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.DBWriteError},
-			})
+		// DB write failure
+		RequestProcessor.AddRateLimitWeight(ctx, 1_000) // 600 invalid attempts/minute
+
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.DBWriteError},
+		})
 	}
 
 	// Invalidate all active sessions for this user
 	// This ensures any compromised sessions are revoked
 	err = AccountProcessor.DenyAllDevicesFromRenewing(data.UserID)
 	if err != nil {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, step2FileName, RequestProcessor.GetRequestId(ctx), "Revoke all devices failed: "+err.Error())
 
-		return ctx.Status(fiber.StatusOK).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{
-					Notifications.PasswordChanged,
-					Notifications.RevokeFailed},
-			})
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
+
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{
+				Notifications.PasswordChanged,
+				Notifications.RevokeFailed},
+		})
 	}
 
 	// Extract device metadata from request headers
 	os, device, browser := StringProcessor.ParseUA(ctx.Get("User-Agent"))
 
 	// Notify user about password change (security alert)
-	MailNotifier.PasswordReset(data.MailAddress, MailModels.PasswordResetComplete, ctx.IP(), os, device, browser, 2)
+	err = MailNotifier.PasswordReset(data.MailAddress, MailModels.PasswordResetComplete, ctx.IP(), os, device, browser, 2)
+	if err != nil {
+		Logs.RootLogger.Add(Logs.Warn, step2FileName, RequestProcessor.GetRequestId(ctx), "PasswordReset mail send failed: "+err.Error())
+	}
 
+	Logs.RootLogger.Add(Logs.Info, step2FileName, RequestProcessor.GetRequestId(ctx), "Request complete")
 	// Return success response
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 		Success: true,

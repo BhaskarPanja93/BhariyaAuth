@@ -1,8 +1,10 @@
 package middlewares
 
 import (
-	StringProcessor "BhariyaAuth/processors/string"
-	"fmt"
+	Logs "BhariyaAuth/processors/logs"
+	RequestProcessor "BhariyaAuth/processors/request"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -39,10 +41,6 @@ const (
 // - Request-End: request end timestamp (UTC).
 // - Time-Taken: total request duration.
 //
-// Context (Locals):
-// - "request-start": time.Time → used across handlers for consistent timing.
-// - "request-id": string → used for logging/tracing.
-//
 // Constants:
 // - MaxResponseTimeAllowed: threshold for identifying slow requests.
 //
@@ -51,40 +49,43 @@ const (
 func ProfilingMiddleware() fiber.Handler {
 	return func(ctx fiber.Ctx) error {
 
-		// Capture request start time in UTC for consistency across systems
-		received := time.Now().UTC()
+		path := ctx.Path()
 
-		// Mark that request has reached API layer (useful for debugging proxies/CDNs)
-		ctx.Set("X-Reached-API", "yes")
+		// Skip if request belongs to API status router
+		if strings.HasPrefix(path, "/auth/api/status") {
+			return ctx.Next()
+		}
 
-		// Generate a short, safe request identifier for tracing
-		requestID := StringProcessor.SafeString(3)
+		// Request start time will be sent in the client's header
+		ctx.Set("X-Reached-API-At", time.Now().UTC().Format(time.StampNano))
+		ctx.Set("X-URL-Path", path)
+
+		// Set a request identifier for tracing
+		requestID := RequestProcessor.SetRequestId(ctx)
+		Logs.RootLogger.Add(Logs.Info, "middleware/profiling", requestID, "Received request from "+ctx.IP()+" for path "+path)
 
 		// Attach request metadata to response headers (early visibility)
-		ctx.Set("X-Request-Start", fmt.Sprintf("%v", received))
-		ctx.Set("X-Request-ID", requestID)
+		ctx.Set(fiber.HeaderXRequestID, requestID)
 
-		// Store metadata in request context for downstream handlers
-		ctx.Locals("request-id", requestID)
-		ctx.Locals("request-start", time.Now().UTC())
-
+		processingStarted := RequestProcessor.SetRequestTime(ctx)
 		// Execute next middleware/handler in chain
 		err := ctx.Next()
 
 		// Capture request end time
-		end := time.Now().UTC()
+		processingEnded := time.Now().UTC()
 
 		// Calculate total duration
-		dur := end.Sub(received)
+		processingDuration := processingEnded.Sub(processingStarted)
 
 		// Detect slow requests exceeding configured threshold
-		if dur > MaxResponseTimeAllowed {
-			// Placeholder for logging/alerting mechanism
+		if processingDuration > MaxResponseTimeAllowed {
+			Logs.RootLogger.Add(Logs.Warn, "middleware/profiling", requestID, "Slow response: "+processingDuration.String())
 		}
 
 		// Attach response timing metadata
-		ctx.Set("X-Response-End", fmt.Sprintf("%v", end))
-		ctx.Set("X-Response-Time", fmt.Sprintf("%v", dur))
+		ctx.Set("X-Rate-Limit-Weight", strconv.Itoa(int(RequestProcessor.GetRateLimitWeight(ctx))))
+		ctx.Set("X-Left-API-At", processingEnded.Format(time.StampNano))
+		ctx.Set("X-Time-Taken", processingDuration.String())
 		return err
 	}
 }

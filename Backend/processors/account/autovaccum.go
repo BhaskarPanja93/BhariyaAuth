@@ -2,6 +2,7 @@ package account
 
 import (
 	Config "BhariyaAuth/constants/config"
+	Logs "BhariyaAuth/processors/logs"
 	Stores "BhariyaAuth/stores"
 	"time"
 )
@@ -43,9 +44,7 @@ import (
 // Returns:
 // - No return value (runs indefinitely).
 func DatabaseAutoVacuum() {
-
 	for {
-
 		// Calculate cutoff time for expired sessions
 		cutoff := time.Now().Add(-Config.RefreshTokenExpireDelta)
 
@@ -58,7 +57,7 @@ func DatabaseAutoVacuum() {
 
 		if err != nil {
 			// On failure: retry sooner to recover quickly
-			// Alarm
+			Logs.RootLogger.Add(Logs.Error, "processors/account/autovacuum", "", "Cleanup failed: "+err.Error())
 			time.Sleep(time.Minute)
 			continue
 		}

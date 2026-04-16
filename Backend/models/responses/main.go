@@ -25,7 +25,12 @@ type APIResponseT struct {
 	RetryAfter    int      `json:"retry-after,omitempty"`
 }
 
-type SingleUserActivityT struct {
+type SingleDeviceT struct {
+	UserID   int32 `json:"uid"`
+	DeviceID int16 `json:"deviceid"`
+}
+
+type SingleUserDeviceT struct {
 	ID         string    `json:"id"`
 	Count      int16     `json:"count"`
 	Remembered bool      `json:"remembered"`
@@ -36,8 +41,7 @@ type SingleUserActivityT struct {
 	Browser    string    `json:"browser"`
 }
 
-type UserActivityResponseT struct {
-	User       string                `json:"user"`
-	Refresh    string                `json:"refresh"`
-	Activities []SingleUserActivityT `json:"activities"`
+type UserDevicesResponseT struct {
+	Current string              `json:"current"`
+	Devices []SingleUserDeviceT `json:"devices"`
 }

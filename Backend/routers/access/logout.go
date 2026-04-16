@@ -5,10 +5,15 @@ import (
 	ResponseModels "BhariyaAuth/models/responses"
 	AccountProcessor "BhariyaAuth/processors/account"
 	CookieProcessor "BhariyaAuth/processors/cookies"
+	Logs "BhariyaAuth/processors/logs"
+	RequestProcessor "BhariyaAuth/processors/request"
 	TokenProcessor "BhariyaAuth/processors/token"
+	"strconv"
 
 	"github.com/gofiber/fiber/v3"
 )
+
+const logoutFileName = "routers/access/logout"
 
 // Logout terminates the current authenticated session by revoking the device session
 // and clearing all authentication-related cookies.
@@ -38,12 +43,16 @@ import (
 func Logout(ctx fiber.Ctx) error {
 
 	// Extract refresh token from request
-	refresh, err := TokenProcessor.ReadRefreshToken(ctx)
+	access, err := TokenProcessor.ReadAccessToken(ctx)
 
 	// Validate token presence and CSRF protection
-	if err != nil || !TokenProcessor.VerifyCSRF(ctx, refresh) {
+	if err != nil {
+		Logs.RootLogger.Add(Logs.Blocked, logoutFileName, RequestProcessor.GetRequestId(ctx), "Access invalid/expired")
+
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
+
+	Logs.RootLogger.Add(Logs.Error, logoutFileName, RequestProcessor.GetRequestId(ctx), "Request for: "+strconv.Itoa(int(access.UserID))+" "+strconv.Itoa(int(access.DeviceID)))
 
 	// Clear all authentication-related cookies from client
 	// This ensures client cannot continue using stale tokens
@@ -53,14 +62,17 @@ func Logout(ctx fiber.Ctx) error {
 
 	// Delete the session/device entry from database
 	// This revokes the refresh token server-side
-	err = AccountProcessor.DenySingleDeviceFromRenewing(refresh.UserID, refresh.DeviceID)
+	err = AccountProcessor.DenySingleDeviceFromRenewing(access.UserID, access.DeviceID)
 	if err != nil {
+		Logs.RootLogger.Add(Logs.Error, logoutFileName, RequestProcessor.GetRequestId(ctx), "Device revoke failed: "+err.Error())
+
 		return ctx.Status(fiber.StatusInternalServerError).JSON(
 			ResponseModels.APIResponseT{
 				Notifications: []string{Notifications.EncryptorError},
 			})
 	}
 
+	Logs.RootLogger.Add(Logs.Error, logoutFileName, RequestProcessor.GetRequestId(ctx), "Request complete")
 	// Return success response indicating auth state has changed
 	return ctx.Status(fiber.StatusOK).JSON(
 		ResponseModels.APIResponseT{

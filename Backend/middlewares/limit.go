@@ -2,7 +2,7 @@ package middlewares
 
 import (
 	ResponseModels "BhariyaAuth/models/responses"
-	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
+	RateLimitProcessor "BhariyaAuth/processors/request"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -135,16 +135,15 @@ func RouteRateLimiter(limit uint32, windowDuration time.Duration, cleanupInterva
 				RetryAfter: retryAfter,
 			})
 		}
-		// Reserve capacity for this request to prevent overshoot
-		// especially for long-running requests
-		RateLimitProcessor.Init(c)
-		window.count.Add(RateLimitProcessor.Get(c))
+
+		// Add default cost to overcome weight not being added due to slow responses
+		window.count.Add(RateLimitProcessor.GetRateLimitWeight(c))
 
 		// Execute downstream handler
 		err := c.Next()
 
 		// Add actual cost
-		window.count.Add(RateLimitProcessor.Get(c))
+		window.count.Add(RateLimitProcessor.GetRateLimitWeight(c))
 		return err
 	}
 }

@@ -2,6 +2,7 @@ package stores
 
 import (
 	Config "BhariyaAuth/constants/config"
+	Logs "BhariyaAuth/processors/logs"
 	"fmt"
 	"time"
 
@@ -9,6 +10,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+const sqlFileName = "stores/sql"
 
 // SQLClient is a global PostgreSQL connection pool.
 //
@@ -38,10 +41,11 @@ var SQLClient *pgxpool.Pool
 // - Credentials and connection details from Secrets.
 // - Pool tuning via pgxpool.Config.
 //
-// ⚠️ Important:
+// Important:
 // - Blocks indefinitely until DB becomes available.
 // - Intended for controlled startup phase.
 func ConnectSQL() {
+	Logs.RootLogger.Add(Logs.Intent, sqlFileName, "", "Connecting SQL")
 
 	// Prevent re-initialization
 	if SQLClient != nil {
@@ -55,32 +59,20 @@ func ConnectSQL() {
 		var dsn string
 
 		if useSocket {
-			fmt.Println("Trying SQL via UNIX socket...")
+			Logs.RootLogger.Add(Logs.Intent, sqlFileName, "", "SQL using unix socket")
 
-			dsn = fmt.Sprintf(
-				"postgres://%s:%s@/%s?host=%s&port=%s&sslmode=disable&TimeZone=UTC",
-				Secrets.SQLUser,
-				Secrets.SQLPassword,
-				Secrets.SQLDBName,
-				Secrets.SQLSocket,
-				Secrets.SQLPort,
-			)
+			dsn = fmt.Sprintf("postgres://%s:%s@/%s?host=%s&port=%s&sslmode=disable&TimeZone=UTC", Secrets.SQLUser, Secrets.SQLPassword, Secrets.SQLDBName, Secrets.SQLSocket, Secrets.SQLPort)
 
 		} else {
-			fmt.Println("Trying SQL via TCP/IP...")
+			Logs.RootLogger.Add(Logs.Intent, sqlFileName, "", "SQL using TCP")
 
-			dsn = fmt.Sprintf(
-				"postgres://%s:%s@%s:%s/%s?sslmode=disable&TimeZone=UTC",
-				Secrets.SQLUser,
-				Secrets.SQLPassword,
-				Secrets.SQLHost,
-				Secrets.SQLPort,
-				Secrets.SQLDBName,
-			)
+			dsn = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable&TimeZone=UTC", Secrets.SQLUser, Secrets.SQLPassword, Secrets.SQLHost, Secrets.SQLPort, Secrets.SQLDBName)
 		}
 
 		config, err := pgxpool.ParseConfig(dsn)
 		if err != nil {
+			Logs.RootLogger.Add(Logs.Error, sqlFileName, "", "SQL Config parse error: "+err.Error())
+
 			panic(err) // configuration error → unrecoverable
 		}
 
@@ -92,16 +84,17 @@ func ConnectSQL() {
 
 		SQLClient, err = pgxpool.NewWithConfig(Config.CtxBG, config)
 		if err != nil {
-			fmt.Println("Failed to create SQL connection:", err.Error())
+			Logs.RootLogger.Add(Logs.Error, sqlFileName, "", "SQL Connect failed: "+err.Error())
 
 			useSocket = !useSocket
 			time.Sleep(2 * time.Second)
 			continue
 		}
+		Logs.RootLogger.Add(Logs.Info, sqlFileName, "", "SQL Connected")
 
 		err = SQLClient.Ping(Config.CtxBG)
 		if err != nil {
-			fmt.Println("Cannot ping SQL:", err.Error())
+			Logs.RootLogger.Add(Logs.Error, sqlFileName, "", "SQL Ping failed: "+err.Error())
 
 			SQLClient.Close()
 			SQLClient = nil
@@ -110,10 +103,9 @@ func ConnectSQL() {
 			time.Sleep(2 * time.Second)
 			continue
 		}
+		Logs.RootLogger.Add(Logs.Info, sqlFileName, "", "SQL Connected and Pinged")
 
 		// Success
 		break
 	}
-
-	fmt.Println("SQL connection established successfully")
 }

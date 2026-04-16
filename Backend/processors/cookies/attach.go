@@ -3,6 +3,7 @@ package cookies
 import (
 	Config "BhariyaAuth/constants/config"
 	TokenModels "BhariyaAuth/models/tokens"
+	RequestProcessor "BhariyaAuth/processors/request"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -12,7 +13,7 @@ import (
 // on the response. These cookies are used for session persistence and request validation.
 func AttachAuthCookies(ctx fiber.Ctx, token TokenModels.NewTokenCombined) {
 
-	start := ctx.Locals("request-start").(time.Time)
+	start := RequestProcessor.GetRequestTime(ctx)
 
 	Refresh := fiber.Cookie{
 		Name:     Config.RefreshTokenInCookie,    // Cookie name from configuration

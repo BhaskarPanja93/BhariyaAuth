@@ -1,47 +1,13 @@
 package string
 
 import (
-	Secrets "BhariyaAuth/constants/secrets"
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"io"
-	"unsafe"
 
-	"github.com/goccy/go-json"
+	"github.com/bytedance/sonic"
 	"golang.org/x/crypto/bcrypt"
 )
-
-// Global encoding and cipher instances.
-//
-// b64:
-// - Base64 URL-safe encoding without padding.
-// - Strict mode ensures invalid input is rejected.
-//
-// aesGCM:
-// - AEAD cipher (AES-GCM).
-// - Provides authenticated encryption (confidentiality + integrity).
-var b64 = base64.RawURLEncoding.Strict()
-var aesGCM cipher.AEAD
-
-// init initializes AES-GCM cipher using application secret key.
-//
-// Behavior:
-// - Panics if cipher initialization fails (critical misconfiguration).
-func init() {
-
-	block, err := aes.NewCipher(Secrets.AESGCMKey)
-	if err != nil {
-		panic(err)
-	}
-
-	aesGCM, err = cipher.NewGCM(block)
-	if err != nil {
-		panic(err)
-	}
-}
 
 // BytesToB64 encodes binary data into URL-safe base64 string.
 func BytesToB64(b []byte) string {
@@ -52,7 +18,11 @@ func BytesToB64(b []byte) string {
 //
 // Returns error if input is malformed.
 func B64ToBytes(s string) ([]byte, error) {
-	return b64.DecodeString(s)
+	data, err := b64.DecodeString(s)
+	if err != nil {
+		return nil, errors.New("b64 decode failed: " + err.Error())
+	}
+	return data, nil
 }
 
 // EncryptToBytes encrypts plaintext using AES-GCM.
@@ -71,7 +41,7 @@ func B64ToBytes(s string) ([]byte, error) {
 func EncryptToBytes(data []byte) ([]byte, error) {
 	nonce := make([]byte, aesGCM.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return []byte{}, err
+		return nil, errors.New("encrypt to bytes failed - Read Full: " + err.Error())
 	}
 	ciphertext := aesGCM.Seal(nonce, nonce, data, nil)
 	return ciphertext, nil
@@ -81,7 +51,7 @@ func EncryptToBytes(data []byte) ([]byte, error) {
 func EncryptToString(data []byte) (string, error) {
 	ciphertext, err := EncryptToBytes(data)
 	if err != nil {
-		return "", err
+		return "", errors.New("encrypt to string failed: " + err.Error())
 	}
 	return BytesToB64(ciphertext), nil
 }
@@ -100,12 +70,12 @@ func EncryptToString(data []byte) (string, error) {
 func DecryptToBytes(data []byte) ([]byte, error) {
 	nonceSize := aesGCM.NonceSize()
 	if len(data) < nonceSize {
-		return nil, errors.New("b2b decrypt: data is too short")
+		return nil, errors.New("decrypt to bytes failed: data is too short")
 	}
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
 	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("decrypt to bytes failed - Open: " + err.Error())
 	}
 	return plaintext, nil
 }
@@ -117,45 +87,57 @@ func DecryptToBytes(data []byte) ([]byte, error) {
 func DecryptToString(data []byte) (string, error) {
 	plaintext, err := DecryptToBytes(data)
 	if err != nil {
-		return "", err
+		return "", errors.New("decrypt to string: " + err.Error())
 	}
 	return BytesToB64(plaintext), nil
 }
 
 // EncryptInterfaceToBytes serializes and encrypts arbitrary struct.
 func EncryptInterfaceToBytes(v interface{}) ([]byte, error) {
-	marshalled, err := json.Marshal(v)
+	marshalled, err := sonic.Marshal(v)
 	if err != nil {
-		return []byte{}, err
+		return nil, errors.New("encrypt interface to bytes - Marshal: " + err.Error())
 	}
-	return EncryptToBytes(marshalled)
-}
-
-// EncryptInterfaceToString serializes, encrypts, and encodes to base64.
-func EncryptInterfaceToString(v interface{}) (string, error) {
-	ciphertext, err := EncryptInterfaceToBytes(v)
+	data, err := EncryptToBytes(marshalled)
 	if err != nil {
-		return "", err
+		return nil, errors.New("encrypt interface to bytes: " + err.Error())
 	}
-	return BytesToB64(ciphertext), nil
+	return data, nil
 }
 
 // DecryptInterfaceFromBytes decrypts and deserializes into struct.
 func DecryptInterfaceFromBytes(data []byte, v interface{}) error {
 	plaintext, err := DecryptToBytes(data)
 	if err != nil {
-		return err
+		return errors.New("decrypt interface from bytes: " + err.Error())
 	}
-	return json.Unmarshal(plaintext, v)
+	err = sonic.Unmarshal(plaintext, v)
+	if err != nil {
+		return errors.New("decrypt interface from bytes - Unmarshal: " + err.Error())
+	}
+	return nil
 }
 
-// DecryptInterfaceFromString decodes, decrypts, and deserializes.
-func DecryptInterfaceFromString(data string, v interface{}) error {
+// EncryptInterfaceToB64 serializes, encrypts, and encodes to base64.
+func EncryptInterfaceToB64(v interface{}) (string, error) {
+	ciphertext, err := EncryptInterfaceToBytes(v)
+	if err != nil {
+		return "", errors.New("encrypt interface to string: " + err.Error())
+	}
+	return BytesToB64(ciphertext), nil
+}
+
+// DecryptInterfaceFromB64 decodes, decrypts, and deserializes.
+func DecryptInterfaceFromB64(data string, v interface{}) error {
 	ciphertext, err := B64ToBytes(data)
 	if err != nil {
-		return err
+		return errors.New("decrypt interface from string: " + err.Error())
 	}
-	return DecryptInterfaceFromBytes(ciphertext, v)
+	err = DecryptInterfaceFromBytes(ciphertext, v)
+	if err != nil {
+		return errors.New("decrypt interface from string: " + err.Error())
+	}
+	return nil
 }
 
 // HashPassword hashes password using bcrypt.
@@ -168,47 +150,9 @@ func DecryptInterfaceFromString(data string, v interface{}) error {
 // - hashed password bytes.
 // - error if hashing fails.
 func HashPassword(password string) ([]byte, error) {
-	return bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-}
-
-// EncryptUserID encrypts int32 using unsafe pointer conversion.
-func EncryptUserID(userID int32) (string, error) {
-	return EncryptToString((*(*[4]byte)(unsafe.Pointer(&userID)))[:])
-}
-
-// EncryptDeviceID encrypts int16 using unsafe pointer conversion.
-func EncryptDeviceID(deviceID int16) (string, error) {
-	return EncryptToString((*(*[2]byte)(unsafe.Pointer(&deviceID)))[:])
-}
-
-// DecryptUserID decrypts and converts bytes back to int32.
-//
-// WARNING:
-// - Assumes byte slice has correct length and alignment.
-func DecryptUserID(data string) (int32, error) {
-	ciphertext, err := B64ToBytes(data)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return 0, err
+		return nil, errors.New("hash password - Generate from password: " + err.Error())
 	}
-	bytes, err := DecryptToBytes(ciphertext)
-	if err != nil {
-		return 0, err
-	}
-	return *(*int32)(unsafe.Pointer(&bytes[0])), nil
-}
-
-// DecryptDeviceID decrypts and converts bytes back to int16.
-//
-// WARNING:
-// - Assumes byte slice has correct length and alignment.
-func DecryptDeviceID(data string) (int16, error) {
-	ciphertext, err := B64ToBytes(data)
-	if err != nil {
-		return 0, err
-	}
-	bytes, err := DecryptToBytes(ciphertext)
-	if err != nil {
-		return 0, err
-	}
-	return *(*int16)(unsafe.Pointer(&bytes[0])), nil
+	return hash, nil
 }

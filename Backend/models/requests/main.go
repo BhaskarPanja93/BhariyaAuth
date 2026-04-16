@@ -15,6 +15,7 @@ type PasswordResetForm2 struct {
 type SignInForm1 struct {
 	Mail     string `form:"mail"`
 	Remember string `form:"remember"`
+	Process  string `form:"process"`
 }
 
 type SignInForm2 struct {
@@ -35,9 +36,8 @@ type SignUpForm2 struct {
 }
 
 type DeviceRevokeForm struct {
-	User    string `form:"uid"`
-	All     string `form:"all"`
-	Refresh string `form:"refresh"`
+	All    string `form:"all"`
+	Device string `form:"device"`
 }
 
 type MFAForm struct {

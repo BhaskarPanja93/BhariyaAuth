@@ -3,11 +3,14 @@ package account
 import (
 	Config "BhariyaAuth/constants/config"
 	ResponseModels "BhariyaAuth/models/responses"
+	Logs "BhariyaAuth/processors/logs"
 	Stores "BhariyaAuth/stores"
+	"errors"
+	"strconv"
 	"sync"
 	"time"
 
-	"github.com/goccy/go-json"
+	"github.com/bytedance/sonic"
 )
 
 // Ensures listener starts only once (thread-safe)
@@ -41,7 +44,7 @@ func ListenAccountResponses() {
 				var response ResponseModels.AccountDetailsResponseT
 
 				// Ignore malformed messages
-				if err := json.Unmarshal([]byte(msg.Payload), &response); err != nil {
+				if err := sonic.Unmarshal([]byte(msg.Payload), &response); err != nil {
 					continue
 				}
 
@@ -90,7 +93,7 @@ func RequestAccountDetails(userID int32) (ResponseModels.AccountDetailsResponseT
 		UserID:   userID,
 	}
 
-	payload, err := json.Marshal(request)
+	payload, err := sonic.Marshal(request)
 	if err != nil {
 		return ResponseModels.AccountDetailsResponseT{}, err
 	}
@@ -110,7 +113,7 @@ func RequestAccountDetails(userID int32) (ResponseModels.AccountDetailsResponseT
 		return res, nil
 
 	case <-time.After(2 * time.Second):
-		return ResponseModels.AccountDetailsResponseT{}, DataRequestTimedOutError
+		return ResponseModels.AccountDetailsResponseT{}, errors.New("account data request: timed out")
 	}
 }
 
@@ -127,6 +130,7 @@ func RequestAccountDetails(userID int32) (ResponseModels.AccountDetailsResponseT
 //
 //	receive request → query DB → marshal → publish response
 func ServeAccountDetails() {
+	Logs.RootLogger.Add(Logs.Intent, "main", "", "Initializing Account serving")
 
 	channel := Stores.RedisClient.
 		Subscribe(Config.CtxBG, Config.AccountDetailsRequestChannel).
@@ -137,7 +141,8 @@ func ServeAccountDetails() {
 		var request ResponseModels.AccountDetailsRequestT
 
 		// Ignore malformed requests
-		if err := json.Unmarshal([]byte(message.Payload), &request); err != nil {
+		if err := sonic.Unmarshal([]byte(message.Payload), &request); err != nil {
+			Logs.RootLogger.Add(Logs.Error, "processors/account/external", "", "Malformed request: "+message.Payload)
 			continue
 		}
 
@@ -156,12 +161,14 @@ func ServeAccountDetails() {
 		)
 
 		if err != nil {
+			Logs.RootLogger.Add(Logs.Error, "processors/account/external", "", "Serve account details - SQL query: "+err.Error())
 			continue
 		}
 
 		// Serialize before sending
-		payload, err := json.Marshal(response)
+		payload, err := sonic.Marshal(response)
 		if err != nil {
+			Logs.RootLogger.Add(Logs.Error, "processors/account/external", "", "Serve account details - JSON marshal: "+request.ServerID+" "+strconv.Itoa(int(request.UserID))+" "+err.Error())
 			continue
 		}
 
@@ -173,7 +180,10 @@ func ServeAccountDetails() {
 		).Err()
 
 		if err != nil {
+			Logs.RootLogger.Add(Logs.Error, "processors/account/external", "", "Serve account details - Redis publish: "+request.ServerID+" "+strconv.Itoa(int(request.UserID))+" "+err.Error())
 			continue
 		}
+
+		Logs.RootLogger.Add(Logs.Info, "processors/account/external", "", "Serve account details"+request.ServerID+" "+strconv.Itoa(int(request.UserID)))
 	}
 }

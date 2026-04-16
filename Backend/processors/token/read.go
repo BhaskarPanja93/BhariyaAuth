@@ -4,6 +4,7 @@ import (
 	Config "BhariyaAuth/constants/config"
 	TokenModels "BhariyaAuth/models/tokens"
 	StringProcessor "BhariyaAuth/processors/string"
+	"errors"
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
@@ -54,14 +55,14 @@ func ReadAccessToken(ctx fiber.Ctx) (TokenModels.AccessToken, error) {
 	header := strings.TrimPrefix(ctx.Get(Config.AccessTokenInHeader), "Bearer ")
 
 	// Decrypt token
-	err := StringProcessor.DecryptInterfaceFromString(header, &access)
+	err := StringProcessor.DecryptInterfaceFromB64(header, &access)
 	if err != nil {
 		return access, err
 	}
 
 	// Validate token type
 	if access.TokenType != accessTokenType {
-		return access, IncorrectAccessTokenTypeError
+		return access, errors.New("read access Token: incorrect type")
 	}
 
 	return access, nil
@@ -78,13 +79,13 @@ func ReadRefreshToken(ctx fiber.Ctx) (TokenModels.RefreshToken, error) {
 
 	cookie := ctx.Cookies(Config.RefreshTokenInCookie)
 
-	err := StringProcessor.DecryptInterfaceFromString(cookie, &refresh)
+	err := StringProcessor.DecryptInterfaceFromB64(cookie, &refresh)
 	if err != nil {
 		return refresh, err
 	}
 
 	if refresh.TokenType != refreshTokenType {
-		return refresh, IncorrectRefreshTokenTypeError
+		return refresh, errors.New("read refresh Token: incorrect type")
 	}
 
 	return refresh, nil
@@ -95,13 +96,13 @@ func ReadMFAToken(token string) (TokenModels.MFAToken, error) {
 
 	var mfa TokenModels.MFAToken
 
-	err := StringProcessor.DecryptInterfaceFromString(token, &mfa)
+	err := StringProcessor.DecryptInterfaceFromB64(token, &mfa)
 	if err != nil {
 		return mfa, err
 	}
 
 	if mfa.TokenType != mfaTokenType {
-		return mfa, IncorrectMFATokenTypeError
+		return mfa, errors.New("read mfa Token: incorrect type")
 	}
 
 	return mfa, nil
@@ -112,13 +113,13 @@ func ReadSSOToken(token string) (TokenModels.SSOState, error) {
 
 	var sso TokenModels.SSOState
 
-	err := StringProcessor.DecryptInterfaceFromString(token, &sso)
+	err := StringProcessor.DecryptInterfaceFromB64(token, &sso)
 	if err != nil {
 		return sso, err
 	}
 
 	if sso.TokenType != ssoTokenType {
-		return sso, IncorrectSSOTokenTypeError
+		return sso, errors.New("read sso Token: incorrect type")
 	}
 
 	return sso, nil
@@ -129,13 +130,13 @@ func ReadPasswordResetToken(token string) (TokenModels.PasswordReset, error) {
 
 	var reset TokenModels.PasswordReset
 
-	err := StringProcessor.DecryptInterfaceFromString(token, &reset)
+	err := StringProcessor.DecryptInterfaceFromB64(token, &reset)
 	if err != nil {
 		return reset, err
 	}
 
 	if reset.TokenType != passwordResetTokenType {
-		return reset, IncorrectPasswordResetTokenTypeError
+		return reset, errors.New("read password reset Token: incorrect type")
 	}
 
 	return reset, nil
@@ -146,13 +147,13 @@ func ReadSignInToken(token string) (TokenModels.SignIn, error) {
 
 	var signIn TokenModels.SignIn
 
-	err := StringProcessor.DecryptInterfaceFromString(token, &signIn)
+	err := StringProcessor.DecryptInterfaceFromB64(token, &signIn)
 	if err != nil {
 		return signIn, err
 	}
 
 	if signIn.TokenType != signInTokenType {
-		return signIn, IncorrectSignInTokenTypeError
+		return signIn, errors.New("read signin Token: incorrect type")
 	}
 
 	return signIn, nil
@@ -163,13 +164,13 @@ func ReadSignUpToken(token string) (TokenModels.SignUp, error) {
 
 	var signUp TokenModels.SignUp
 
-	err := StringProcessor.DecryptInterfaceFromString(token, &signUp)
+	err := StringProcessor.DecryptInterfaceFromB64(token, &signUp)
 	if err != nil {
 		return signUp, err
 	}
 
 	if signUp.TokenType != signUpTokenType {
-		return signUp, IncorrectSignUpTokenTypeError
+		return signUp, errors.New("read signup Token: incorrect type")
 	}
 
 	return signUp, nil

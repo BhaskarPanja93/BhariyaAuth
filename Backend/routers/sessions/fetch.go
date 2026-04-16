@@ -5,13 +5,17 @@ import (
 	Notifications "BhariyaAuth/models/notifications"
 	ResponseModels "BhariyaAuth/models/responses"
 	AccountProcessor "BhariyaAuth/processors/account"
-	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
+	Logs "BhariyaAuth/processors/logs"
+	RequestProcessor "BhariyaAuth/processors/request"
 	StringProcessor "BhariyaAuth/processors/string"
 	TokenProcessor "BhariyaAuth/processors/token"
 	Stores "BhariyaAuth/stores"
+	"strconv"
 
 	"github.com/gofiber/fiber/v3"
 )
+
+const fetchFilename = "routers/sessions/fetch"
 
 // Fetch retrieves all active device sessions associated with the authenticated user.
 //
@@ -44,15 +48,19 @@ func Fetch(ctx fiber.Ctx) error {
 
 	// Ensure token is valid and still fresh (not expired)
 	if err != nil || !TokenProcessor.AccessIsFresh(ctx, access) {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Blocked, fetchFilename, RequestProcessor.GetRequestId(ctx), "Access invalid/expired")
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
 		return ctx.SendStatus(fiber.StatusUnauthorized)
 	}
+	Logs.RootLogger.Add(Logs.Intent, fetchFilename, RequestProcessor.GetRequestId(ctx), "Requested by: "+strconv.Itoa(int(access.UserID))+" "+strconv.Itoa(int(access.DeviceID)))
 
 	// Ensure token is valid and still fresh (not expired)
-	blocked, err := AccountProcessor.CheckDeviceAccessDenied(access.UserID, access.DeviceID)
+	revoked, err := AccountProcessor.CheckDeviceAccessDenied(access.UserID, access.DeviceID)
 	if err != nil {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, fetchFilename, RequestProcessor.GetRequestId(ctx), "Access revoke check failed: "+err.Error())
+
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
 		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
 			Notifications: []string{Notifications.DBReadError},
@@ -60,8 +68,9 @@ func Fetch(ctx fiber.Ctx) error {
 	}
 
 	// Reject request if device/session is blocked
-	if blocked {
-		RateLimitProcessor.Add(ctx, 60_000) // 10 invalid attempts/minute
+	if revoked {
+		Logs.RootLogger.Add(Logs.Blocked, fetchFilename, RequestProcessor.GetRequestId(ctx), "Access revoked")
+		RequestProcessor.AddRateLimitWeight(ctx, 60_000) // 10 invalid attempts/minute
 
 		return ctx.SendStatus(fiber.StatusUnauthorized)
 	}
@@ -69,37 +78,25 @@ func Fetch(ctx fiber.Ctx) error {
 	// Fetch all device/session records for the user
 	rows, err := Stores.SQLClient.Query(Config.CtxBG, "SELECT device_id, visits, remembered, created, updated, os, device, browser FROM devices WHERE user_id = $1", access.UserID)
 	if err != nil {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, fetchFilename, RequestProcessor.GetRequestId(ctx), "Device fetch failed - SQL query: "+err.Error())
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.DBReadError},
-			})
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.DBReadError},
+		})
 	}
 	defer rows.Close()
 
 	// Prepare response container
-	var response ResponseModels.UserActivityResponseT
-
-	// Encrypt user identifier before returning to client
-	response.User, err = StringProcessor.EncryptUserID(access.UserID)
-	if err != nil {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
-
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.EncryptorError},
-			})
-	}
+	var response ResponseModels.UserDevicesResponseT
 
 	// Iterate through all device records
 	for rows.Next() {
 		var deviceID int16
-		var activity ResponseModels.SingleUserActivityT
+		var activity ResponseModels.SingleUserDeviceT
 
 		// Map DB row into response struct
-		err = rows.Scan(
-			&deviceID,
+		err = rows.Scan(&deviceID, // device ID
 			&activity.Count,      // visits count (refresh version)
 			&activity.Remembered, // persistent session flag
 			&activity.Created,    // session creation timestamp
@@ -109,39 +106,41 @@ func Fetch(ctx fiber.Ctx) error {
 			&activity.Browser,    // browser info
 		)
 		if err != nil {
+			Logs.RootLogger.Add(Logs.Warn, fetchFilename, RequestProcessor.GetRequestId(ctx), "Pack device data failed - SQL scan: "+err.Error())
+
 			// Skip malformed rows but continue processing
 			continue
 		}
 
-		// Encrypt device ID before exposing to client
-		activity.ID, err = StringProcessor.EncryptDeviceID(deviceID)
+		// Encrypt device before exposing to client
+		activity.ID, err = StringProcessor.EncryptInterfaceToB64(ResponseModels.SingleDeviceT{
+			UserID:   access.UserID,
+			DeviceID: deviceID,
+		})
 		if err != nil {
+			Logs.RootLogger.Add(Logs.Warn, fetchFilename, RequestProcessor.GetRequestId(ctx), "Device encrypt failed: "+err.Error())
+
 			continue
 		}
 
 		// Identify current session (used for refresh tracking on client)
 		if deviceID == access.DeviceID {
-			response.Refresh = activity.ID
+			response.Current = activity.ID
 		}
 
 		// Append activity record to response
-		response.Activities = append(response.Activities, activity)
+		response.Devices = append(response.Devices, activity)
 	}
 
 	// Loop ended prematurely
 	if err = rows.Err(); err != nil {
-		RateLimitProcessor.Add(ctx, 10_000)
-
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.DBReadError},
-			})
+		Logs.RootLogger.Add(Logs.Warn, fetchFilename, RequestProcessor.GetRequestId(ctx), "Loop ended prematurely: "+err.Error())
 	}
 
+	Logs.RootLogger.Add(Logs.Info, fetchFilename, RequestProcessor.GetRequestId(ctx), "Completed request")
 	// Return aggregated session/activity data
-	return ctx.Status(fiber.StatusOK).JSON(
-		ResponseModels.APIResponseT{
-			Success: true,
-			Reply:   response,
-		})
+	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+		Success: true,
+		Reply:   response,
+	})
 }

@@ -13,7 +13,7 @@ import (
 // - lastSent: timestamp of last OTP dispatch.
 // - mu: protects concurrent access to entry fields.
 type limiterEntry struct {
-	mu        sync.Mutex
+	mu        sync.RWMutex
 	sentCount uint32
 	lastSent  time.Time
 }
@@ -89,8 +89,8 @@ func checkCanSend(key string) (bool, uint32, time.Duration) {
 
 	entry := val.(*limiterEntry)
 
-	entry.mu.Lock()
-	defer entry.mu.Unlock()
+	entry.mu.RLock()
+	defer entry.mu.RUnlock()
 
 	delay := calculateDelay(entry.sentCount)
 	elapsed := time.Since(entry.lastSent)
@@ -127,8 +127,8 @@ func recordSend(key, verification, otp string, prevCount uint32) time.Duration {
 	entry.mu.Lock()
 	entry.sentCount = prevCount + 1
 	entry.lastSent = now
-	newCount := entry.sentCount
 	entry.mu.Unlock()
+	newCount := entry.sentCount
 
 	// Store OTP with expiration
 	otpStore.Store(verification, &otpEntry{
@@ -170,9 +170,9 @@ func cleanupLoop() {
 		limiterStore.Range(func(key, value any) bool {
 			entry := value.(*limiterEntry)
 
-			entry.mu.Lock()
+			entry.mu.RLock()
 			inactive := now.Sub(entry.lastSent) > maxDelay
-			entry.mu.Unlock()
+			entry.mu.RUnlock()
 
 			if inactive {
 				limiterStore.Delete(key)

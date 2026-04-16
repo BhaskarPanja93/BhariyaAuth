@@ -10,7 +10,7 @@ import (
 // OTP sends a one-time password email.
 //
 // Randomly selects a subject and injects OTP into HTML template.
-func OTP(mail, otp string, model MailModels.T, attempts uint8) bool {
+func OTP(mail, otp string, model MailModels.T, attempts uint8) error {
 	return sendMail(
 		mail,
 		model.Subjects[rand.Intn(len(model.Subjects))],
@@ -25,7 +25,7 @@ func OTP(mail, otp string, model MailModels.T, attempts uint8) bool {
 }
 
 // SignIn sends a login notification email (new device/login alert).
-func SignIn(mail string, model MailModels.T, IP, OS, device, browser string, attempts uint8) bool {
+func SignIn(mail string, model MailModels.T, IP, OS, device, browser string, attempts uint8) error {
 	return sendMail(
 		mail,
 		model.Subjects[rand.Intn(len(model.Subjects))],
@@ -35,7 +35,7 @@ func SignIn(mail string, model MailModels.T, IP, OS, device, browser string, att
 }
 
 // SignUp sends a new account creation notification email.
-func SignUp(mail, name string, model MailModels.T, IP, OS, device, browser string, attempts uint8) bool {
+func SignUp(mail, name string, model MailModels.T, IP, OS, device, browser string, attempts uint8) error {
 	return sendMail(
 		mail,
 		model.Subjects[rand.Intn(len(model.Subjects))],
@@ -45,7 +45,7 @@ func SignUp(mail, name string, model MailModels.T, IP, OS, device, browser strin
 }
 
 // PasswordReset sends a password reset confirmation email.
-func PasswordReset(mail string, model MailModels.T, IP, OS, device, browser string, attempts uint8) bool {
+func PasswordReset(mail string, model MailModels.T, IP, OS, device, browser string, attempts uint8) error {
 	return sendMail(
 		mail,
 		model.Subjects[rand.Intn(len(model.Subjects))],
@@ -55,7 +55,7 @@ func PasswordReset(mail string, model MailModels.T, IP, OS, device, browser stri
 }
 
 // AccountBlacklisted sends a security alert when account is blocked.
-func AccountBlacklisted(mail string, attempts uint8) bool {
+func AccountBlacklisted(mail string, attempts uint8) error {
 	content := `Your account has been flagged. All future actions will be blocked. Contact support ASAP if you think this is a mistake.`
 
 	return sendMail(mail, "Account Blacklisted", content, attempts)

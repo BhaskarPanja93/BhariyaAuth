@@ -7,8 +7,9 @@ import (
 	FormModels "BhariyaAuth/models/requests"
 	ResponseModels "BhariyaAuth/models/responses"
 	FormProcessor "BhariyaAuth/processors/form"
+	Logs "BhariyaAuth/processors/logs"
 	OTPProcessor "BhariyaAuth/processors/otp"
-	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
+	RequestProcessor "BhariyaAuth/processors/request"
 	StringProcessor "BhariyaAuth/processors/string"
 	TokenProcessor "BhariyaAuth/processors/token"
 	Stores "BhariyaAuth/stores"
@@ -17,6 +18,8 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5"
 )
+
+const step1FileName = "routers/passwordreset/step1"
 
 // Step1 initiates the password reset flow by verifying the user's email
 // and issuing an OTP along with a secure, encrypted reset token.
@@ -56,69 +59,84 @@ func Step1(ctx fiber.Ctx) error {
 
 	// Validate:
 	// - form parsing success
-	// - email format correctness
-	if !FormProcessor.ReadFormData(ctx, form) ||
-		!StringProcessor.EmailIsValid(form.Mail) {
+	if FormProcessor.ReadFormData(ctx, form) != nil {
+		Logs.RootLogger.Add(Logs.Blocked, step1FileName, RequestProcessor.GetRequestId(ctx), "Invalid form")
 
 		// Penalize invalid input attempts
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
+
+	// Validate:
+	// - email format correctness
+	if !StringProcessor.EmailIsValid(form.Mail) {
+		Logs.RootLogger.Add(Logs.Blocked, step1FileName, RequestProcessor.GetRequestId(ctx), "Invalid email")
+
+		// Penalize invalid input attempts
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
+
+		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
+	}
+	Logs.RootLogger.Add(Logs.Intent, step1FileName, RequestProcessor.GetRequestId(ctx), "Requested for: "+form.Mail)
 
 	// Fetch user account associated with the provided email
 	var userID int32
 	err := Stores.SQLClient.QueryRow(Config.CtxBG, `SELECT user_id FROM users WHERE mail = $1 LIMIT 1`, form.Mail).Scan(&userID)
 	if errors.Is(err, pgx.ErrNoRows) {
+		Logs.RootLogger.Add(Logs.Blocked, step1FileName, RequestProcessor.GetRequestId(ctx), "Account not found")
+
 		// Account does not exist (high penalty to prevent enumeration)
-		RateLimitProcessor.Add(ctx, 60_000) // 10 invalid attempts/minute
+		RequestProcessor.AddRateLimitWeight(ctx, 60_000) // 10 invalid attempts/minute
 
-		return ctx.Status(fiber.StatusOK).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.AccountNotFound},
-			})
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.AccountNotFound},
+		})
 	} else if err != nil {
-		// Unexpected database error
-		RateLimitProcessor.Add(ctx, 1_000) // 600 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, step1FileName, RequestProcessor.GetRequestId(ctx), "Account find failed - SQL query: "+err.Error())
 
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.DBReadError},
-			})
+		// Unexpected database error
+		RequestProcessor.AddRateLimitWeight(ctx, 1_000) // 600 invalid attempts/minute
+
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.DBReadError},
+		})
 	}
 
 	// Send OTP to user's email for password reset verification
-	step2code, retry := OTPProcessor.Send(form.Mail, MailModels.PasswordResetStarted, ctx.IP())
+	step2code, retry, err := OTPProcessor.Send(form.Mail, MailModels.PasswordResetStarted, ctx.IP())
 
 	// OTP dispatch failed (rate-limited or system issue)
 	if step2code == "" {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, step1FileName, RequestProcessor.GetRequestId(ctx), "Step2 code empty: "+err.Error())
 
-		return ctx.Status(fiber.StatusOK).JSON(
-			ResponseModels.APIResponseT{
-				Reply:         retry.Seconds(), // Inform client when retry is allowed
-				Notifications: []string{Notifications.OTPSendFailed},
-			})
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
+
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Reply:         retry.Seconds(), // Inform client when retry is allowed
+			Notifications: []string{Notifications.OTPSendFailed},
+		})
 	}
 
 	// Construct payload required for Step2
 	// Contains identity + OTP reference for verification
 	token, err := TokenProcessor.CreatePasswordResetToken(form.Mail, userID, step2code)
 	if err != nil {
-		// Encryption failure (critical security issue)
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, step1FileName, RequestProcessor.GetRequestId(ctx), "Token creation failed: "+err.Error())
 
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.EncryptorError},
-			})
+		// Encryption failure (critical security issue)
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
+
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.EncryptorError},
+		})
 	}
 
+	Logs.RootLogger.Add(Logs.Info, step1FileName, RequestProcessor.GetRequestId(ctx), "Request complete")
 	// Return encrypted token to client.
 	// Client must include this token in Step2 along with OTP
-	return ctx.Status(fiber.StatusOK).JSON(
-		ResponseModels.APIResponseT{
-			Success: true,
-			Reply:   token,
-		})
+	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+		Success: true,
+		Reply:   token,
+	})
 }

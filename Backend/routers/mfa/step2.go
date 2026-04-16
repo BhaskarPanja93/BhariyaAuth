@@ -7,17 +7,20 @@ import (
 	ResponseModels "BhariyaAuth/models/responses"
 	CookieProcessor "BhariyaAuth/processors/cookies"
 	FormProcessor "BhariyaAuth/processors/form"
+	Logs "BhariyaAuth/processors/logs"
 	OTPProcessor "BhariyaAuth/processors/otp"
-	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
+	RequestProcessor "BhariyaAuth/processors/request"
 	StringProcessor "BhariyaAuth/processors/string"
 	TokenProcessor "BhariyaAuth/processors/token"
 	Stores "BhariyaAuth/stores"
 	"errors"
-	"time"
+	"strconv"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5"
 )
+
+const step1FileName = "routers/mfa/step1"
 
 // Step2 completes the Multi-Factor Authentication (MFA) process by verifying the OTP
 // and upgrading the session to a "verified" state.
@@ -54,9 +57,10 @@ func Step2(ctx fiber.Ctx) error {
 
 	// Parse incoming form data (token + OTP)
 	form := new(FormModels.MFAForm)
-	if !FormProcessor.ReadFormData(ctx, form) {
+	if FormProcessor.ReadFormData(ctx, form) != nil {
+		Logs.RootLogger.Add(Logs.Blocked, step1FileName, RequestProcessor.GetRequestId(ctx), "Invalid form")
 		// Penalize malformed requests
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
@@ -64,16 +68,20 @@ func Step2(ctx fiber.Ctx) error {
 	// Reconstruct MFA state from decrypted token
 	data, err := TokenProcessor.ReadMFAToken(form.Token)
 	if err != nil {
+		Logs.RootLogger.Add(Logs.Blocked, step1FileName, RequestProcessor.GetRequestId(ctx), "Token read failed: "+err.Error())
 		// Prevent token misuse across flows
-		RateLimitProcessor.Add(ctx, 60_000) // 10 invalid attempts/minute
+		RequestProcessor.AddRateLimitWeight(ctx, 60_000) // 10 invalid attempts/minute
 
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
 
+	Logs.RootLogger.Add(Logs.Intent, step1FileName, RequestProcessor.GetRequestId(ctx), "Requested by: "+strconv.Itoa(int(data.UserID))+" "+strconv.Itoa(int(data.DeviceID)))
+
 	// Validate OTP provided by user
 	if !OTPProcessor.Validate(data.Step2Code, form.Verification) {
+		Logs.RootLogger.Add(Logs.Blocked, step1FileName, RequestProcessor.GetRequestId(ctx), "Incorrect OTP")
 		// High penalty to prevent brute-force attempts
-		RateLimitProcessor.Add(ctx, 60_000) // 10 invalid attempts/minute
+		RequestProcessor.AddRateLimitWeight(ctx, 60_000) // 10 invalid attempts/minute
 
 		return ctx.Status(fiber.StatusOK).JSON(
 			ResponseModels.APIResponseT{
@@ -85,16 +93,20 @@ func Step2(ctx fiber.Ctx) error {
 	var blocked bool
 	err = Stores.SQLClient.QueryRow(Config.CtxBG, "SELECT blocked FROM users WHERE user_id = $1 LIMIT 1", data.UserID).Scan(&blocked)
 	if errors.Is(err, pgx.ErrNoRows) {
+		Logs.RootLogger.Add(Logs.Blocked, step1FileName, RequestProcessor.GetRequestId(ctx), "Account not found")
+
 		// Account does not exist (edge case)
-		RateLimitProcessor.Add(ctx, 60_000) // 10 invalid attempts/minute
+		RequestProcessor.AddRateLimitWeight(ctx, 60_000) // 10 invalid attempts/minute
 
 		return ctx.Status(fiber.StatusInternalServerError).JSON(
 			ResponseModels.APIResponseT{
 				Notifications: []string{Notifications.AccountNotFound},
 			})
 	} else if err != nil {
+		Logs.RootLogger.Add(Logs.Error, step1FileName, RequestProcessor.GetRequestId(ctx), "Account blocked check failed: "+err.Error())
+
 		// Unexpected database error
-		RateLimitProcessor.Add(ctx, 1_000) // 600 invalid attempts/minute
+		RequestProcessor.AddRateLimitWeight(ctx, 1_000) // 600 invalid attempts/minute
 
 		return ctx.Status(fiber.StatusInternalServerError).JSON(
 			ResponseModels.APIResponseT{
@@ -104,7 +116,9 @@ func Step2(ctx fiber.Ctx) error {
 
 	// Reject MFA completion if account is blocked
 	if blocked {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Blocked, step1FileName, RequestProcessor.GetRequestId(ctx), "Account is blocked")
+
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
 		return ctx.Status(fiber.StatusOK).JSON(
 			ResponseModels.APIResponseT{
@@ -117,12 +131,14 @@ func Step2(ctx fiber.Ctx) error {
 	data.Step2Code = ""
 
 	// Record verification timestamp (used for expiry/validation in downstream flows)
-	data.Created = ctx.Locals("request-start").(time.Time)
+	data.Created = RequestProcessor.GetRequestTime(ctx)
 
 	// Serialize updated MFA state
-	token, err := StringProcessor.EncryptInterfaceToString(data)
+	token, err := StringProcessor.EncryptInterfaceToB64(data)
 	if err != nil {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Error, step1FileName, RequestProcessor.GetRequestId(ctx), "Token create failed: "+err.Error())
+
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
 
 		return ctx.Status(fiber.StatusInternalServerError).JSON(
 			ResponseModels.APIResponseT{
@@ -133,6 +149,7 @@ func Step2(ctx fiber.Ctx) error {
 	// Attach MFA cookie to mark session as second-factor verified
 	CookieProcessor.AttachMFACookie(ctx, token)
 
+	Logs.RootLogger.Add(Logs.Info, step1FileName, RequestProcessor.GetRequestId(ctx), "Completed request")
 	// Return success response
 	return ctx.Status(fiber.StatusOK).JSON(
 		ResponseModels.APIResponseT{

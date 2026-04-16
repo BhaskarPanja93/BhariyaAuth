@@ -7,14 +7,18 @@ import (
 	FormModels "BhariyaAuth/models/requests"
 	ResponseModels "BhariyaAuth/models/responses"
 	FormProcessor "BhariyaAuth/processors/form"
+	Logs "BhariyaAuth/processors/logs"
 	OTPProcessor "BhariyaAuth/processors/otp"
-	RateLimitProcessor "BhariyaAuth/processors/ratelimit"
+	RequestProcessor "BhariyaAuth/processors/request"
 	StringProcessor "BhariyaAuth/processors/string"
 	TokenProcessor "BhariyaAuth/processors/token"
 	Stores "BhariyaAuth/stores"
+	"strconv"
 
 	"github.com/gofiber/fiber/v3"
 )
+
+const step1FileName = "routers/signup/step1"
 
 // Step1 initiates the first phase of user registration with email verification.
 //
@@ -56,73 +60,92 @@ func Step1(ctx fiber.Ctx) error {
 
 	// Validate:
 	// - form parsing success
-	// - name format
-	// - email format
-	// - password strength
-	if !FormProcessor.ReadFormData(ctx, form) ||
-		!StringProcessor.NameIsValid(form.Name) ||
-		!StringProcessor.EmailIsValid(form.Mail) ||
-		!StringProcessor.PasswordIsStrong(form.Password) {
+	if FormProcessor.ReadFormData(ctx, form) != nil {
+		Logs.RootLogger.Add(Logs.Blocked, step1FileName, RequestProcessor.GetRequestId(ctx), "Form read failed")
 
 		// Penalize invalid attempts (moderate penalty)
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute allowed
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute allowed
 
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
+
+	// Validate:
+	// - name format
+	// - email format
+	// - password strength
+	validName := StringProcessor.NameIsValid(form.Name)
+	validEmail := StringProcessor.EmailIsValid(form.Mail)
+	validPassword := StringProcessor.PasswordIsStrong(form.Password)
+	if !validName || !validEmail || !validPassword {
+		Logs.RootLogger.Add(Logs.Blocked, step1FileName, RequestProcessor.GetRequestId(ctx), "Form values invalid: "+strconv.FormatBool(validName)+" "+form.Name+" "+strconv.FormatBool(validEmail)+" "+form.Mail+" "+strconv.FormatBool(validPassword))
+
+		// Penalize invalid attempts (moderate penalty)
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute allowed
+
+		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
+	}
+
+	Logs.RootLogger.Add(Logs.Intent, step1FileName, RequestProcessor.GetRequestId(ctx), "Requested account: "+form.Mail)
 
 	// Check if an account already exists for the given email
 	var exists bool
 	err := Stores.SQLClient.QueryRow(Config.CtxBG, `SELECT EXISTS(SELECT 1 FROM users WHERE mail = $1)`, form.Mail).Scan(&exists)
 	if err != nil {
-		// Database read failure (low penalty, not user fault necessarily)
-		RateLimitProcessor.Add(ctx, 1_000) // 600 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Blocked, step1FileName, RequestProcessor.GetRequestId(ctx), "Account exists: "+form.Mail)
 
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.DBReadError},
-			})
+		// Database read failure (low penalty, not user fault necessarily)
+		RequestProcessor.AddRateLimitWeight(ctx, 1_000) // 600 invalid attempts/minute
+
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.DBReadError},
+		})
 	}
 
 	// Reject registration if account already exists
 	if exists {
-		// High penalty to discourage enumeration attacks
-		RateLimitProcessor.Add(ctx, 60_000) // 10 invalid attempts/minute
+		Logs.RootLogger.Add(Logs.Blocked, step1FileName, RequestProcessor.GetRequestId(ctx), "Account exists: "+form.Mail)
 
-		return ctx.Status(fiber.StatusOK).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.AccountPresent},
-			})
+		// High penalty to discourage enumeration attacks
+		RequestProcessor.AddRateLimitWeight(ctx, 60_000) // 10 invalid attempts/minute
+
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.AccountPresent},
+		})
 	}
 
 	// Send OTP to user's email for verification in Step2
-	step2code, retryAfter := OTPProcessor.Send(form.Mail, MailModels.SignUpStarted, ctx.IP())
-	if step2code == "" {
-		// OTP dispatch failed (temporary issue or abuse protection)
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
+	step2code, retryAfter, err := OTPProcessor.Send(form.Mail, MailModels.SignUpStarted, ctx.IP())
+	if err != nil {
+		Logs.RootLogger.Add(Logs.Error, step1FileName, RequestProcessor.GetRequestId(ctx), "Step2 code empty: "+err.Error())
 
-		return ctx.Status(fiber.StatusOK).JSON(
-			ResponseModels.APIResponseT{
-				Reply:         retryAfter.Seconds(), // Inform client when retry is allowed
-				Notifications: []string{Notifications.OTPSendFailed},
-			})
+		// OTP dispatch failed
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
+
+		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+			Reply:         retryAfter.Seconds(), // Inform client when retry is allowed
+			Notifications: []string{Notifications.OTPSendFailed},
+		})
 	}
 
 	// Construct payload required for Step2
 	// This includes all validated user data + OTP reference
 	token, err := TokenProcessor.CreateSignUpToken(form, step2code)
 	if err != nil {
-		RateLimitProcessor.Add(ctx, 10_000) // 60 invalid attempts/minute
-		return ctx.Status(fiber.StatusInternalServerError).JSON(
-			ResponseModels.APIResponseT{
-				Notifications: []string{Notifications.EncryptorError},
-			})
+		Logs.RootLogger.Add(Logs.Error, step1FileName, RequestProcessor.GetRequestId(ctx), "Token creation failed: "+err.Error())
+
+		RequestProcessor.AddRateLimitWeight(ctx, 10_000) // 60 invalid attempts/minute
+
+		return ctx.Status(fiber.StatusInternalServerError).JSON(ResponseModels.APIResponseT{
+			Notifications: []string{Notifications.EncryptorError},
+		})
 	}
+
+	Logs.RootLogger.Add(Logs.Info, step1FileName, RequestProcessor.GetRequestId(ctx), "Competed request")
 
 	// Return encrypted token to client.
 	// Client must include this token in Step2 along with OTP for verification
-	return ctx.Status(fiber.StatusOK).JSON(
-		ResponseModels.APIResponseT{
-			Success: true,
-			Reply:   token,
-		})
+	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
+		Success: true,
+		Reply:   token,
+	})
 }

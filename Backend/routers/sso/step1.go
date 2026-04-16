@@ -2,6 +2,8 @@ package sso
 
 import (
 	CookieProcessor "BhariyaAuth/processors/cookies"
+	Logs "BhariyaAuth/processors/logs"
+	RequestProcessor "BhariyaAuth/processors/request"
 	ResponseProcessor "BhariyaAuth/processors/sso"
 	StringProcessor "BhariyaAuth/processors/string"
 	TokenProcessor "BhariyaAuth/processors/token"
@@ -9,6 +11,8 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/markbates/goth"
 )
+
+const step1FileName = "routers/sso/step1"
 
 // Step1 initializes the Single Sign-On (SSO) authentication flow.
 //
@@ -40,18 +44,25 @@ func Step1(ctx fiber.Ctx) error {
 
 	// Extract provider name from URL parameters (must match registered Goth providers)
 	providerName := ctx.Params(ProviderParam)
+	state := ctx.Query(StateQuery)
+	remember := ctx.Query("remember", "no") == "yes"
+	Logs.RootLogger.Add(Logs.Intent, step1FileName, RequestProcessor.GetRequestId(ctx), "Requested: "+providerName)
 
 	// Attempt to retrieve the SSO provider configuration from Goth
 	provider, err := goth.GetProvider(providerName)
 	if err != nil {
+		Logs.RootLogger.Add(Logs.Blocked, step1FileName, RequestProcessor.GetRequestId(ctx), "Provider not found: "+providerName)
+
 		// Fail early if provider is not recognized
 		return ResponseProcessor.FailurePopup(ctx, UnknownProvider)
 	}
 
 	// Construct the SSO state payload that will persist across the authentication flow
 	// This state is later returned by the provider and used for validation
-	encryptedState, err := TokenProcessor.CreateSSOToken(ctx, providerName)
+	encryptedState, err := TokenProcessor.CreateSSOToken(ctx, providerName, state, remember)
 	if err != nil {
+		Logs.RootLogger.Add(Logs.Error, step1FileName, RequestProcessor.GetRequestId(ctx), "State token creation failed: "+err.Error())
+
 		// Abort if encryption fails (critical security failure)
 		return ResponseProcessor.FailurePopup(ctx, StateEncryptFailed)
 	}
@@ -60,6 +71,8 @@ func Step1(ctx fiber.Ctx) error {
 	// This state is typically sent as a query parameter to the provider
 	session, err := provider.BeginAuth(encryptedState)
 	if err != nil {
+		Logs.RootLogger.Add(Logs.Error, step1FileName, RequestProcessor.GetRequestId(ctx), "Session creation failed: "+err.Error())
+
 		// Abort if provider session initialization fails
 		return ResponseProcessor.FailurePopup(ctx, SessionCreateFailed)
 	}
@@ -67,13 +80,17 @@ func Step1(ctx fiber.Ctx) error {
 	// Retrieve the authentication URL to which the user must be redirected
 	authURL, err := session.GetAuthURL()
 	if err != nil {
+		Logs.RootLogger.Add(Logs.Error, step1FileName, RequestProcessor.GetRequestId(ctx), "URL generation failed: "+err.Error())
+
 		// Abort if URL generation fails
 		return ResponseProcessor.FailurePopup(ctx, AuthURLNotFound)
 	}
 
 	// Encrypt the session data before storing it in the client cookie
-	encryptedSession, err := StringProcessor.EncryptInterfaceToString(session)
+	encryptedSession, err := StringProcessor.EncryptInterfaceToB64(session)
 	if err != nil {
+		Logs.RootLogger.Add(Logs.Error, step1FileName, RequestProcessor.GetRequestId(ctx), "Session encrypt failed: "+err.Error())
+
 		// Abort if session serialization fails
 		return ResponseProcessor.FailurePopup(ctx, SessionEncryptFailed)
 	}
@@ -82,6 +99,7 @@ func Step1(ctx fiber.Ctx) error {
 	// This allows retrieval during the callback phase of the SSO flow
 	CookieProcessor.AttachSSOCookie(ctx, encryptedSession)
 
+	Logs.RootLogger.Add(Logs.Info, step1FileName, RequestProcessor.GetRequestId(ctx), "Completed request")
 	// Redirect the user to the provider's authentication page
 	// The encrypted state is passed along and session is maintained via cookie
 	return ctx.Redirect().To(authURL)

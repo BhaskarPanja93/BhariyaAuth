@@ -34,6 +34,7 @@ type PasswordReset struct {
 type SSOState struct {
 	TokenType string    `json:"tt"`
 	Provider  string    `json:"pro"`
+	State     string    `json:"st"`
 	Expiry    time.Time `json:"exp"`
 	Remember  bool      `json:"rem"`
 }

@@ -1,6 +1,8 @@
 package form
 
 import (
+	"errors"
+
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -33,18 +35,18 @@ import (
 // Returns:
 // - true if binding succeeds.
 // - false if all binding attempts fail.
-func ReadFormData(ctx fiber.Ctx, form any) bool {
+func ReadFormData(ctx fiber.Ctx, form any) error {
 
 	// Attempt to bind form data first (common for HTML forms)
 	if err := ctx.Bind().Form(form); err == nil {
-		return true
+		return nil
 	}
 
 	// Fallback to body parsing (e.g., JSON payload)
 	if err := ctx.Bind().Body(form); err == nil {
-		return true
+		return nil
 	}
 
 	// Both parsing methods failed
-	return false
+	return errors.New("form could not be read")
 }
