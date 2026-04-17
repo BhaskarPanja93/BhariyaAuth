@@ -85,7 +85,7 @@ func Step1(ctx fiber.Ctx) error {
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
 
-	Logs.RootLogger.Add(Logs.Intent, step1FileName, RequestProcessor.GetRequestId(ctx), "Requested account: "+form.Mail)
+	Logs.RootLogger.Add(Logs.Intent, step1FileName, RequestProcessor.GetRequestId(ctx), "Requested for: "+form.Mail)
 
 	// Check if an account already exists for the given email
 	var exists bool
@@ -140,7 +140,7 @@ func Step1(ctx fiber.Ctx) error {
 		})
 	}
 
-	Logs.RootLogger.Add(Logs.Info, step1FileName, RequestProcessor.GetRequestId(ctx), "Competed request")
+	Logs.RootLogger.Add(Logs.Info, step1FileName, RequestProcessor.GetRequestId(ctx), "Request Complete")
 
 	// Return encrypted token to client.
 	// Client must include this token in Step2 along with OTP for verification

@@ -79,7 +79,7 @@ func Step2(ctx fiber.Ctx) error {
 		})
 	}
 
-	Logs.RootLogger.Add(Logs.Intent, step2FileName, RequestProcessor.GetRequestId(ctx), "Requested account: "+data.MailAddress)
+	Logs.RootLogger.Add(Logs.Intent, step2FileName, RequestProcessor.GetRequestId(ctx), "Requested for: "+data.MailAddress)
 
 	// Re-check if account already exists (race condition protection)
 	var exists bool
@@ -132,7 +132,7 @@ func Step2(ctx fiber.Ctx) error {
 			Notifications: []string{Notifications.DBWriteError},
 		})
 	}
-	Logs.RootLogger.Add(Logs.Info, step2FileName, RequestProcessor.GetRequestId(ctx), "Signed Up: "+data.MailAddress+" "+strconv.Itoa(int(userID)))
+	Logs.RootLogger.Add(Logs.Info, step2FileName, RequestProcessor.GetRequestId(ctx), "Signed Up: "+strconv.Itoa(int(userID)))
 
 	// Register user device/session
 	deviceID, err := AccountProcessor.RecordReturningUser(ctx, data.MailAddress, userID, data.Remember, false)
@@ -172,7 +172,7 @@ func Step2(ctx fiber.Ctx) error {
 	// Attach MFA cookie
 	CookieProcessor.AttachMFACookie(ctx, mfaToken)
 
-	Logs.RootLogger.Add(Logs.Info, step2FileName, RequestProcessor.GetRequestId(ctx), "Completed request: "+strconv.Itoa(int(userID))+" "+strconv.Itoa(int(deviceID)))
+	Logs.RootLogger.Add(Logs.Info, step2FileName, RequestProcessor.GetRequestId(ctx), "Request Complete: "+strconv.Itoa(int(userID))+" "+strconv.Itoa(int(deviceID)))
 	// Return access token and expiry to client
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 		Success:    true,

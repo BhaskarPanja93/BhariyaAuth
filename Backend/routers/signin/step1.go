@@ -85,7 +85,7 @@ func Step1(ctx fiber.Ctx) error {
 
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
-	Logs.RootLogger.Add(Logs.Intent, step1FileName, RequestProcessor.GetRequestId(ctx), "Requested account: "+form.Mail+" "+form.Process)
+	Logs.RootLogger.Add(Logs.Intent, step1FileName, RequestProcessor.GetRequestId(ctx), "Requested for: "+form.Mail+" "+form.Process)
 
 	// Fetch user metadata in a single query (optimized DB access)
 	var userID int32
@@ -175,7 +175,7 @@ func Step1(ctx fiber.Ctx) error {
 		})
 	}
 
-	Logs.RootLogger.Add(Logs.Info, step1FileName, RequestProcessor.GetRequestId(ctx), "Completed request")
+	Logs.RootLogger.Add(Logs.Info, step1FileName, RequestProcessor.GetRequestId(ctx), "Request Complete")
 
 	// Return encrypted token to client.
 	// Client must use this token in Step2 along with password or OTP

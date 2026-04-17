@@ -62,7 +62,7 @@ func Revoke(ctx fiber.Ctx) error {
 
 		return ctx.SendStatus(fiber.StatusUnauthorized)
 	}
-	Logs.RootLogger.Add(Logs.Intent, revokeFileName, RequestProcessor.GetRequestId(ctx), "Requested by: "+strconv.Itoa(int(access.UserID))+strconv.Itoa(int(access.DeviceID)))
+	Logs.RootLogger.Add(Logs.Intent, revokeFileName, RequestProcessor.GetRequestId(ctx), "Requested for: "+strconv.Itoa(int(access.UserID))+strconv.Itoa(int(access.DeviceID)))
 
 	// Ensure current device/session is not blocked
 	revoked, err := AccountProcessor.CheckDeviceAccessDenied(access.UserID, access.DeviceID)
@@ -104,7 +104,7 @@ func Revoke(ctx fiber.Ctx) error {
 	}
 
 	if form.All == "yes" {
-		Logs.RootLogger.Add(Logs.Intent, revokeFileName, RequestProcessor.GetRequestId(ctx), "Requested to revoke all devices")
+		Logs.RootLogger.Add(Logs.Intent, revokeFileName, RequestProcessor.GetRequestId(ctx), "Requested for"+strconv.Itoa(int(access.UserID))+" "+strconv.Itoa(int(access.DeviceID))+" revoke all devices")
 
 		// Prevent all devices from renewing (global logout)
 		err = AccountProcessor.DenyAllDevicesFromRenewing(access.UserID)
@@ -115,7 +115,7 @@ func Revoke(ctx fiber.Ctx) error {
 
 			return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 		}
-		Logs.RootLogger.Add(Logs.Info, revokeFileName, RequestProcessor.GetRequestId(ctx), "Completed request")
+		Logs.RootLogger.Add(Logs.Info, revokeFileName, RequestProcessor.GetRequestId(ctx), "Request Complete")
 		return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 			Success: true,
 		})
@@ -130,7 +130,7 @@ func Revoke(ctx fiber.Ctx) error {
 		return ctx.SendStatus(fiber.StatusUnauthorized)
 	}
 
-	Logs.RootLogger.Add(Logs.Intent, revokeFileName, RequestProcessor.GetRequestId(ctx), "Requested to revoke: "+strconv.Itoa(int(device.DeviceID)))
+	Logs.RootLogger.Add(Logs.Intent, revokeFileName, RequestProcessor.GetRequestId(ctx), "Requested for"+strconv.Itoa(int(access.UserID))+" "+strconv.Itoa(int(access.DeviceID))+" revoke: "+strconv.Itoa(int(device.DeviceID)))
 
 	// Revoke specific device/session
 	err = AccountProcessor.DenySingleDeviceFromRenewing(device.UserID, device.DeviceID)
@@ -142,7 +142,7 @@ func Revoke(ctx fiber.Ctx) error {
 		return ctx.SendStatus(fiber.StatusInternalServerError)
 	}
 
-	Logs.RootLogger.Add(Logs.Info, revokeFileName, RequestProcessor.GetRequestId(ctx), "Completed request")
+	Logs.RootLogger.Add(Logs.Info, revokeFileName, RequestProcessor.GetRequestId(ctx), "Request Complete")
 	// Return success response
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 		Success: true,

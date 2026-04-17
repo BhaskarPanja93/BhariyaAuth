@@ -46,7 +46,7 @@ var RedisClient *redis.Client
 // Important:
 // - This function blocks indefinitely until Redis is reachable.
 func ConnectRedis() {
-	Logs.RootLogger.Add(Logs.Intent, sqlFileName, "", "Connecting Redis")
+	Logs.RootLogger.Add(Logs.Intent, sqlFileName, "", "Attempting connect Redis")
 
 	// Prevent re-initialization if already connected
 	if RedisClient != nil {

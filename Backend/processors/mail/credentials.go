@@ -20,7 +20,7 @@ import (
 func refreshCredentials() {
 	_, _, _ = group.Do("refreshCredentials", func() (any, error) {
 
-		Logs.RootLogger.Add(Logs.Intent, "processors/mail/main", "", "Credentials refreshing")
+		Logs.RootLogger.Add(Logs.Intent, "processors/mail/main", "", "Attempting credential refresh")
 
 		c, err := graph.NewGraphServiceClientWithCredentials(
 			credential,

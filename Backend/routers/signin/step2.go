@@ -90,7 +90,7 @@ func Step2(ctx fiber.Ctx) error {
 		})
 	}
 
-	Logs.RootLogger.Add(Logs.Intent, step2FileName, RequestProcessor.GetRequestId(ctx), "Requested account: "+strconv.Itoa(int(data.UserID))+" "+data.Step2Process)
+	Logs.RootLogger.Add(Logs.Intent, step2FileName, RequestProcessor.GetRequestId(ctx), "Requested for: "+strconv.Itoa(int(data.UserID))+" "+data.Step2Process)
 
 	var hash string  // Stored password hash (for password flow)
 	var t string     // User type/role
@@ -205,7 +205,7 @@ func Step2(ctx fiber.Ctx) error {
 		var mfaToken string
 		mfaToken, err = TokenProcessor.CreateMFAToken(ctx, data.UserID, deviceID, data.Step2Code)
 		if err != nil {
-			Logs.RootLogger.Add(Logs.Warn, step2FileName, RequestProcessor.GetRequestId(ctx), "MFA creation failed")
+			Logs.RootLogger.Add(Logs.Warn, step2FileName, RequestProcessor.GetRequestId(ctx), "MFA creation failed: "+err.Error())
 		}
 		CookieProcessor.AttachMFACookie(ctx, mfaToken)
 	}
@@ -213,7 +213,7 @@ func Step2(ctx fiber.Ctx) error {
 	// Attach authentication cookies (refresh + CSRF)
 	CookieProcessor.AttachAuthCookies(ctx, token)
 
-	Logs.RootLogger.Add(Logs.Info, step2FileName, RequestProcessor.GetRequestId(ctx), "Completed request: "+strconv.Itoa(int(deviceID)))
+	Logs.RootLogger.Add(Logs.Info, step2FileName, RequestProcessor.GetRequestId(ctx), "Request Complete: "+strconv.Itoa(int(deviceID)))
 
 	// Return access token and expiry
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{

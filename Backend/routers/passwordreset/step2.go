@@ -93,7 +93,7 @@ func Step2(ctx fiber.Ctx) error {
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
 
-	Logs.RootLogger.Add(Logs.Intent, step2FileName, RequestProcessor.GetRequestId(ctx), "Requested by: "+strconv.Itoa(int(data.UserID)))
+	Logs.RootLogger.Add(Logs.Intent, step2FileName, RequestProcessor.GetRequestId(ctx), "Requested for: "+strconv.Itoa(int(data.UserID)))
 
 	// Validate OTP provided by user
 	if !OTPProcessor.Validate(data.Step2Code, form.Verification) {

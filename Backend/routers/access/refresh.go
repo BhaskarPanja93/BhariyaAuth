@@ -91,7 +91,7 @@ func Refresh(ctx fiber.Ctx) error {
 				Notifications: []string{Notifications.SessionRevoked},
 			})
 	} else if err != nil {
-		Logs.RootLogger.Add(Logs.Error, refreshFileName, RequestProcessor.GetRequestId(ctx), "Account data fetch failed")
+		Logs.RootLogger.Add(Logs.Error, refreshFileName, RequestProcessor.GetRequestId(ctx), "Account data fetch failed: "+err.Error())
 		RequestProcessor.AddRateLimitWeight(ctx, 1_000) // 600 invalid attempts/minute
 
 		return ctx.Status(fiber.StatusInternalServerError).JSON(
@@ -154,7 +154,7 @@ func Refresh(ctx fiber.Ctx) error {
 	// Attach new refresh + CSRF cookies
 	CookieProcessor.AttachAuthCookies(ctx, token)
 
-	Logs.RootLogger.Add(Logs.Error, refreshFileName, RequestProcessor.GetRequestId(ctx), "Request complete")
+	Logs.RootLogger.Add(Logs.Info, refreshFileName, RequestProcessor.GetRequestId(ctx), "Request complete")
 	// Return new access token and expiry
 	return ctx.Status(fiber.StatusOK).JSON(
 		ResponseModels.APIResponseT{

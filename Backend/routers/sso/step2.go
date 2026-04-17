@@ -62,7 +62,7 @@ func Step2(ctx fiber.Ctx) error {
 	encryptedSession := ctx.Cookies(Config.SSOStateInCookie) // Encrypted session stored earlier
 	providerName := ctx.Params(ProviderParam)                // Provider identifier
 
-	Logs.RootLogger.Add(Logs.Intent, step2FileName, RequestProcessor.GetRequestId(ctx), "Requested: "+providerName)
+	Logs.RootLogger.Add(Logs.Intent, step2FileName, RequestProcessor.GetRequestId(ctx), "Requested for: "+providerName)
 
 	// Retrieve provider configuration from Goth
 	provider, err := goth.GetProvider(providerName)
@@ -199,7 +199,7 @@ func Step2(ctx fiber.Ctx) error {
 			// Registration failed
 			return ResponseProcessor.FailurePopup(ctx, AccountCreateFailed)
 		}
-		Logs.RootLogger.Add(Logs.Info, step2FileName, RequestProcessor.GetRequestId(ctx), "Signed Up: "+user.Email+" "+strconv.Itoa(int(userID)))
+		Logs.RootLogger.Add(Logs.Info, step2FileName, RequestProcessor.GetRequestId(ctx), "Signed Up: "+strconv.Itoa(int(userID)))
 	}
 
 	// Prevent signin if account is blocked

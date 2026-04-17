@@ -46,7 +46,7 @@ func Step1(ctx fiber.Ctx) error {
 	providerName := ctx.Params(ProviderParam)
 	state := ctx.Query(StateQuery)
 	remember := ctx.Query("remember", "no") == "yes"
-	Logs.RootLogger.Add(Logs.Intent, step1FileName, RequestProcessor.GetRequestId(ctx), "Requested: "+providerName)
+	Logs.RootLogger.Add(Logs.Intent, step1FileName, RequestProcessor.GetRequestId(ctx), "Requested for: "+providerName)
 
 	// Attempt to retrieve the SSO provider configuration from Goth
 	provider, err := goth.GetProvider(providerName)
@@ -99,7 +99,7 @@ func Step1(ctx fiber.Ctx) error {
 	// This allows retrieval during the callback phase of the SSO flow
 	CookieProcessor.AttachSSOCookie(ctx, encryptedSession)
 
-	Logs.RootLogger.Add(Logs.Info, step1FileName, RequestProcessor.GetRequestId(ctx), "Completed request")
+	Logs.RootLogger.Add(Logs.Info, step1FileName, RequestProcessor.GetRequestId(ctx), "Request Complete")
 	// Redirect the user to the provider's authentication page
 	// The encrypted state is passed along and session is maintained via cookie
 	return ctx.Redirect().To(authURL)

@@ -45,7 +45,7 @@ var SQLClient *pgxpool.Pool
 // - Blocks indefinitely until DB becomes available.
 // - Intended for controlled startup phase.
 func ConnectSQL() {
-	Logs.RootLogger.Add(Logs.Intent, sqlFileName, "", "Connecting SQL")
+	Logs.RootLogger.Add(Logs.Intent, sqlFileName, "", "Attempting connect SQL")
 
 	// Prevent re-initialization
 	if SQLClient != nil {

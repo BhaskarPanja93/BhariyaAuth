@@ -72,7 +72,7 @@ func Logout(ctx fiber.Ctx) error {
 			})
 	}
 
-	Logs.RootLogger.Add(Logs.Error, logoutFileName, RequestProcessor.GetRequestId(ctx), "Request complete")
+	Logs.RootLogger.Add(Logs.Info, logoutFileName, RequestProcessor.GetRequestId(ctx), "Request complete")
 	// Return success response indicating auth state has changed
 	return ctx.Status(fiber.StatusOK).JSON(
 		ResponseModels.APIResponseT{

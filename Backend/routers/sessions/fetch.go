@@ -53,7 +53,7 @@ func Fetch(ctx fiber.Ctx) error {
 
 		return ctx.SendStatus(fiber.StatusUnauthorized)
 	}
-	Logs.RootLogger.Add(Logs.Intent, fetchFilename, RequestProcessor.GetRequestId(ctx), "Requested by: "+strconv.Itoa(int(access.UserID))+" "+strconv.Itoa(int(access.DeviceID)))
+	Logs.RootLogger.Add(Logs.Intent, fetchFilename, RequestProcessor.GetRequestId(ctx), "Requested for: "+strconv.Itoa(int(access.UserID))+" "+strconv.Itoa(int(access.DeviceID)))
 
 	// Ensure token is valid and still fresh (not expired)
 	revoked, err := AccountProcessor.CheckDeviceAccessDenied(access.UserID, access.DeviceID)
@@ -137,7 +137,7 @@ func Fetch(ctx fiber.Ctx) error {
 		Logs.RootLogger.Add(Logs.Warn, fetchFilename, RequestProcessor.GetRequestId(ctx), "Loop ended prematurely: "+err.Error())
 	}
 
-	Logs.RootLogger.Add(Logs.Info, fetchFilename, RequestProcessor.GetRequestId(ctx), "Completed request")
+	Logs.RootLogger.Add(Logs.Info, fetchFilename, RequestProcessor.GetRequestId(ctx), "Request Complete")
 	// Return aggregated session/activity data
 	return ctx.Status(fiber.StatusOK).JSON(ResponseModels.APIResponseT{
 		Success: true,

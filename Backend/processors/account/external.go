@@ -184,6 +184,6 @@ func ServeAccountDetails() {
 			continue
 		}
 
-		Logs.RootLogger.Add(Logs.Info, "processors/account/external", "", "Serve account details"+request.ServerID+" "+strconv.Itoa(int(request.UserID)))
+		Logs.RootLogger.Add(Logs.Info, "processors/account/external", "", "Served account details to: "+request.ServerID+" account: "+strconv.Itoa(int(request.UserID)))
 	}
 }

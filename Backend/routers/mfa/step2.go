@@ -75,7 +75,7 @@ func Step2(ctx fiber.Ctx) error {
 		return ctx.SendStatus(fiber.StatusUnprocessableEntity)
 	}
 
-	Logs.RootLogger.Add(Logs.Intent, step1FileName, RequestProcessor.GetRequestId(ctx), "Requested by: "+strconv.Itoa(int(data.UserID))+" "+strconv.Itoa(int(data.DeviceID)))
+	Logs.RootLogger.Add(Logs.Intent, step1FileName, RequestProcessor.GetRequestId(ctx), "Requested for: "+strconv.Itoa(int(data.UserID))+" "+strconv.Itoa(int(data.DeviceID)))
 
 	// Validate OTP provided by user
 	if !OTPProcessor.Validate(data.Step2Code, form.Verification) {
@@ -149,7 +149,7 @@ func Step2(ctx fiber.Ctx) error {
 	// Attach MFA cookie to mark session as second-factor verified
 	CookieProcessor.AttachMFACookie(ctx, token)
 
-	Logs.RootLogger.Add(Logs.Info, step1FileName, RequestProcessor.GetRequestId(ctx), "Completed request")
+	Logs.RootLogger.Add(Logs.Info, step1FileName, RequestProcessor.GetRequestId(ctx), "Request complete")
 	// Return success response
 	return ctx.Status(fiber.StatusOK).JSON(
 		ResponseModels.APIResponseT{
