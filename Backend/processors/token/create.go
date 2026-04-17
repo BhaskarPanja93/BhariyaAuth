@@ -83,8 +83,11 @@ func CreateFreshToken(
 			IdentifierType: identifierType,
 		},
 	)
+	if err != nil {
+		return combined, errors.New("Create renew token - refresh: " + err.Error())
+	}
 
-	return combined, errors.New("Create renew token - refresh: " + err.Error())
+	return combined, nil
 }
 
 // CreateRenewToken generates a new access and refresh token from an existing refresh token.
