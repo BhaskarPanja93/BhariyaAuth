@@ -1,7 +1,6 @@
 {% package html %}
 
 {% func SSOFailurePopup(reason string) %}
-<!DOCTYPE html>
 <html lang="en">
     <script>
         async function onAuthFailure() {

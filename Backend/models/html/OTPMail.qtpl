@@ -1,23 +1,22 @@
 {% package html %}
 
 {% func OTP(frontendURL string, header string, otp string, isIgnorable bool) %}
-<!DOCTYPE html>
 <html lang="en">
     <head>
         <meta charset="UTF-8" />
         <title>BhariyaAuth OTP</title>
     </head>
     <body style="margin:0; padding:0; background-color: #eef0f3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;">
-    <table width="100%" cellpadding="0" cellspacing="0">
+    <table cellpadding="0" cellspacing="0" width="100%">
         <tr>
             <td align="center" style="padding: 48px 16px;">
-                <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; background-color: #ffffff; border-radius: 14px; border: 1px solid #e5e7eb; overflow: hidden;">
+                <table cellpadding="0" cellspacing="0" style="max-width: 520px; background-color: #ffffff; border-radius: 14px; border: 1px solid #e5e7eb; overflow: hidden;" width="100%">
                     <tr>
-                        <td style="background: linear-gradient(135deg, #1f2937, #0b0d10); padding: 28px; border-bottom: 1px solid #1f2937;" align="center">
-                            <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid rgba(255,255,255,0.12); border-radius: 10px;">
+                        <td align="center" style="background: linear-gradient(135deg, #1f2937, #0b0d10); padding: 28px; border-bottom: 1px solid #1f2937;">
+                            <table cellpadding="0" cellspacing="0" style="border: 1px solid rgba(255,255,255,0.12); border-radius: 10px;" width="100%">
                                 <tr>
                                     <td align="center" style="padding: 20px;">
-                                        <img src="{%s frontendURL %}/favicons/DarkMode.png" width="120" style="display:block;" />
+                                        <img src="{%s frontendURL %}/favicons/DarkMode.png" style="display:block;" width="120" />
                                     </td>
                                 </tr>
                             </table>
@@ -25,7 +24,7 @@
                     </tr>
                     <tr>
                         <td style="padding: 28px;">
-                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px;">
+                            <table cellpadding="0" cellspacing="0" style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px;" width="100%">
                                 <tr>
                                     <td style="padding: 28px; text-align: center;">
                                         <p style="margin: 0 0 16px; font-size: 15px; color: #374151; line-height: 1.5;">
@@ -44,7 +43,7 @@
                     </tr>
                     <tr>
                         <td style="padding: 0 28px 28px;">
-                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;">
+                            <table cellpadding="0" cellspacing="0" style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;" width="100%">
                                 <tr>
                                     <td style="padding: 18px; text-align: center;">
                                         <p style="margin: 0; font-size: 12px; color: #6b7280;">

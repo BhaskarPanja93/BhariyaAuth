@@ -1,7 +1,6 @@
 {% package html %}
 
 {% func SSOSuccessPopup(token string, expires string, state string) %}
-<!DOCTYPE html>
 <html lang="en">
     <head>
         <script>
