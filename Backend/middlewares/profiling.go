@@ -3,6 +3,8 @@ package middlewares
 import (
 	Logs "BhariyaAuth/processors/logs"
 	RequestProcessor "BhariyaAuth/processors/request"
+	"fmt"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -47,7 +49,16 @@ const (
 // Returns:
 // - Proceeds with next middleware/handler and enriches response with profiling metadata.
 func ProfilingMiddleware() fiber.Handler {
-	return func(ctx fiber.Ctx) error {
+	return func(ctx fiber.Ctx) (err error) {
+
+		defer func() {
+			if r := recover(); r != nil {
+				// Log the panic
+				Logs.RootLogger.Add(Logs.Error, "middleware/profiling", "", fmt.Sprintf("Panic: %v\n%s", r, debug.Stack()))
+				// Send 500 response
+				err = ctx.SendStatus(fiber.StatusInternalServerError)
+			}
+		}()
 
 		path := ctx.Path()
 
@@ -62,14 +73,14 @@ func ProfilingMiddleware() fiber.Handler {
 
 		// Set a request identifier for tracing
 		requestID := RequestProcessor.SetRequestId(ctx)
-		Logs.RootLogger.Add(Logs.Info, "middleware/profiling", requestID, "Received request from "+ctx.IP()+" for path "+path)
+		Logs.RootLogger.Add(Logs.Intent, "middleware/profiling", requestID, "Received request from "+ctx.IP()+" for path "+path)
 
 		// Attach request metadata to response headers (early visibility)
 		ctx.Set(fiber.HeaderXRequestID, requestID)
 
 		processingStarted := RequestProcessor.SetRequestTime(ctx)
 		// Execute next middleware/handler in chain
-		err := ctx.Next()
+		err = ctx.Next()
 
 		// Capture request end time
 		processingEnded := time.Now().UTC()
