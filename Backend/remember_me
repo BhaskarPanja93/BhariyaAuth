@@ -22,7 +22,6 @@ FUTURE:
 try different encoder, instead of json
 add service start and stop and update features
 add graceful shutdown to all services + Cancellable background CTX
-Try CookieSameSiteStrictMode instead of CookieSameSiteLaxMode for SSO
 Admin page, mail send (individual/grouped/all), block/unblock account, revoke devices, entry update.
 Instead of auto-retry on 429, make it manual with client based retry-after checking
 FEATURE FLAGS PLEASEEEEEEE
