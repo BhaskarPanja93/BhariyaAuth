@@ -1,71 +1,77 @@
 package tokens
 
 import (
-	UsersTypes "BhariyaAuth/models/users"
 	"time"
 )
 
-type SignInT struct {
+// All tokens  that are either generated, for eg, Step1 of a process, Cookie etc
+
+type SignIn struct {
 	TokenType    string `json:"tt"`
-	UserID       uint32 `json:"uid"`
-	RememberMe   bool   `json:"remember"`
-	Step2Process string `json:"2_type"`
-	Step2Code    string `json:"2_code"`
-	Mail         string `json:"mail"`
+	UserID       int32  `json:"uid"`
+	Remember     bool   `json:"rem"`
+	Step2Process string `json:"2t"`
+	Step2Code    string `json:"2c"`
+	MailAddress  string `json:"add"`
 }
 
-type SignUpT struct {
-	TokenType  string `json:"tt"`
-	Mail       string `json:"mail"`
-	RememberMe bool   `json:"remember"`
-	Name       string `json:"name"`
-	Password   string `json:"password"`
-	Step2Code  string `json:"2_code"`
+type SignUp struct {
+	TokenType   string `json:"tt"`
+	MailAddress string `json:"add"`
+	Remember    bool   `json:"rem"`
+	Name        string `json:"name"`
+	Password    string `json:"pass"`
+	Step2Code   string `json:"2c"`
 }
 
-type PasswordResetT struct {
-	TokenType string `json:"tt"`
-	Mail      string `json:"mail"`
-	UserID    uint32 `json:"uid"`
-	Step2Code string `json:"2_code"`
+type PasswordReset struct {
+	TokenType   string `json:"tt"`
+	MailAddress string `json:"add"`
+	UserID      int32  `json:"uid"`
+	Step2Code   string `json:"2c"`
 }
 
-type SSOStateT struct {
-	Provider   string    `json:"pro"`
-	Expiry     time.Time `json:"exp"`
-	RememberMe bool      `json:"rem"`
-}
-
-type MFATokenT struct {
+type SSOState struct {
 	TokenType string    `json:"tt"`
-	Step2Code string    `json:"2_code"`
-	UserID    uint32    `json:"uid"`
-	Creation  time.Time `json:"cre"`
+	Provider  string    `json:"pro"`
+	State     string    `json:"st"`
+	Expiry    time.Time `json:"exp"`
+	Remember  bool      `json:"rem"`
+}
+
+type MFAToken struct {
+	TokenType string    `json:"tt"`
+	Step2Code string    `json:"2c"`
+	UserID    int32     `json:"uid"`
+	DeviceID  int16     `json:"did"`
+	Created   time.Time `json:"cre"`
 	Verified  bool      `json:"ver"`
 }
 
-type AccessTokenT struct {
-	UserID       uint32       `json:"uid"`
-	RefreshID    uint16       `json:"rid"`
-	UserType     UsersTypes.T `json:"typ"`
-	AccessExpiry time.Time    `json:"axe"`
-	RememberMe   bool         `json:"rem"`
+type AccessToken struct {
+	TokenType string    `json:"tt"`
+	UserID    int32     `json:"uid"`
+	DeviceID  int16     `json:"did"`
+	UserType  string    `json:"typ"`
+	Expiry    time.Time `json:"exp"`
+	Remember  bool      `json:"rem"`
 }
 
-type RefreshTokenT struct {
-	UserID         uint32       `json:"uid"`
-	RefreshID      uint16       `json:"rid"`
-	RefreshIndex   uint16       `json:"rin"`
-	RefreshCreated time.Time    `json:"rca"`
-	RefreshUpdated time.Time    `json:"rua"`
-	RefreshExpiry  time.Time    `json:"rxa"`
-	UserType       UsersTypes.T `json:"typ"`
-	CSRF           string       `json:"csr"`
-	RememberMe     bool         `json:"rem"`
-	IdentifierType string       `json:"siu"`
+type RefreshToken struct {
+	TokenType      string    `json:"tt"`
+	UserID         int32     `json:"uid"`
+	DeviceID       int16     `json:"did"`
+	Visits         int16     `json:"vis"`
+	Created        time.Time `json:"cre"`
+	Updated        time.Time `json:"upd"`
+	Expiry         time.Time `json:"exp"`
+	UserType       string    `json:"typ"`
+	CSRF           string    `json:"csrf"`
+	Remember       bool      `json:"rem"`
+	IdentifierType string    `json:"it"`
 }
 
-type NewTokenCombinedT struct {
+type NewTokenCombined struct {
 	AccessToken   string
 	RefreshToken  string
 	AccessExpires time.Time

@@ -2,40 +2,46 @@ package responses
 
 import "time"
 
+// All response types
+
 type AccountDetailsRequestT struct {
 	ServerID string `json:"sid"`
-	UserID   uint32 `json:"uid"`
+	UserID   int32  `json:"uid"`
 }
 
 type AccountDetailsResponseT struct {
-	UserID   uint32    `json:"uid"`
-	Email    string    `json:"mail"`
-	Name     string    `json:"name"`
-	Creation time.Time `json:"creation"`
+	UserID  int32     `json:"uid"`
+	Email   string    `json:"mail"`
+	Name    string    `json:"name"`
+	Created time.Time `json:"created"`
 }
 
 type APIResponseT struct {
-	Success       bool     `json:"success"`
-	Reply         any      `json:"reply"`
-	ModifyAuth    bool     `json:"modify-auth"`
-	NewToken      string   `json:"new-token"`
-	Notifications []string `json:"notifications"`
-	RetryAfter    int      `json:"retry-after"`
+	Success       bool     `json:"success,omitempty"`
+	Reply         any      `json:"reply,omitempty"`
+	ModifyAuth    bool     `json:"modify-auth,omitempty"`
+	NewToken      string   `json:"new-token,omitempty"`
+	Notifications []string `json:"notifications,omitempty"`
+	RetryAfter    int      `json:"retry-after,omitempty"`
 }
 
-type SingleUserActivityT struct {
+type SingleDeviceT struct {
+	UserID   int32 `json:"uid"`
+	DeviceID int16 `json:"deviceid"`
+}
+
+type SingleUserDeviceT struct {
 	ID         string    `json:"id"`
-	Count      uint16    `json:"count"`
+	Count      int16     `json:"count"`
 	Remembered bool      `json:"remembered"`
-	Creation   time.Time `json:"creation"`
+	Created    time.Time `json:"created"`
 	Updated    time.Time `json:"updated"`
 	OS         string    `json:"os"`
 	Device     string    `json:"device"`
 	Browser    string    `json:"browser"`
 }
 
-type UserActivityResponseT struct {
-	UserID     string                `json:"user_id"`
-	DeviceID   string                `json:"device_id"`
-	Activities []SingleUserActivityT `json:"activities"`
+type UserDevicesResponseT struct {
+	Current string              `json:"current"`
+	Devices []SingleUserDeviceT `json:"devices"`
 }
