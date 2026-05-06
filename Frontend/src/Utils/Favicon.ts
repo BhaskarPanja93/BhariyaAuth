@@ -1,5 +1,5 @@
-export const SetFavicon = (href) => {
-    let link = document.querySelector("link[rel~='icon']");
+export function Favicon(href: string) {
+    let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
     if (!link) {
         link = document.createElement('link');
         link.rel = 'icon';

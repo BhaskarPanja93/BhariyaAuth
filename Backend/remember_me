@@ -7,6 +7,17 @@ log format:
 if self error: self function name - source of error - error
 if chained error : self function name - error
 
+authorization -
+    header(checked) : Bearer <token>
+refresh -
+    cookie(checked) : <token>
+csrf -
+    header(checked) : csrf <token>
+    cookie(checked) : <token>
+mfa -
+    header(checked) : mfa <token>
+    cookie(skipped) : <token>
+
 200: (ok, soft reject or accept)
 401: (reject, user not authenticated)
 403: (reject, user needs mfa completed)

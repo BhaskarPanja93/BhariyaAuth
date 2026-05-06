@@ -1,6 +1,18 @@
 import {InputOtp} from 'primereact/inputotp';
+import React from "react";
 
-export default function OTPInput({value, onValueChange, disabled}) {
+type InputTemplateOptions = {
+    props: React.InputHTMLAttributes<HTMLInputElement>;
+    events: React.InputHTMLAttributes<HTMLInputElement>;
+};
+
+export default function OTPInput(
+    {value, onValueChange, disabled}:
+    {
+        value:string,
+        onValueChange:React.Dispatch<React.SetStateAction<string>>,
+        disabled:boolean
+    }) {
     return (<div className="card flex justify-content-center">
             <style scoped>
                 {`
@@ -29,8 +41,20 @@ export default function OTPInput({value, onValueChange, disabled}) {
 
             <InputOtp
                 value={value}
-                onChange={(e) => onValueChange(e.value)}
-                inputTemplate={({events, props}) => <input {...events} {...props} type="text" className="custom-otp-input" name="otp-input"/>}
+                onChange={(e) => onValueChange(String(e.value ?? ""))}
+                inputTemplate={(options) => {
+                    const {events, props} = options as unknown as InputTemplateOptions;
+
+                    return (
+                        <input
+                            {...props}
+                            {...events}
+                            type="text"
+                            className={`${props.className ?? ""} custom-otp-input`.trim()}
+                            name="otp-input"
+                        />
+                    );
+                }}
                 length={6}
                 disabled={disabled}
             />
