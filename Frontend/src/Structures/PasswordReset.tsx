@@ -1,45 +1,53 @@
 import {useEffect, useRef, useState} from 'react'
-import SubmitButton from "../Elements/SubmitButton.jsx";
-import PasswordInput from "../Elements/PasswordInput.jsx";
-import {EmailIsValid, OTPIsValid} from "../Utils/Strings.js";
-import {AuthBackendURL} from "../Values/Constants.js";
-import {useNavigate} from "react-router-dom";
-import {FetchNotificationManager} from "../Contexts/Notification.jsx";
-import {FetchConnectionManager} from "../Contexts/Connection.jsx";
-import OTPInput from "../Elements/OTPInput.jsx";
-import EmailInput from "../Elements/EmailInput.jsx";
-import {Countdown} from "../Utils/Countdown.js";
-import OTPResendButton from "../Elements/OTPResendButton.jsx";
+import SubmitButton from "../Elements/SubmitButton";
+import PasswordInput from "../Elements/PasswordInput";
+import {EmailIsValid, OTPIsValid} from "../Utils/Strings";
+import {APIRoute} from "../Values/Constants";
+import {useLocation, useNavigate} from "react-router";
+import NotificationManager from "../Contexts/Notification.tsx";
+import ConnectionManager from "../Contexts/Connection.tsx";
+import OTPInput from "../Elements/OTPInput";
+import EmailInput from "../Elements/EmailInput";
+import Countdown from "../Utils/Countdown";
+import OTPResendButton from "../Elements/OTPResendButton";
 
-export default function PasswordReset({disabled}) {
+export default function PasswordReset() {
     const navigate = useNavigate();
-    const {SendNotification} = FetchNotificationManager();
-    const {SendPost} = FetchConnectionManager()
+    const location = useLocation();
+    const params = new URLSearchParams(location.search);
 
-    const [uiDisabled, setUiDisabled] = useState(false)
-    const [currentStep, setCurrentStep] = useState(1)
-    const OTPResendTimerID = useRef(0)
-    const [OTPDelay, setOTPDelay] = useState(0)
-    const [password, setPassword] = useState("")
-    const [passwordConfirmation, setPasswordConfirmation] = useState("")
-    const [email, setEmail] = useState("")
-    const [verification, setVerification] = useState()
-    const currentToken = useRef("")
+    const {SendNotification} = NotificationManager();
+    const {SendPost} = ConnectionManager()
+
+    const [uiDisabled, setUiDisabled] = useState<boolean>(false)
+    const [currentStep, setCurrentStep] = useState<number>(1)
+    const otpCountdownRef = useRef<Countdown | null>(null)
+    const [OTPDelay, setOTPDelay] = useState<number>(0)
+    const [password, setPassword] = useState<string>("")
+    const [passwordConfirmation, setPasswordConfirmation] = useState<string>("")
+    const [email, setEmail] = useState<string>("")
+    const [verification, setVerification] = useState<string>("")
+    const currentToken = useRef<string>("")
 
     const Step1 = () => {
         if (!EmailIsValid(email)) return SendNotification("Email is invalid");
 
         setUiDisabled(true);
         const form = new FormData();
-        form.append("mail_address", email);
-        SendPost(false, AuthBackendURL,  "/passwordreset/step1/", form, null)
+        form.append("mail", email);
+        SendPost(false, false, false, APIRoute,  "/passwordreset/step1", form)
             .then((data) => {
-                if (data["success"]) {
-                    SendNotification("Please enter the OTP sent to your mail")
-                    currentToken.current = data["reply"]
+                if (data.success) {
+                    SendNotification("Please enter the OTP sent to your mail for Password Reset")
+                    currentToken.current = data.reply
                     setCurrentStep(2)
-                } else if (data["reply"]) {
-                    Countdown(data["reply"], 0.1, OTPResendTimerID, setOTPDelay).then()
+                } else if (data.reply) {
+                    const countdown = otpCountdownRef.current
+                    if (!countdown) {
+                        otpCountdownRef.current = new Countdown(data.reply, 0.1, setOTPDelay).start()
+                    } else {
+                        countdown.resetDuration(data.reply)
+                    }
                 }
             })
             .catch((error)=>{console.log("PasswordReset Step1 stopped because:", error)})
@@ -49,7 +57,11 @@ export default function PasswordReset({disabled}) {
     };
 
     const Step2 = () => {
-        if (!currentToken.current) return SendNotification("Step 1 incomplete. Please resend OTP");
+        if (!currentToken.current) {
+            setCurrentStep(1)
+            SendNotification("Something went wrong. Please enter email again")
+            return
+        }
         if (password !== passwordConfirmation) return SendNotification("Passwords don't match")
         if (!OTPIsValid(verification)) return SendNotification("Incorrect OTP");
 
@@ -57,12 +69,12 @@ export default function PasswordReset({disabled}) {
         const form = new FormData();
         form.append("token", currentToken.current);
         form.append("verification", verification);
-        form.append("new_password", password);
-        SendPost(false, AuthBackendURL, "/passwordreset/step2", form, null)
+        form.append("password", password);
+        SendPost(false, false, false, APIRoute, "/passwordreset/step2", form)
             .then((data) => {
-                if (data["success"]) {
+                if (data.success) {
                     SendNotification("Password changed successfully")
-                    navigate("/")
+                    navigate(location.state?.return_to || params.get("return_to") || "/")
                 }
             })
             .catch((error)=>{console.log("PasswordReset Step2 stopped because:", error)})
@@ -73,6 +85,9 @@ export default function PasswordReset({disabled}) {
 
     useEffect(() => {
         document.title = "PasswordReset - Bhariya";
+        return () => {
+            otpCountdownRef.current?.cancel()
+        }
     }, [])
 
     return (<div className="min-h-screen flex items-center justify-center">
@@ -107,7 +122,7 @@ export default function PasswordReset({disabled}) {
                                     needsConfirm={true}
                                     confirm={passwordConfirmation}
                                     onConfirmChange={setPasswordConfirmation}
-                                    disabled={disabled || currentStep !== 2} />
+                                    disabled={uiDisabled || currentStep !== 2} />
                             </>
                         }
                         <SubmitButton
