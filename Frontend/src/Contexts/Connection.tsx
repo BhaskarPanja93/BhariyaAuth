@@ -5,6 +5,7 @@ import Cookies from "js-cookie";
 import {CurrentTime, Sleep} from "../Utils/Time";
 import NotificationManager from "./Notification.tsx";
 import {APIRoute, FrontendRoute, CSRFCookiePath, MFACookiePath, Origin} from "../Values/Constants";
+import {useNavigate} from "react-router";
 
 declare module 'axios' {
     export interface AxiosRequestConfig {
@@ -71,6 +72,8 @@ interface ConnectionContextType {
 const Context = createContext<ConnectionContextType | undefined>(undefined);
 
 export function ConnectionContext ({children}: { children: ReactNode }) {
+    const navigate = useNavigate();
+
     const {SendNotification} = NotificationManager();
     const AccessToken = useRef("")
     const AccessExpiry = useRef(new Date())
@@ -355,6 +358,7 @@ export function ConnectionContext ({children}: { children: ReactNode }) {
                 }
                 // Server rejected even after refresh
                 SendNotification("You do not have enough permissions to perform this action.")
+                navigate("/", {replace:true})
                 return Promise.reject("Invalid permissions")
             }
             if (config.AuthRefreshPurpose) {
