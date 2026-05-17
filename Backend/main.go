@@ -5,6 +5,7 @@ import (
 	AccountProcessor "BhariyaAuth/processors/account"
 	Logs "BhariyaAuth/processors/logs"
 	AccountRouters "BhariyaAuth/routers/access"
+	LogsRouters "BhariyaAuth/routers/logs"
 	MFARouters "BhariyaAuth/routers/mfa"
 	PasswordResetRouters "BhariyaAuth/routers/passwordreset"
 	SessionRouters "BhariyaAuth/routers/sessions"
@@ -140,6 +141,7 @@ func main() {
 	SSORouters.AttachRoutes(APIGroup)
 	SessionRouters.AttachRoutes(APIGroup)
 	MFARouters.AttachRoutes(APIGroup)
+	LogsRouters.AttachRoutes(APIGroup)
 
 	// WSGroup := MainApp.Group("/auth/ws")
 	// ChatRouters.AttachRoutes(WSGroup)

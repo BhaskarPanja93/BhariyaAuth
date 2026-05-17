@@ -39,8 +39,8 @@ type LogEntry struct {
 
 const (
 	MaxAge         = 7 * 24 * time.Hour
-	FilenameFormat = "2006 01 02"
-	TimeFormat     = "150405.0000"
+	FilenameFormat = "20060102"
+	TimeFormat     = "150405.000"
 	Path           = "./logs"
 )
 
@@ -77,7 +77,7 @@ func (logger *Logger) enforceMaxAge() {
 
 		var startTime time.Time
 
-		startTime, err = time.Parse(FilenameFormat, strings.TrimPrefix(name, logger.Name+" "))
+		startTime, err = time.Parse(FilenameFormat, strings.TrimPrefix(name, logger.Name))
 		if err != nil {
 			continue // skip unknown files
 		}
@@ -95,15 +95,15 @@ func (logger *Logger) reset() error {
 	logger.date = time.Now().UTC().Truncate(24 * time.Hour)
 	logger.enforceMaxAge()
 	_ = os.Mkdir(Path, 0744)
-	fileName := filepath.Join(Path, logger.Name+" "+logger.date.Format(FilenameFormat))
+	fileName := filepath.Join(Path, logger.Name+logger.date.Format(FilenameFormat))
 	var err error
 	logger.file, err = os.OpenFile(fileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		fmt.Println("LOGGER: open file error", err.Error())
 		return err
 	}
-	_, _ = logger.file.WriteString("# ----------------\n# LOGGER START\n# ----------------\n")
 	logger.encoder = sonic.ConfigFastest.NewEncoder(logger.file)
+	logger.Add(Info, "Logger", "", "--Logger start--")
 	return nil
 }
 
@@ -151,6 +151,38 @@ func (logger *Logger) Add(level uint8, fileName string, identifier string, conte
 		logger.channel <- entry
 	}
 	return entry
+}
+
+func (logger *Logger) CheckAvailableLogFiles() []string {
+	files, err := os.ReadDir(Path)
+	if err != nil {
+		return []string{}
+	}
+	names := make([]string, 0)
+
+	for _, f := range files {
+		if f.IsDir() {
+			continue // skip folders
+		}
+
+		name := f.Name()
+
+		if !strings.HasPrefix(name, logger.Name) {
+			continue // skip other files
+		}
+		names = append(names, name)
+	}
+	return names
+}
+
+func (logger *Logger) ReadLogFile(name string) string {
+	fileName := filepath.Join(Path, name)
+	file, err := os.ReadFile(fileName)
+	if err != nil {
+		fmt.Println("LOGGER: read file error", fileName, err.Error())
+		return ""
+	}
+	return string(file)
 }
 
 func levelToString(level uint8) string {

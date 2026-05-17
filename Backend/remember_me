@@ -30,10 +30,12 @@ ISSUES:
 websocket buffer infinite
 
 FUTURE:
+recheck where post and get are used
+make a field in request to allow large files like logs to be sent without the server reading into memory for json (request.config.passThroughResponseBody)
+change comments, recreate readme
 try different encoder, instead of json
 add service start and stop and update features
 add graceful shutdown to all services + Cancellable background CTX
 Admin page, mail send (individual/grouped/all), block/unblock account, revoke devices, entry update.
-Instead of auto-retry on 429, make it manual with client based retry-after checking
 FEATURE FLAGS PLEASEEEEEEE
 device fingerprinting, to prevent one bad IP user denying service for all innocent users of same IP
