@@ -62,7 +62,7 @@ func Revoke(ctx fiber.Ctx) error {
 
 		return ctx.SendStatus(fiber.StatusUnauthorized)
 	}
-	Logs.RootLogger.Add(Logs.Intent, revokeFileName, RequestProcessor.GetRequestId(ctx), "Requested for: "+strconv.Itoa(int(access.UserID))+strconv.Itoa(int(access.DeviceID)))
+	Logs.RootLogger.Add(Logs.Intent, revokeFileName, RequestProcessor.GetRequestId(ctx), "Requested for: "+strconv.Itoa(int(access.UserID))+" "+strconv.Itoa(int(access.DeviceID)))
 
 	// Ensure current device/session is not blocked
 	revoked, err := AccountProcessor.CheckDeviceAccessDenied(access.UserID, access.DeviceID)

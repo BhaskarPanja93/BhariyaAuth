@@ -7,14 +7,14 @@ export const Origin = `https://${Domain}`;
 export const Purpose = "/auth";
 export const PurposeFull = `${Origin}${Purpose}`;
 
-export const FrontendPrefix = "";
-export const FrontendSuffix = BetaFrontend ? "/beta" : "";
+const FrontendPrefix = "";
+const FrontendSuffix = BetaFrontend ? "/beta" : "";
 
-export const APIPrefix = "/api";
-export const APISuffix = BetaAPI ? "/beta" : "";
+const APIPrefix = "/api";
+const APISuffix = BetaAPI ? "/beta" : "";
 
-export const WSPrefix = "/ws";
-export const WSSuffix = BetaWS ? "/beta" : "";
+const WSPrefix = "/ws";
+const WSSuffix = BetaWS ? "/beta" : "";
 
 export const FrontendRoute =
     `${PurposeFull}${FrontendPrefix}${FrontendSuffix}`;
