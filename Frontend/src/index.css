@@ -1,15 +1,7 @@
 @import "tailwindcss";
 
-body {
-  overflow: hidden;
-}
-
 ::-webkit-scrollbar {
   display: none;
-}
-
-* {
-  scrollbar-width: none;
 }
 
 /* WebKit (Chrome, Edge, Safari) */

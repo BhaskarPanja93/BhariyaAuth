@@ -3,33 +3,38 @@ package users
 // User types allowed
 
 type T struct {
-	Short  string   `json:"short"`
-	Claims []string `json:"claims"`
+	Short     string `json:"short"`
+	Authority uint8  `json:"authority"`
 }
 
 type allT struct {
 	Unknown   T
 	Viewer    T
-	Technical T
+	Moderator T
 	Admin     T
+	Owner     T
 }
 
 var All = allT{
 	Unknown: T{
-		Short:  "U",
-		Claims: []string{},
+		Short:     "U",
+		Authority: 0,
 	},
 	Viewer: T{
-		Short:  "V",
-		Claims: []string{"viewer"},
+		Short:     "V",
+		Authority: 1,
 	},
-	Technical: T{
-		Short:  "T",
-		Claims: []string{"technical", "viewer"},
+	Moderator: T{
+		Short:     "M",
+		Authority: 100,
 	},
 	Admin: T{
-		Short:  "A",
-		Claims: []string{"admin", "technical", "viewer"},
+		Short:     "A",
+		Authority: 200,
+	},
+	Owner: T{
+		Short:     "O",
+		Authority: 255,
 	},
 }
 
@@ -39,8 +44,9 @@ func init() {
 	_ByName = map[string]T{
 		All.Unknown.Short:   All.Unknown,
 		All.Viewer.Short:    All.Viewer,
-		All.Technical.Short: All.Technical,
+		All.Moderator.Short: All.Moderator,
 		All.Admin.Short:     All.Admin,
+		All.Owner.Short:     All.Owner,
 	}
 }
 
