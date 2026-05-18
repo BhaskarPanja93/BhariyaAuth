@@ -5,6 +5,7 @@ const RegisterStructure = lazy(() => import('../Structures/SignUp'))
 const SessionsStructure = lazy(() => import('../Structures/Sessions'))
 const PasswordResetStructure = lazy(() => import('../Structures/PasswordReset'))
 const MfaStructure = lazy(() => import('../Structures/Mfa'))
+const MailStructure = lazy(() => import('../Structures/Mail'))
 
 import '../index.css'
 
@@ -16,6 +17,7 @@ export default function Router() {
                 <Route path="/signup" element={<RegisterStructure/>}/>
                 <Route path="/sessions" element={<SessionsStructure/>}/>
                 <Route path="/mfa" element={<MfaStructure/>}/>
+                <Route path="/mail" element={<MailStructure/>}/>
                 <Route path="/passwordreset" element={<PasswordResetStructure/>}/>
                 <Route path="*" element={<Navigate to="/sessions" replace/>}/>
             </Routes>
