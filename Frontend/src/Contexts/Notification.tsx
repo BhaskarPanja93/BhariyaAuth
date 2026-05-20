@@ -1,4 +1,4 @@
-import {type Context, createContext, type ReactNode, useContext, useRef, useState} from "react";
+﻿import {type Context, createContext, type ReactNode, useContext, useRef, useState} from "react";
 import {Sleep} from "../Utils/Time.ts";
 
 type SendNotificationT = (message: string) => void
@@ -52,3 +52,5 @@ export default function NotificationManager() {
     }
     return context;
 };
+
+

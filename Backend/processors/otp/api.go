@@ -8,67 +8,25 @@ import (
 	"time"
 )
 
-// Send generates and dispatches an OTP to a user with rate limiting.
-//
-// Flow:
-//
-//	check rate limit → generate OTP → send mail → store OTP → return verification token
-//
-// Parameters:
-// - address: recipient email.
-// - model: mail template model.
-// - identifier: additional key component (e.g., IP).
-//
-// Returns:
-// - verification: token used later for validation.
-// - delay: retry delay if rate-limited or after sending.
-//
-// Notes:
-// - verification token is separate from OTP (prevents brute-force guessing).
-// - OTP is stored server-side and never exposed directly.
 func Send(address string, model MailModels.T, identifier string) (string, time.Duration, error) {
 	key := address + ":" + identifier
 
-	// Check rate limit
 	canSend, count, wait := checkCanSend(key)
 	if !canSend {
 		return "", wait, errors.New("otp resend rate limited")
 	}
 
-	// Generate OTP (numeric)
-	otp := StringProcessor.SafeNumber(6)
+	otpValue := StringProcessor.SafeNumber(6)
+	verificationToken := StringProcessor.SafeString(12)
 
-	// Generate verification token (lookup key)
-	verification := StringProcessor.SafeString(12)
-
-	// Record send + store OTP
-	delay := recordSend(key, verification, otp, count)
-
-	// Send email
-	if err := MailNotifier.OTP(address, otp, model, 2); err != nil {
+	if err := MailNotifier.OTP(address, otpValue, model, 2); err != nil {
 		return "", wait, errors.New("otp send failed: " + err.Error())
 	}
 
-	return verification, delay, nil
+	delay := recordSend(key, verificationToken, otpValue, count)
+	return verificationToken, delay, nil
 }
 
-// Validate verifies the OTP against stored value.
-//
-// Flow:
-//
-//	lookup OTP → check expiry → compare → delete on success
-//
-// Parameters:
-// - verification: lookup key.
-// - otp: user-provided OTP.
-//
-// Returns:
-// - true if valid.
-// - false otherwise.
-//
-// Security:
-// - OTP is single-use (deleted after successful validation).
-// - Expired OTPs are rejected.
 func Validate(verification, otp string) bool {
 	val, ok := otpStore.Load(verification)
 	if !ok {
@@ -76,13 +34,10 @@ func Validate(verification, otp string) bool {
 	}
 
 	entry := val.(*otpEntry)
-
-	// Enforce OTP validity
 	if time.Now().After(entry.expires) || otp != entry.otp {
 		return false
 	}
 
-	// Enforce single-use OTP
 	otpStore.Delete(verification)
 	return true
 }

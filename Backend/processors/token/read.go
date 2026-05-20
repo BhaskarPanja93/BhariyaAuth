@@ -10,74 +10,46 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-// ReadHeaderCSRF extracts CSRF token from request header.
-//
-// Source:
-// - Header name defined in Config.CSRFInHeader.
-//
-// Usage:
-// - Used in double-submit CSRF protection.
-//
-// Returns:
-// - CSRF token string (empty if missing).
 func ReadHeaderCSRF(ctx fiber.Ctx) string {
-	return ctx.Get(Config.CSRFInHeader)
+	return strings.TrimSpace(ctx.Get(Config.CSRFInHeader))
 }
 
-// ReadCookieCSRF extracts CSRF token from cookie.
-//
-// Source:
-// - Cookie name defined in Config.CSRFInCookie.
-//
-// Usage:
-// - Compared against header CSRF for validation.
 func ReadCookieCSRF(ctx fiber.Ctx) string {
-	return ctx.Cookies(Config.CSRFInCookie)
+	return strings.TrimSpace(ctx.Cookies(Config.CSRFInCookie))
 }
 
-// ReadAccessToken extracts, decrypts, and validates access token from header.
-//
-// Flow:
-//
-//	read header → strip "Bearer " → decrypt → validate type
-//
-// Returns:
-// - AccessToken struct if valid.
-// - error if:
-//   - missing/invalid token
-//   - decryption fails
-//   - token type mismatch.
+func readBearerValue(rawHeader string) string {
+	header := strings.TrimSpace(rawHeader)
+	if len(header) < 7 {
+		return header
+	}
+
+	if strings.EqualFold(header[:7], "Bearer ") {
+		return strings.TrimSpace(header[7:])
+	}
+
+	return header
+}
+
 func ReadAccessToken(ctx fiber.Ctx) (TokenModels.AccessToken, error) {
-
 	var access TokenModels.AccessToken
+	token := readBearerValue(ctx.Get(Config.AccessTokenInHeader))
 
-	// Extract token from Authorization header
-	header := strings.TrimPrefix(ctx.Get(Config.AccessTokenInHeader), "Bearer ")
-
-	// Decrypt token
-	err := StringProcessor.DecryptInterfaceFromB64(header, &access)
+	err := StringProcessor.DecryptInterfaceFromB64(token, &access)
 	if err != nil {
 		return access, err
 	}
 
-	// Validate token type
 	if access.TokenType != accessTokenType {
-		return access, errors.New("read access Token: incorrect type")
+		return access, errors.New("read access token: incorrect type")
 	}
 
 	return access, nil
 }
 
-// ReadRefreshToken extracts, decrypts, and validates refresh token from cookie.
-//
-// Flow:
-//
-//	read cookie → decrypt → validate type
 func ReadRefreshToken(ctx fiber.Ctx) (TokenModels.RefreshToken, error) {
-
 	var refresh TokenModels.RefreshToken
-
-	cookie := ctx.Cookies(Config.RefreshTokenInCookie)
+	cookie := strings.TrimSpace(ctx.Cookies(Config.RefreshTokenInCookie))
 
 	err := StringProcessor.DecryptInterfaceFromB64(cookie, &refresh)
 	if err != nil {
@@ -85,92 +57,82 @@ func ReadRefreshToken(ctx fiber.Ctx) (TokenModels.RefreshToken, error) {
 	}
 
 	if refresh.TokenType != refreshTokenType {
-		return refresh, errors.New("read refresh Token: incorrect type")
+		return refresh, errors.New("read refresh token: incorrect type")
 	}
 
 	return refresh, nil
 }
 
-// ReadMFAToken decrypts and validates MFA token.
 func ReadMFAToken(token string) (TokenModels.MFAToken, error) {
-
 	var mfa TokenModels.MFAToken
 
-	err := StringProcessor.DecryptInterfaceFromB64(token, &mfa)
+	err := StringProcessor.DecryptInterfaceFromB64(strings.TrimSpace(token), &mfa)
 	if err != nil {
 		return mfa, err
 	}
 
 	if mfa.TokenType != mfaTokenType {
-		return mfa, errors.New("read mfa Token: incorrect type")
+		return mfa, errors.New("read mfa token: incorrect type")
 	}
 
 	return mfa, nil
 }
 
-// ReadSSOToken decrypts and validates SSO state token.
 func ReadSSOToken(token string) (TokenModels.SSOState, error) {
-
 	var sso TokenModels.SSOState
 
-	err := StringProcessor.DecryptInterfaceFromB64(token, &sso)
+	err := StringProcessor.DecryptInterfaceFromB64(strings.TrimSpace(token), &sso)
 	if err != nil {
 		return sso, err
 	}
 
 	if sso.TokenType != ssoTokenType {
-		return sso, errors.New("read sso Token: incorrect type")
+		return sso, errors.New("read sso token: incorrect type")
 	}
 
 	return sso, nil
 }
 
-// ReadPasswordResetToken decrypts and validates password reset token.
 func ReadPasswordResetToken(token string) (TokenModels.PasswordReset, error) {
-
 	var reset TokenModels.PasswordReset
 
-	err := StringProcessor.DecryptInterfaceFromB64(token, &reset)
+	err := StringProcessor.DecryptInterfaceFromB64(strings.TrimSpace(token), &reset)
 	if err != nil {
 		return reset, err
 	}
 
 	if reset.TokenType != passwordResetTokenType {
-		return reset, errors.New("read password reset Token: incorrect type")
+		return reset, errors.New("read password reset token: incorrect type")
 	}
 
 	return reset, nil
 }
 
-// ReadSignInToken decrypts and validates signin step token.
 func ReadSignInToken(token string) (TokenModels.SignIn, error) {
-
 	var signIn TokenModels.SignIn
 
-	err := StringProcessor.DecryptInterfaceFromB64(token, &signIn)
+	err := StringProcessor.DecryptInterfaceFromB64(strings.TrimSpace(token), &signIn)
 	if err != nil {
 		return signIn, err
 	}
 
 	if signIn.TokenType != signInTokenType {
-		return signIn, errors.New("read signin Token: incorrect type")
+		return signIn, errors.New("read signin token: incorrect type")
 	}
 
 	return signIn, nil
 }
 
-// ReadSignUpToken decrypts and validates registration step token.
 func ReadSignUpToken(token string) (TokenModels.SignUp, error) {
-
 	var signUp TokenModels.SignUp
 
-	err := StringProcessor.DecryptInterfaceFromB64(token, &signUp)
+	err := StringProcessor.DecryptInterfaceFromB64(strings.TrimSpace(token), &signUp)
 	if err != nil {
 		return signUp, err
 	}
 
 	if signUp.TokenType != signUpTokenType {
-		return signUp, errors.New("read signup Token: incorrect type")
+		return signUp, errors.New("read signup token: incorrect type")
 	}
 
 	return signUp, nil

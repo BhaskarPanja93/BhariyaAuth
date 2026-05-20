@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useRef, useState} from "react";
+﻿import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import ConnectionManager from "../Contexts/Connection.tsx";
 import NotificationManager from "../Contexts/Notification.tsx";
 import {APIRoute} from "../Values/Constants";
@@ -141,7 +141,7 @@ function parseRows(dayFileName: string, rawText: string): LogRow[] {
                 content: parsed.c,
             });
         } catch {
-            //
+
         }
     }
 
@@ -250,7 +250,7 @@ export default function LogsPage() {
         return filteredAndSortedRows.slice(startIndex, endIndex);
     }, [filteredAndSortedRows, startIndex, endIndex]);
 
-    const loadAvailableDays = () => {
+    const loadAvailableDays = useCallback(() => {
         setDaysLoading(true);
 
         SendPost(true, false, false, APIRoute, "/logs/available")
@@ -278,9 +278,9 @@ export default function LogsPage() {
             .finally(() => {
                 setDaysLoading(false);
             });
-    };
+    }, [SendNotification, SendPost]);
 
-    const loadLogs = (dayFileName: string) => {
+    const loadLogs = useCallback((dayFileName: string) => {
         if (!dayFileName) {
             setRows([]);
             return;
@@ -310,7 +310,7 @@ export default function LogsPage() {
             .finally(() => {
                 setLogsLoading(false);
             });
-    };
+    }, [SendNotification, SendPost]);
 
     const addFilter = (key: ColumnKey, value: string) => {
         const id = `${key}:${value}`;
@@ -387,12 +387,18 @@ export default function LogsPage() {
 
     useEffect(() => {
         document.title = "Logs - Bhariya";
-        loadAvailableDays();
-    }, []);
+        const timeoutId = window.setTimeout(() => {
+            loadAvailableDays();
+        }, 0);
+        return () => window.clearTimeout(timeoutId);
+    }, [loadAvailableDays]);
 
     useEffect(() => {
-        loadLogs(selectedDay);
-    }, [selectedDay]);
+        const timeoutId = window.setTimeout(() => {
+            loadLogs(selectedDay);
+        }, 0);
+        return () => window.clearTimeout(timeoutId);
+    }, [loadLogs, selectedDay]);
 
     useEffect(() => {
         const updateViewportMetrics = () => {
@@ -544,7 +550,7 @@ export default function LogsPage() {
                                 className="p-2 border-r border-gray-700 last:border-r-0 text-left hover:bg-gray-800/70">
                                 <span>{column.label}</span>
                                 {sortKey === column.key &&
-                                    <span className="ml-2 text-cyan-300">{sortDirection === "asc" ? "▲" : "▼"}</span>}
+                                    <span className="ml-2 text-cyan-300">{sortDirection === "asc" ? "˄" : "˅"}</span>}
                             </button>)}
                     </div>
 
@@ -616,3 +622,5 @@ export default function LogsPage() {
         </div>
     </div>;
 }
+
+

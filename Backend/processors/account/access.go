@@ -8,7 +8,7 @@ import (
 )
 
 func denySingleDeviceAccess(userID int32, deviceID int16) error {
-	key := Config.RefreshBlocked + ":" + strconv.Itoa(int(userID)) + strconv.Itoa(int(deviceID))
+	key := Config.RefreshBlocked + ":" + strconv.Itoa(int(userID)) + ":" + strconv.Itoa(int(deviceID))
 	err := Stores.RedisClient.Set(Config.CtxBG, key, nil, Config.AccessTokenExpireDelta).Err()
 	if err != nil {
 		return errors.New("Deny single device access - redis set: " + err.Error())
@@ -17,7 +17,7 @@ func denySingleDeviceAccess(userID int32, deviceID int16) error {
 }
 
 func CheckDeviceAccessDenied(userID int32, deviceID int16) (bool, error) {
-	key := Config.RefreshBlocked + ":" + strconv.Itoa(int(userID)) + strconv.Itoa(int(deviceID))
+	key := Config.RefreshBlocked + ":" + strconv.Itoa(int(userID)) + ":" + strconv.Itoa(int(deviceID))
 	exists, err := Stores.RedisClient.Exists(Config.CtxBG, key).Result()
 	if err != nil {
 		return true, errors.New("Check single device access - redis exists: " + err.Error())

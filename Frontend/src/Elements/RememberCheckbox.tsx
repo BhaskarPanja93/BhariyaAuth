@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 
 export default function RememberCheckbox(
     { checked, onCheckedChange, disabled }:
@@ -20,3 +20,4 @@ export default function RememberCheckbox(
         </div>
     )
 }
+

@@ -1,4 +1,4 @@
-export default function SubmitButton(
+﻿export default function SubmitButton(
     { text, onClick, disabled }:
     {
         text: string,
@@ -16,3 +16,4 @@ export default function SubmitButton(
         </div>
     )
 }
+

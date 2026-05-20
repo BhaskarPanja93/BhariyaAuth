@@ -35,7 +35,6 @@ var (
 func AttachProviders() {
 	Logs.RootLogger.Add(Logs.Intent, "routers/sso/main", "", "Initializing goth providers")
 
-	// Initialize all providers usable for SSO
 	goth.UseProviders(googleProvider, discordProvider, microsoftonlineProvider)
 }
 

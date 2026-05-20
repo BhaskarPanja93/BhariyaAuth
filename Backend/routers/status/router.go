@@ -15,6 +15,6 @@ func AttachRoutes(APIGroup fiber.Router) {
 
 	StatusRouter := APIGroup.Group("/status")
 	StatusRouter.All("/ready", func(ctx fiber.Ctx) error { return nil })
-	StatusRouter.Get("/metrics", monitor.New(monitor.Config{Title: "BhariyaAuth Metrics", Refresh: 1 * time.Second})) // TODO: replace with custom solution
+	StatusRouter.Get("/metrics", monitor.New(monitor.Config{Title: "BhariyaAuth Metrics", Refresh: 1 * time.Second}))
 	StatusRouter.Get("/ip", func(ctx fiber.Ctx) error { return ctx.SendString(ctx.IP() + " <- " + strings.Join(ctx.IPs(), "/")) })
 }

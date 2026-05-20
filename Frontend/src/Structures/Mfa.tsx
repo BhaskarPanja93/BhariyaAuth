@@ -1,4 +1,4 @@
-import OTPInput from '../Elements/OTPInput'
+﻿import OTPInput from '../Elements/OTPInput'
 import SubmitButton from "../Elements/SubmitButton";
 import {OTPIsValid} from "../Utils/Strings";
 import {APIRoute} from "../Values/Constants";
@@ -119,3 +119,5 @@ export default function Mfa() {
         </div>
     </div>)
 }
+
+

@@ -1,7 +1,5 @@
 package users
 
-// User types allowed
-
 type T struct {
 	Short     string `json:"short"`
 	Authority uint8  `json:"authority"`

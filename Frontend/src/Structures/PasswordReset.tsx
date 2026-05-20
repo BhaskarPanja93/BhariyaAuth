@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from 'react'
+﻿import {useEffect, useRef, useState} from 'react'
 import SubmitButton from "../Elements/SubmitButton";
 import PasswordInput from "../Elements/PasswordInput";
 import {EmailIsValid, OTPIsValid} from "../Utils/Strings";
@@ -134,3 +134,5 @@ export default function PasswordReset() {
             </div>
         </div>)
 }
+
+

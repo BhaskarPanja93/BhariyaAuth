@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from 'react'
+﻿import {useEffect, useRef, useState} from 'react'
 import {Link, useNavigate, useLocation} from "react-router";
 import EmailInput from '../Elements/EmailInput'
 import PasswordInput from '../Elements/PasswordInput'
@@ -182,3 +182,5 @@ export default function RegisterPage() {
         </div>
     )
 }
+
+

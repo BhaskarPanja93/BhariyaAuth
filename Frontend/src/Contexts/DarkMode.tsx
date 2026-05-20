@@ -1,4 +1,4 @@
-import {createContext, type ReactNode, useContext, useEffect, useState} from "react";
+﻿import {createContext, type ReactNode, useContext, useEffect, useState} from "react";
 import {Favicon} from "../Utils/Favicon";
 import {FrontendRoute} from "../Values/Constants";
 
@@ -36,3 +36,5 @@ export default function DarkModeManager(): DarkModeContextType {
     }
     return context;
 };
+
+

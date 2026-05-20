@@ -1,4 +1,4 @@
-export function Sleep(milliseconds: number) {
+﻿export function Sleep(milliseconds: number) {
     return new Promise<void>(resolve =>
         setTimeout(resolve, Math.max(0, milliseconds))
     );
@@ -7,3 +7,4 @@ export function Sleep(milliseconds: number) {
 export function CurrentTime() {
     return Date.now()
 }
+

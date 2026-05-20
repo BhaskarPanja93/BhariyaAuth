@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 
 export default function NameInput(
     { value, onValueChange, disabled }:
@@ -17,3 +17,4 @@ export default function NameInput(
         </div>
     )
 }
+

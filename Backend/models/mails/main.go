@@ -1,8 +1,5 @@
 package mails
 
-// T is the type of one purpose of mail sending.
-// Subjects contains a list instead of a single one, this prevents mail inboxes from merging multiple instances of the same mail purpose for better UX.
-// Ignorable decides if a password reset link be provided at the end of the mail.
 type T struct {
 	Subjects  []string
 	Header    string
@@ -54,16 +51,16 @@ var (
 
 	SignUpStarted = T{
 		Subjects: []string{
-			"Welcome! Let’s verify your email",
+			"Welcome! Let's verify your email",
 			"Complete your registration",
-			"Almost done — confirm your email",
+			"Almost done - confirm your email",
 			"Verify your email to get started",
 			"Finish setting up your account",
 			"Your registration verification code",
 			"Confirm your email address",
 			"Activate your new account",
 			"One last step to join us",
-			"Let’s get your account ready",
+			"Let's get your account ready",
 		},
 		Header: "Enter the OTP below to verify your email:",
 	}
@@ -84,11 +81,11 @@ var (
 		Subjects: []string{
 			"Reset your password securely",
 			"Your password reset code",
-			"Let’s set a new password",
+			"Let's set a new password",
 			"Password reset",
 			"Finish resetting your password",
 			"Your account recovery code",
-			"Reset your password — one quick step left",
+			"Reset your password - one quick step left",
 			"Secure your new password",
 			"Confirm your password reset",
 		},

@@ -1,7 +1,5 @@
 package requests
 
-// All form types
-
 type PasswordResetForm1 struct {
 	Mail string `form:"mail"`
 }

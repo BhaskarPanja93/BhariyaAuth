@@ -1,4 +1,4 @@
-import {lazy, Suspense} from "react";
+﻿import {lazy, Suspense} from "react";
 import {Navigate, Route, Routes} from 'react-router';
 const LoginStructure = lazy(() => import('../Structures/SignIn'))
 const RegisterStructure = lazy(() => import('../Structures/SignUp'))
@@ -24,3 +24,5 @@ export default function Router() {
         </Suspense>
     )
 }
+
+

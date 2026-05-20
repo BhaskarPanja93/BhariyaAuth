@@ -1,4 +1,4 @@
-export default function OTPResendButton(
+﻿export default function OTPResendButton(
     { delay, onClick, disabled }:
     {
         delay:number,
@@ -15,3 +15,4 @@ export default function OTPResendButton(
         </button>
     )
 }
+

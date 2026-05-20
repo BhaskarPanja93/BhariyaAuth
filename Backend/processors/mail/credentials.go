@@ -6,21 +6,14 @@ import (
 	graph "github.com/microsoftgraph/msgraph-sdk-go"
 )
 
-// refreshCredentials refreshes the Microsoft Graph client instance.
-//
-// - Uses singleflight to ensure only one refresh happens concurrently.
-// - Recreates the GraphServiceClient using existing credentials.
-// - Updates global client reference if successful.
-//
-// Concurrency Model:
-// - Prevents duplicate refresh calls under high contention.
-//
-// Returns:
-// - No direct return (updates global state).
 func refreshCredentials() {
 	_, _, _ = group.Do("refreshCredentials", func() (any, error) {
 
 		Logs.RootLogger.Add(Logs.Intent, "processors/mail/main", "", "Attempting credential refresh")
+		if credential == nil {
+			Logs.RootLogger.Add(Logs.Error, "processors/mail/main", "", "Credential refresh skipped: credential is nil")
+			return nil, nil
+		}
 
 		c, err := graph.NewGraphServiceClientWithCredentials(
 			credential,

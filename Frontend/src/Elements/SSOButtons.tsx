@@ -1,4 +1,4 @@
-import ConnectionManager from "../Contexts/Connection.tsx";
+﻿import ConnectionManager from "../Contexts/Connection.tsx";
 import {APIRoute} from "../Values/Constants.ts";
 import {useNavigate} from "react-router";
 import NotificationManager from "../Contexts/Notification.tsx";
@@ -57,3 +57,4 @@ export default function SSOButtons(
         </div>
     )
 }
+
