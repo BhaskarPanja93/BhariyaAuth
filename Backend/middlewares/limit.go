@@ -103,17 +103,15 @@ func RouteRateLimiter(limit uint32, windowDuration time.Duration, cleanupInterva
 			})
 		}
 
-		window.count++
+		window.count += 1000
 		window.mu.Unlock()
 
 		err := ctx.Next()
 
 		weight := RateLimitProcessor.GetRateLimitWeight(ctx)
-		if weight > 1 {
-			window.mu.Lock()
-			window.count += weight - 1
-			window.mu.Unlock()
-		}
+		window.mu.Lock()
+		window.count += weight - 1000
+		window.mu.Unlock()
 
 		return err
 	}
