@@ -19,7 +19,7 @@ func Send(address string, model MailModels.T, identifier string) (string, time.D
 	otpValue := StringProcessor.SafeNumber(6)
 	verificationToken := StringProcessor.SafeString(12)
 
-	if err := MailNotifier.OTP(address, otpValue, model, 2); err != nil {
+	if err := MailNotifier.OTP(address, otpValue, model); err != nil {
 		return "", wait, errors.New("otp send failed: " + err.Error())
 	}
 

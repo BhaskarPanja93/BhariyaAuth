@@ -32,9 +32,10 @@ func sendMail(mail, subject, content string, attempts uint8) error {
 	message.SetSubject(&subject)
 	message.SetBody(body)
 
-	recipient := graphmodels.NewRecipient()
 	emailAddress := graphmodels.NewEmailAddress()
 	emailAddress.SetAddress(&mail)
+
+	recipient := graphmodels.NewRecipient()
 	recipient.SetEmailAddress(emailAddress)
 
 	message.SetToRecipients([]graphmodels.Recipientable{recipient})

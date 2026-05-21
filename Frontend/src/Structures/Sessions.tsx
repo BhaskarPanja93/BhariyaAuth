@@ -35,7 +35,7 @@ export type SingleUserDeviceProcessed = {
 
 export default function Sessions() {
     const {SendNotification} = NotificationManager();
-    const {SendPost} = ConnectionManager()
+    const {SendGet, SendPost} = ConnectionManager()
 
     const [uiDisabled, setUiDisabled] = useState<boolean>(false)
     const [loading, setLoading] = useState<boolean>(false)
@@ -44,7 +44,7 @@ export default function Sessions() {
 
     const FetchDevices = useCallback(() => {
         setLoading(true);
-        SendPost(true, false, false, APIRoute, "/sessions/fetch")
+        SendGet(true, false, false, APIRoute, "/sessions/fetch")
             .then((data) => {
                 if (data.success) {
                     const reply: UserDevicesResponse = data.reply
@@ -83,7 +83,7 @@ export default function Sessions() {
             .finally(() => {
                 setLoading(false);
             })
-    }, [SendNotification, SendPost])
+    }, [SendNotification, SendGet])
 
     const RevokeDevice = useCallback((revokeAll: boolean, deviceID: string) => {
         if (currentDevice == undefined) return SendNotification("No devices visible. Refresh this page and retry.");

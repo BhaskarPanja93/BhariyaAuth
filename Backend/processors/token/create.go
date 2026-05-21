@@ -98,6 +98,7 @@ func CreateRenewToken(
 
 	combined.CSRF = refresh.CSRF
 	combined.RememberMe = refresh.Remember
+	combined.AccessExpires = now.Add(Config.AccessTokenExpireDelta)
 
 	combined.RefreshToken, err = StringProcessor.EncryptInterfaceToB64(refresh)
 

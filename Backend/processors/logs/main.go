@@ -38,7 +38,7 @@ type LogEntry struct {
 }
 
 const (
-	MaxAge         = 7 * 24 * time.Hour
+	MaxAge         = 30 * 24 * time.Hour
 	FilenameFormat = "20060102"
 	TimeFormat     = "150405.000"
 	Path           = "./logs"
@@ -49,7 +49,7 @@ func CreateLogger(name string) *Logger {
 		Name:    name,
 		channel: make(chan LogEntry, 128),
 	}
-	_logger.reset()
+	_ = _logger.reset()
 	go _logger.listen()
 	return _logger
 }

@@ -131,7 +131,7 @@ func Step2(ctx fiber.Ctx) error {
 
 	os, device, browser := StringProcessor.ParseUA(ctx.Get("User-Agent"))
 
-	err = MailNotifier.PasswordReset(data.MailAddress, MailModels.PasswordResetComplete, ctx.IP(), os, device, browser, 2)
+	err = MailNotifier.PasswordReset(data.MailAddress, MailModels.PasswordResetComplete, ctx.IP(), os, device, browser)
 	if err != nil {
 		Logs.RootLogger.Add(Logs.Warn, step2FileName, RequestProcessor.GetRequestId(ctx), "PasswordReset mail send failed: "+err.Error())
 	}

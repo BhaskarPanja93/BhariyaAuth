@@ -56,7 +56,7 @@ func ListenAccountResponses() {
 func RequestAccountDetails(userID int32) (ResponseModels.AccountDetailsResponseT, error) {
 	ListenAccountResponses()
 
-	requestID := StringProcessor.SafeString(10)
+	requestID := StringProcessor.SafeString(5)
 	key := pendingRequestKey(userID, requestID)
 	responseChannel := make(chan ResponseModels.AccountDetailsResponseT, 1)
 

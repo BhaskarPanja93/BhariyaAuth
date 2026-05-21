@@ -150,7 +150,7 @@ function parseRows(dayFileName: string, rawText: string): LogRow[] {
 
 export default function LogsPage() {
     const {SendNotification} = NotificationManager();
-    const {SendPost} = ConnectionManager();
+    const {SendGet} = ConnectionManager();
 
     const listRef = useRef<HTMLDivElement | null>(null);
     const timeZoneBlurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -253,7 +253,7 @@ export default function LogsPage() {
     const loadAvailableDays = useCallback(() => {
         setDaysLoading(true);
 
-        SendPost(true, false, false, APIRoute, "/logs/available")
+        SendGet(true, false, false, APIRoute, "/logs/available")
             .then((data) => {
                 if (!data.success) {
                     setAvailableDays([]);
@@ -278,7 +278,7 @@ export default function LogsPage() {
             .finally(() => {
                 setDaysLoading(false);
             });
-    }, [SendNotification, SendPost]);
+    }, [SendNotification, SendGet]);
 
     const loadLogs = useCallback((dayFileName: string) => {
         if (!dayFileName) {
@@ -291,7 +291,7 @@ export default function LogsPage() {
         if (listRef.current) listRef.current.scrollTop = 0;
 
         const safeDay = encodeURIComponent(dayFileName);
-        SendPost(true, false, false, APIRoute, `/logs/${safeDay}`)
+        SendGet(true, false, false, APIRoute, `/logs/${safeDay}`)
             .then((data) => {
                 if (!data.success) {
                     setRows([]);
@@ -310,7 +310,7 @@ export default function LogsPage() {
             .finally(() => {
                 setLogsLoading(false);
             });
-    }, [SendNotification, SendPost]);
+    }, [SendNotification, SendGet]);
 
     const addFilter = (key: ColumnKey, value: string) => {
         const id = `${key}:${value}`;

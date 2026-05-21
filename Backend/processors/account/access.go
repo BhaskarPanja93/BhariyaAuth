@@ -68,15 +68,15 @@ func DenySingleDeviceFromRenewing(userID int32, deviceID int16) error {
 }
 
 func BlacklistUser(userID int32) error {
-	err := DenyAllDevicesFromRenewing(userID)
-	if err != nil {
-		return errors.New("Blacklist user: " + err.Error())
-	}
-	_, err = Stores.SQLClient.Exec(
+	_, err := Stores.SQLClient.Exec(
 		Config.CtxBG,
 		"UPDATE users SET blocked = TRUE WHERE user_id = $1", userID)
 	if err != nil {
 		return errors.New("Blacklist user - SQL exec: " + err.Error())
+	}
+	err = DenyAllDevicesFromRenewing(userID)
+	if err != nil {
+		return errors.New("Blacklist user: " + err.Error())
 	}
 	return nil
 }
