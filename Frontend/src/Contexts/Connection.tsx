@@ -1,4 +1,4 @@
-﻿import {createContext, type ReactNode, type RefObject, useContext, useEffect, useMemo, useRef} from "react";
+﻿import {createContext, type ReactNode, type RefObject, useCallback, useContext, useEffect, useMemo, useRef} from "react";
 import type {AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig} from "axios";
 import axios, {AxiosError} from "axios";
 import Cookies from "js-cookie";
@@ -66,11 +66,12 @@ interface ConnectionContextType {
     EnsureLoggedIn: EnsureLoggedInT;
 }
 
+const {SendNotification} = NotificationManager();
+
 const Context = createContext<ConnectionContextType | undefined>(undefined);
 
 export function ConnectionContext({children}: { children: ReactNode }) {
     const navigate = useNavigate();
-    const {SendNotification} = NotificationManager();
 
     const AccessToken = useRef("");
     const AccessExpiry = useRef(new Date(0));
@@ -86,54 +87,30 @@ export function ConnectionContext({children}: { children: ReactNode }) {
     const refreshCredentialConnection = useMemo(() => axios.create({withCredentials: true}), []);
     const cookieDisabledConnection = useMemo(() => axios.create({withCredentials: false}), []);
 
-    const GetGatewayErrors = (host: string) => GatewayErrors.current[host] || 0;
+    const getGatewayErrors = (host: string) => GatewayErrors.current[host] || 0;
 
-    const ResetGatewayErrors = (host: string) => {
-        if (GetGatewayErrors(host) !== 0) {
+    const resetGatewayErrors = useCallback((host: string) => {
+        if (getGatewayErrors(host) !== 0) {
             SendNotification("Server is back online");
+            GatewayErrors.current[host] = 0;
         }
-        GatewayErrors.current[host] = 0;
-    };
+    },[])
 
-    const IncrementGatewayErrors = (host: string) => {
-        const current = GetGatewayErrors(host);
+    const incrementGatewayErrors = useCallback((host: string) => {
+        const current = getGatewayErrors(host);
         GatewayErrors.current[host] = current + 1;
         if (current === 0) {
             SendNotification("Server unreachable. Retrying..");
         }
-    };
+    },[])
 
-    const ValidateConnectionConfig: (config: AxiosRequestConfig) => asserts config is ConnectionRequestConfig = (config) => {
+    const validateConnectionConfig: (config: AxiosRequestConfig) => asserts config is ConnectionRequestConfig = (config) => {
         if (!config.connection || !config.HostURL || !config.RemainingPath) {
             throw new Error("Missing connection metadata on axios request config.");
         }
     };
 
-    const SendGet: SendGetT = async (attachAuth, attachMFA, closeOnSuccess, host, path) => {
-        const config: ConnectionRequestConfig = {
-            HostURL: host,
-            RemainingPath: path,
-            AttachAuth: attachAuth,
-            AttachMFA: attachMFA,
-            CloseIfPopup: closeOnSuccess,
-            connection: cookieDisabledConnection,
-        };
-        return config.connection.get(host + path, config);
-    };
-
-    const SendPost: SendPostT = async (attachAuth, attachMFA, closeOnSuccess, host, path, data) => {
-        const config: ConnectionRequestConfig = {
-            HostURL: host,
-            RemainingPath: path,
-            AttachAuth: attachAuth,
-            AttachMFA: attachMFA,
-            CloseIfPopup: closeOnSuccess,
-            connection: cookieDisabledConnection,
-        };
-        return config.connection.post(host + path, data, config);
-    };
-
-    const IsServerOnline = (host: string): Promise<boolean> => {
+    const pingServer = useCallback((host: string): Promise<boolean> => {
         if (!currentPings.current[host]) {
             const path = "/status/ready";
             const config: ConnectionRequestConfig = {
@@ -147,11 +124,10 @@ export function ConnectionContext({children}: { children: ReactNode }) {
                 .catch(() => false)
                 .finally(() => delete currentPings.current[host]);
         }
-
         return currentPings.current[host];
-    };
+    },[cookieDisabledConnection])
 
-    const RefreshToken = async () => {
+    const refreshToken = useCallback(async () => {
         if (!currentRefresh.current) {
             const path = "/access/refresh";
             const config: ConnectionRequestConfig = {
@@ -171,50 +147,18 @@ export function ConnectionContext({children}: { children: ReactNode }) {
         }
 
         return currentRefresh.current;
-    };
+    },[refreshCredentialConnection])
 
-    const Logout: LogoutT = async () => {
-        if (currentLogout.current == null) {
-            const path = "/access/logout";
-            const config: ConnectionRequestConfig = {
-                HostURL: APIRoute,
-                RemainingPath: path,
-                AttachAuth: true,
-                connection: cookieDisabledConnection,
-            };
-
-            currentLogout.current = config.connection.post(APIRoute + path, null, config)
-                .then(() => true)
-                .catch(() => false)
-                .finally(() => {
-                    currentLogout.current = undefined;
-                });
-        }
-
-        return currentLogout.current;
-    };
-
-    const PromptMFA = async () => OpenPopup("MFA", FrontendRoute + "/mfa", false);
-    const PromptLogin = async () => OpenPopup("SIGNIN", FrontendRoute + "/signin", false);
-
-    const EnsureLoggedIn: EnsureLoggedInT = async () => {
-        const accessIsUsable = IsLoggedIn.current && AccessExpiry.current.getTime() > CurrentTime();
-        if (accessIsUsable) {
-            return true;
-        }
-        return await RefreshToken();
-    };
-
-    const RetryRequest = async (config: AxiosRequestConfig) => {
-        ValidateConnectionConfig(config);
+    const RetryRequest = useCallback(async (config: AxiosRequestConfig) => {
+        validateConnectionConfig(config);
         try {
             return await config.connection(config);
         } catch (error) {
             return Promise.reject(error);
         }
-    };
+    }, [])
 
-    const OpenPopup: OpenPopupT = async (key, URL, closeOnSuccess) => {
+    const OpenPopup: OpenPopupT = useCallback(async (key, URL, closeOnSuccess) => {
         if (!currentPopups.current[URL]) {
             currentPopups.current[URL] = new Promise<boolean>((resolve) => {
                 const popup = window.open(URL, key, "width=500,height=750,popup");
@@ -267,14 +211,71 @@ export function ConnectionContext({children}: { children: ReactNode }) {
         }
 
         return currentPopups.current[URL];
+    }, [])
+
+    const Logout: LogoutT = async () => {
+        if (currentLogout.current == null) {
+            const path = "/access/logout";
+            const config: ConnectionRequestConfig = {
+                HostURL: APIRoute,
+                RemainingPath: path,
+                AttachAuth: true,
+                connection: cookieDisabledConnection,
+            };
+
+            currentLogout.current = config.connection.post(APIRoute + path, null, config)
+                .then(() => true)
+                .catch(() => false)
+                .finally(() => {
+                    currentLogout.current = undefined;
+                });
+        }
+
+        return currentLogout.current;
     };
 
-    const RequestFulfilledInterceptor = async (config: InternalAxiosRequestConfig): Promise<InternalAxiosRequestConfig> => {
-        ValidateConnectionConfig(config);
+    const SendGet: SendGetT = useCallback(async (attachAuth, attachMFA, closeOnSuccess, host, path) => {
+        const config: ConnectionRequestConfig = {
+            HostURL: host,
+            RemainingPath: path,
+            AttachAuth: attachAuth,
+            AttachMFA: attachMFA,
+            CloseIfPopup: closeOnSuccess,
+            connection: cookieDisabledConnection,
+        };
+        return config.connection.get(host + path, config);
+    },[cookieDisabledConnection])
+
+    const SendPost: SendPostT = useCallback(async (attachAuth, attachMFA, closeOnSuccess, host, path, data) => {
+        const config: ConnectionRequestConfig = {
+            HostURL: host,
+            RemainingPath: path,
+            AttachAuth: attachAuth,
+            AttachMFA: attachMFA,
+            CloseIfPopup: closeOnSuccess,
+            connection: cookieDisabledConnection,
+        };
+        return config.connection.post(host + path, data, config);
+    },[cookieDisabledConnection])
+
+    const PromptMFA = useCallback(async () => OpenPopup("MFA", FrontendRoute + "/mfa", false),[OpenPopup])
+
+    const PromptLogin = useCallback(async () => OpenPopup("SIGNIN", FrontendRoute + "/signin", false),[OpenPopup])
+
+    const EnsureLoggedIn: EnsureLoggedInT = useCallback(async () => {
+        const accessIsUsable = IsLoggedIn.current && AccessExpiry.current.getTime() > CurrentTime();
+        if (accessIsUsable) {
+            return true;
+        }
+        return await refreshToken();
+    },[refreshToken])
+
+    const RequestFulfilledInterceptor = useCallback(async (config: InternalAxiosRequestConfig): Promise<InternalAxiosRequestConfig> => {
+        validateConnectionConfig(config);
 
         if (!config.ConnectivityTestPurpose) {
-            while (GetGatewayErrors(config.HostURL) > 0) {
-                if (await IsServerOnline(config.HostURL)) {
+            while (getGatewayErrors(config.HostURL) > 0) {
+                if (await pingServer(config.HostURL)) {
                     break;
                 }
                 await Sleep(1000);
@@ -315,13 +316,13 @@ export function ConnectionContext({children}: { children: ReactNode }) {
         }
 
         return config;
-    };
+    }, [EnsureLoggedIn, pingServer, PromptLogin, PromptMFA])
 
-    const RequestRejectedInterceptor = async (error: AxiosError) => Promise.reject(error);
+    const RequestRejectedInterceptor = useCallback(async (error: AxiosError) => Promise.reject(error),[])
 
-    const ResponseFulfilledInterceptor = async (response: AxiosResponse<RawAPIResponseT>): Promise<ProcessedAPIResponseT> => {
+    const ResponseFulfilledInterceptor = useCallback(async (response: AxiosResponse<RawAPIResponseT>): Promise<ProcessedAPIResponseT> => {
         const config = response.config;
-        ValidateConnectionConfig(config);
+        validateConnectionConfig(config);
 
         const data = response.data;
         const status = response.status;
@@ -331,7 +332,7 @@ export function ConnectionContext({children}: { children: ReactNode }) {
         }
 
         if (status === 200) {
-            ResetGatewayErrors(config.HostURL);
+            resetGatewayErrors(config.HostURL);
             if (data["modify-auth"]) {
                 AccessToken.current = data["new-token"];
                 AccessExpiry.current = new Date(data.reply);
@@ -350,9 +351,9 @@ export function ConnectionContext({children}: { children: ReactNode }) {
         }
 
         return {success: data.success, reply: data.reply};
-    };
+    },[resetGatewayErrors])
 
-    const ResponseRejectedInterceptor = async (error: AxiosError<RawAPIResponseT>) => {
+    const ResponseRejectedInterceptor = useCallback(async (error: AxiosError<RawAPIResponseT>) => {
         const response = error.response;
         const config = response?.config;
         const data = response?.data;
@@ -363,7 +364,7 @@ export function ConnectionContext({children}: { children: ReactNode }) {
         }
 
         if (!config) return Promise.reject(error);
-        ValidateConnectionConfig(config);
+        validateConnectionConfig(config);
 
         if (status === 401) {
             if (!config.AttachAuth && !config.AuthRefreshPurpose) {
@@ -375,7 +376,7 @@ export function ConnectionContext({children}: { children: ReactNode }) {
             if (config.AttachAuth) {
                 if (!config.CausedRefresh) {
                     IsLoggedIn.current = false;
-                    if (await RefreshToken()) {
+                    if (await refreshToken()) {
                         config.CausedRefresh = true;
                         return await RetryRequest(config);
                     }
@@ -411,7 +412,6 @@ export function ConnectionContext({children}: { children: ReactNode }) {
         } else if (status === 429) {
             const retryAfterRaw = data?.["retry-after"];
             if (!retryAfterRaw) return Promise.reject("Rate limited");
-
             const retryAfter = new Date(CurrentTime() + Number(retryAfterRaw) * 1000);
             RateLimits.current[config.HostURL + config.RemainingPath] = retryAfter;
             SendNotification(`Rate limit reached. Please retry after ${Math.trunc((retryAfter.getTime() - CurrentTime()) / 1000)} seconds.`);
@@ -419,7 +419,7 @@ export function ConnectionContext({children}: { children: ReactNode }) {
         } else if (status === 500) {
             return Promise.reject("Server error");
         } else if (status === 502 || status === 504) {
-            IncrementGatewayErrors(config.HostURL);
+            incrementGatewayErrors(config.HostURL);
             await Sleep(1000);
             return await RetryRequest(config);
         } else {
@@ -428,7 +428,7 @@ export function ConnectionContext({children}: { children: ReactNode }) {
         }
 
         return Promise.reject(error);
-    };
+    }, [incrementGatewayErrors, PromptLogin, refreshToken, RetryRequest, navigate])
 
     const ResponseFulfilledInterceptorCompat = ResponseFulfilledInterceptor as unknown as (response: AxiosResponse) => AxiosResponse | Promise<AxiosResponse>;
 
@@ -444,13 +444,7 @@ export function ConnectionContext({children}: { children: ReactNode }) {
             cookieDisabledConnection.interceptors.request.eject(cookieRequestId);
             cookieDisabledConnection.interceptors.response.eject(cookieResponseId);
         };
-    }, [
-        RequestFulfilledInterceptor,
-        ResponseFulfilledInterceptorCompat,
-        ResponseRejectedInterceptor,
-        cookieDisabledConnection,
-        refreshCredentialConnection,
-    ]);
+    }, [RequestFulfilledInterceptor, RequestRejectedInterceptor, ResponseFulfilledInterceptorCompat, ResponseRejectedInterceptor, cookieDisabledConnection, refreshCredentialConnection]);
 
     return <Context.Provider value={{SendGet, SendPost, OpenPopup, Logout, EnsureLoggedIn}}>
         {children}

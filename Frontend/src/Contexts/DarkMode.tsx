@@ -10,6 +10,7 @@ const Context = createContext<DarkModeContextType | undefined>(undefined);
 
 export function DarkModeContext({children}: { children: ReactNode }) {
     const [IsDarkMode, setIsDarkMode] = useState<boolean>(false);
+
     useEffect(() => {
         const applyMode = (isDarkMode: boolean): void => {
             setIsDarkMode(isDarkMode);
