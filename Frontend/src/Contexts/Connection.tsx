@@ -18,9 +18,12 @@ declare module "axios" {
         AttachMFA?: boolean;
         CausedRefresh?: boolean;
 
-        ConnectivityTestPurpose?: boolean;
-        AuthRefreshPurpose?: boolean;
-        CloseIfPopup?: boolean;
+        PurposePing?: boolean;
+        PurposeAuthRefresh?: boolean;
+        PurposeLogout?: boolean;
+        SkipLoginPrompt?: boolean;
+
+        CloseOnSuccess?: boolean;
     }
 }
 
@@ -38,7 +41,7 @@ type RawAPIResponseT = {
     notifications: string[];
     "modify-auth": boolean;
     "new-token": string;
-    "retry-after": number | string;
+    "retry-after": number;
 };
 
 type ProcessedAPIResponseT = {
@@ -55,7 +58,7 @@ type ConnectionRequestConfig = AxiosRequestConfig & {
 type SendGetT = (attachCreds: boolean, attachMFA: boolean, closeOnSuccess: boolean, host: string, remainingPath: string) => Promise<ProcessedAPIResponseT>;
 type SendPostT = (attachCreds: boolean, attachMFA: boolean, closeOnSuccess: boolean, host: string, remainingPath: string, data?: FormData) => Promise<ProcessedAPIResponseT>;
 type LogoutT = () => Promise<boolean>;
-type EnsureLoggedInT = () => Promise<boolean>;
+type CheckLoggedIn = (skipLogin:boolean) => Promise<boolean>;
 type OpenPopupT = (key: string, URL: string, closeOnSuccess: boolean) => Promise<boolean>;
 
 interface ConnectionContextType {
@@ -63,7 +66,7 @@ interface ConnectionContextType {
     SendPost: SendPostT;
     OpenPopup: OpenPopupT;
     Logout: LogoutT;
-    EnsureLoggedIn: EnsureLoggedInT;
+    CheckLoggedIn: CheckLoggedIn;
 }
 
 const context = createContext<ConnectionContextType | undefined>(undefined);
@@ -83,7 +86,7 @@ export function ConnectionContext({children}: { children: ReactNode }) {
     const currentRefresh: RefObject<Promise<boolean> | undefined> = useRef(undefined);
     const currentLogout: RefObject<Promise<boolean> | undefined> = useRef(undefined);
 
-    const refreshCredentialConnection = useMemo(() => axios.create({withCredentials: true}), []);
+    const cookieEnabledConnection = useMemo(() => axios.create({withCredentials: true}), []);
     const cookieDisabledConnection = useMemo(() => axios.create({withCredentials: false}), []);
 
     const getGatewayErrors = (host: string) => GatewayErrors.current[host] || 0;
@@ -105,20 +108,19 @@ export function ConnectionContext({children}: { children: ReactNode }) {
 
     const validateConnectionConfig: (config: AxiosRequestConfig) => asserts config is ConnectionRequestConfig = (config) => {
         if (!config.connection || !config.HostURL || !config.RemainingPath) {
-            throw new Error("Missing connection metadata on axios request config.");
+            throw new Error();
         }
     };
 
     const pingServer = useCallback((host: string): Promise<boolean> => {
         if (!currentPings.current[host]) {
-            const path = "/status/ready";
             const config: ConnectionRequestConfig = {
                 HostURL: host,
-                RemainingPath: path,
-                ConnectivityTestPurpose: true,
+                RemainingPath: "/status/ready",
+                PurposePing: true,
                 connection: cookieDisabledConnection,
             };
-            currentPings.current[host] = config.connection.get(host + path, config)
+            currentPings.current[host] = config.connection.get(config.HostURL + config.RemainingPath, config)
                 .then(() => true)
                 .catch(() => false)
                 .finally(() => delete currentPings.current[host]);
@@ -126,27 +128,25 @@ export function ConnectionContext({children}: { children: ReactNode }) {
         return currentPings.current[host];
     },[cookieDisabledConnection])
 
-    const refreshToken = useCallback(async () => {
+    const refreshToken = useCallback(async (skipLogin:boolean) => {
         if (!currentRefresh.current) {
-            const path = "/access/refresh";
             const config: ConnectionRequestConfig = {
                 HostURL: APIRoute,
-                RemainingPath: path,
+                RemainingPath: "/access/refresh",
                 AttachCSRF: true,
-                AuthRefreshPurpose: true,
-                connection: refreshCredentialConnection,
+                PurposeAuthRefresh: true,
+                SkipLoginPrompt:skipLogin,
+                connection: cookieEnabledConnection,
             };
-
-            currentRefresh.current = Promise.resolve(config.connection.post(APIRoute + path, null, config))
+            currentRefresh.current = Promise.resolve(config.connection.post(config.HostURL + config.RemainingPath,null, config))
                 .then(() => true)
                 .catch(() => false)
                 .finally(() => {
                     currentRefresh.current = undefined;
                 });
         }
-
         return currentRefresh.current;
-    },[refreshCredentialConnection])
+    },[cookieEnabledConnection])
 
     const RetryRequest = useCallback(async (config: AxiosRequestConfig) => {
         validateConnectionConfig(config);
@@ -157,7 +157,7 @@ export function ConnectionContext({children}: { children: ReactNode }) {
         }
     }, [])
 
-    const OpenPopup: OpenPopupT = useCallback(async (key, URL, closeOnSuccess) => {
+    const OpenPopup: OpenPopupT = useCallback((key, URL, closeOnSuccess) => {
         if (!currentPopups.current[URL]) {
             currentPopups.current[URL] = new Promise<boolean>((resolve) => {
                 const popup = window.open(URL, key, "width=500,height=750,popup");
@@ -167,7 +167,6 @@ export function ConnectionContext({children}: { children: ReactNode }) {
                     resolve(false);
                     return;
                 }
-
                 let finished = false;
                 function onMessage(event: MessageEvent<PopupResponseT>) {
                     if (event.source === popup && event.origin === Origin) {
@@ -178,60 +177,55 @@ export function ConnectionContext({children}: { children: ReactNode }) {
                             if (closeOnSuccess && window.opener) {
                                 window.opener.postMessage(event.data, window.location.origin);
                                 window.close();
+                                return;
                             }
 
                             if (event.data["modify-auth"]) {
-                                const token = event.data.token;
-                                const expires = event.data.expires;
-                                if (token) AccessToken.current = token;
-                                if (expires) AccessExpiry.current = new Date(expires);
+                                if (event.data.token) AccessToken.current = event.data.token;
+                                if (event.data.expires) AccessExpiry.current = new Date(event.data.expires);
                                 IsLoggedIn.current = !!AccessToken.current;
                             }
 
-                            delete currentPopups.current[URL];
                             resolve(true);
+                            delete currentPopups.current[URL];
                             return;
                         }
                     }
                 }
-
                 window.addEventListener("message", onMessage);
                 const interval = setInterval(() => {
                     if (popup.closed) {
                         clearInterval(interval);
                         if (!finished) {
-                            delete currentPopups.current[URL];
                             window.removeEventListener("message", onMessage);
                             resolve(false);
+                            delete currentPopups.current[URL];
                         }
                     }
                 }, 200);
             });
         }
-
         return currentPopups.current[URL];
     }, [SendNotification])
 
-    const Logout: LogoutT = async () => {
-        if (currentLogout.current == null) {
+    const Logout: LogoutT = useCallback(() => {
+        if (!currentLogout.current) {
             const path = "/access/logout";
             const config: ConnectionRequestConfig = {
                 HostURL: APIRoute,
                 RemainingPath: path,
                 AttachAuth: true,
-                connection: cookieDisabledConnection,
+                connection: cookieEnabledConnection,
             };
-
-            currentLogout.current = config.connection.post(APIRoute + path, null, config)
+            currentLogout.current = config.connection.get(APIRoute + path, config)
                 .then(() => true)
                 .catch(() => false)
                 .finally(() => {
                     currentLogout.current = undefined;
                 });
         }
-
         return currentLogout.current;
-    };
+    },[cookieEnabledConnection])
 
     const SendGet: SendGetT = useCallback(async (attachAuth, attachMFA, closeOnSuccess, host, path) => {
         const config: ConnectionRequestConfig = {
@@ -239,7 +233,7 @@ export function ConnectionContext({children}: { children: ReactNode }) {
             RemainingPath: path,
             AttachAuth: attachAuth,
             AttachMFA: attachMFA,
-            CloseIfPopup: closeOnSuccess,
+            CloseOnSuccess: closeOnSuccess,
             connection: cookieDisabledConnection,
         };
         return config.connection.get(host + path, config);
@@ -251,7 +245,7 @@ export function ConnectionContext({children}: { children: ReactNode }) {
             RemainingPath: path,
             AttachAuth: attachAuth,
             AttachMFA: attachMFA,
-            CloseIfPopup: closeOnSuccess,
+            CloseOnSuccess: closeOnSuccess,
             connection: cookieDisabledConnection,
         };
         return config.connection.post(host + path, data, config);
@@ -261,26 +255,25 @@ export function ConnectionContext({children}: { children: ReactNode }) {
 
     const PromptLogin = useCallback(async () => OpenPopup("SIGNIN", FrontendRoute + "/signin", false),[OpenPopup])
 
-    const EnsureLoggedIn: EnsureLoggedInT = useCallback(async () => {
+    const CheckLoggedIn: CheckLoggedIn = useCallback(async (skipLogin:boolean) => {
         const accessIsUsable = IsLoggedIn.current && AccessExpiry.current.getTime() > CurrentTime();
         if (accessIsUsable) {
             return true;
         }
-        return await refreshToken();
+        if (!skipLogin) return await refreshToken(false);
+        return false;
     },[refreshToken])
 
     const RequestFulfilledInterceptor = useCallback(async (config: InternalAxiosRequestConfig): Promise<InternalAxiosRequestConfig> => {
         validateConnectionConfig(config);
-
-        if (!config.ConnectivityTestPurpose) {
-            while (getGatewayErrors(config.HostURL) > 0) {
+        if (!config.PurposePing) {
+            while (getGatewayErrors(config.HostURL) != 0) {
                 if (await pingServer(config.HostURL)) {
                     break;
                 }
                 await Sleep(1000);
             }
         }
-
         const rateLimitKey = config.HostURL + config.RemainingPath;
         if (rateLimitKey in RateLimits.current) {
             const retryAfter = RateLimits.current[rateLimitKey];
@@ -292,18 +285,23 @@ export function ConnectionContext({children}: { children: ReactNode }) {
 
         config.headers = config.headers || {};
 
-        if (config.AttachAuth) {
-            if (!await EnsureLoggedIn()) return Promise.reject("Auth absent");
-            config.headers["authorization"] = `Bearer ${AccessToken.current}`;
+        if (config.PurposeLogout) {
+            if (!await CheckLoggedIn(true)) return Promise.reject("Not Logged in");
+            if (!config.AttachAuth) config.AttachAuth = true;
         }
 
         if (config.AttachMFA) {
-            if (!await EnsureLoggedIn()) return Promise.reject("Auth absent");
             let mfa = Cookies.get(MFACookiePath);
             if (!mfa && !await PromptMFA()) return Promise.reject("MFA incomplete");
             mfa = Cookies.get(MFACookiePath);
             if (!mfa) return Promise.reject("MFA absent");
             config.headers["mfa"] = mfa;
+            if (!config.AttachAuth) config.AttachAuth = true;
+        }
+
+        if (config.AttachAuth) {
+            if (!await CheckLoggedIn(false)) return Promise.reject("Access absent");
+            config.headers["authorization"] = `Bearer ${AccessToken.current}`;
         }
 
         if (config.AttachCSRF) {
@@ -315,7 +313,7 @@ export function ConnectionContext({children}: { children: ReactNode }) {
         }
 
         return config;
-    }, [pingServer, SendNotification, EnsureLoggedIn, PromptMFA, PromptLogin])
+    }, [pingServer, SendNotification, CheckLoggedIn, PromptMFA, PromptLogin])
 
     const RequestRejectedInterceptor = useCallback(async (error: AxiosError) => Promise.reject(error),[])
 
@@ -326,7 +324,7 @@ export function ConnectionContext({children}: { children: ReactNode }) {
         const data = response.data;
         const status = response.status;
 
-        if (data?.notifications) {
+        if (data.notifications) {
             data.notifications.forEach((notification) => SendNotification(notification));
         }
 
@@ -337,7 +335,7 @@ export function ConnectionContext({children}: { children: ReactNode }) {
                 AccessExpiry.current = new Date(data.reply);
                 IsLoggedIn.current = !!AccessToken.current;
             }
-            if (config.CloseIfPopup && window.opener && data.success) {
+            if (config.CloseOnSuccess && window.opener && data.success) {
                 const popupResponse: PopupResponseT = {
                     success: data.success,
                     "modify-auth": data["modify-auth"],
@@ -357,45 +355,36 @@ export function ConnectionContext({children}: { children: ReactNode }) {
         const config = response?.config;
         const data = response?.data;
         const status = response?.status;
-
         if (data?.notifications) {
             data.notifications.forEach((notification) => SendNotification(notification));
         }
-
         if (!config) return Promise.reject(error);
         validateConnectionConfig(config);
-
         if (status === 401) {
-            if (!config.AttachAuth && !config.AuthRefreshPurpose) {
+            if (!config.AttachAuth && !config.PurposeAuthRefresh) {
                 SendNotification("Retrying with authentication. Please report this incident to admin");
                 config.AttachAuth = true;
-                return await RetryRequest(config);
+                return RetryRequest(config);
             }
-
             if (config.AttachAuth) {
                 if (!config.CausedRefresh) {
-                    IsLoggedIn.current = false;
-                    if (await refreshToken()) {
-                        config.CausedRefresh = true;
-                        return await RetryRequest(config);
+                    config.CausedRefresh = true;
+                    if (await refreshToken(false)) {
+                        return RetryRequest(config);
                     }
                     SendNotification("You need to be logged in to a valid account to perform this action.");
                     return Promise.reject("Not logged in/Session expired/revoked");
                 }
-
+                if (await PromptLogin()) return RetryRequest(config);
                 SendNotification("You do not have enough permissions to perform this action.");
                 navigate("/", {replace: true});
                 return Promise.reject("Invalid permissions");
             }
-
-            if (config.AuthRefreshPurpose) {
-                const loggedIn = await PromptLogin();
-                if (loggedIn) {
-                    return loggedIn;
+            if (config.PurposeAuthRefresh) {
+                if (await PromptLogin()) {
+                    return true;
                 }
-                if (!config.AttachAuth) {
-                    SendNotification("You are not logged in. Please login and try again.");
-                }
+                SendNotification("You are not logged in.");
                 return Promise.reject("Session expired/revoked");
             }
         } else if (status === 403) {
@@ -403,49 +392,52 @@ export function ConnectionContext({children}: { children: ReactNode }) {
                 config.AttachMFA = true;
                 return await RetryRequest(config);
             }
+            if (await PromptMFA()) return await RetryRequest(config);
             SendNotification("MFA verification is required for this action.");
-            return Promise.reject("MFA required");
+            return Promise.reject("MFA incomplete");
         } else if (status === 422) {
             SendNotification("Frontend has errors, please refresh and retry or report this to admin.");
             return Promise.reject("Frontend Errors");
         } else if (status === 429) {
-            const retryAfterRaw = data?.["retry-after"];
+            const retryAfterRaw = data?.["retry-after"] || 1;
             if (!retryAfterRaw) return Promise.reject("Rate limited");
-            const retryAfter = new Date(CurrentTime() + Number(retryAfterRaw) * 1000);
-            RateLimits.current[config.HostURL + config.RemainingPath] = retryAfter;
-            SendNotification(`Rate limit reached. Please retry after ${Math.trunc((retryAfter.getTime() - CurrentTime()) / 1000)} seconds.`);
+            RateLimits.current[config.HostURL + config.RemainingPath] = new Date(CurrentTime() + Number(retryAfterRaw) * 1000);
+            SendNotification(`Rate limit reached. Please retry after ${retryAfterRaw} seconds.`);
             return Promise.reject("Rate limited");
         } else if (status === 500) {
+            SendNotification("Server error. Please try again or report it to admins.")
             return Promise.reject("Server error");
-        } else if (status === 502 || status === 504) {
+        } else if (status === 502 || status === 504 || status === 404) {
             incrementGatewayErrors(config.HostURL);
+            SendNotification("Server not reachable. Retrying automatically.")
             await Sleep(1000);
             return await RetryRequest(config);
         } else {
+            SendNotification(`Unknown error (${status}). Retrying automatically.`)
             await Sleep(1000);
             return await RetryRequest(config);
         }
 
         return Promise.reject(error);
-    }, [SendNotification, RetryRequest, navigate, refreshToken, PromptLogin, incrementGatewayErrors])
+    }, [SendNotification, RetryRequest, navigate, refreshToken, PromptLogin, PromptMFA, incrementGatewayErrors])
 
     const ResponseFulfilledInterceptorCompat = ResponseFulfilledInterceptor as unknown as (response: AxiosResponse) => AxiosResponse | Promise<AxiosResponse>;
 
     useEffect(() => {
-        const refreshRequestId = refreshCredentialConnection.interceptors.request.use(RequestFulfilledInterceptor, RequestRejectedInterceptor);
-        const refreshResponseId = refreshCredentialConnection.interceptors.response.use(ResponseFulfilledInterceptorCompat, ResponseRejectedInterceptor);
+        const refreshRequestId = cookieEnabledConnection.interceptors.request.use(RequestFulfilledInterceptor, RequestRejectedInterceptor);
+        const refreshResponseId = cookieEnabledConnection.interceptors.response.use(ResponseFulfilledInterceptorCompat, ResponseRejectedInterceptor);
         const cookieRequestId = cookieDisabledConnection.interceptors.request.use(RequestFulfilledInterceptor, RequestRejectedInterceptor);
         const cookieResponseId = cookieDisabledConnection.interceptors.response.use(ResponseFulfilledInterceptorCompat, ResponseRejectedInterceptor);
 
         return () => {
-            refreshCredentialConnection.interceptors.request.eject(refreshRequestId);
-            refreshCredentialConnection.interceptors.response.eject(refreshResponseId);
+            cookieEnabledConnection.interceptors.request.eject(refreshRequestId);
+            cookieEnabledConnection.interceptors.response.eject(refreshResponseId);
             cookieDisabledConnection.interceptors.request.eject(cookieRequestId);
             cookieDisabledConnection.interceptors.response.eject(cookieResponseId);
         };
-    }, [RequestFulfilledInterceptor, RequestRejectedInterceptor, ResponseFulfilledInterceptorCompat, ResponseRejectedInterceptor, cookieDisabledConnection, refreshCredentialConnection]);
+    }, [RequestFulfilledInterceptor, RequestRejectedInterceptor, ResponseFulfilledInterceptorCompat, ResponseRejectedInterceptor, cookieDisabledConnection, cookieEnabledConnection]);
 
-    return <context.Provider value={{SendGet, SendPost, OpenPopup, Logout, EnsureLoggedIn}}>
+    return <context.Provider value={{SendGet, SendPost, OpenPopup, Logout, CheckLoggedIn: CheckLoggedIn}}>
         {children}
     </context.Provider>;
 }

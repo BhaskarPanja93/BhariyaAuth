@@ -1,0 +1,19 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Build arm64" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="BhariyaAuth" />
+    <working_directory value="$PROJECT_DIR$/Backend" />
+    <go_parameters value="-trimpath -buildvcs=false -ldflags=&quot;-s -w&quot;" />
+    <envs>
+      <env name="GOOS" value="linux" />
+      <env name="GOARCH" value="arm64" />
+      <env name="CGO_ENABLED" value="0" />
+    </envs>
+    <kind value="PACKAGE" />
+    <package value="BhariyaAuth" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/../BhariyaAuth|$PROJECT_DIR$/Backend/main.go" />
+    <output_directory value="$PROJECT_DIR$/Backend" />
+    <option name="run" value="false" />
+    <method v="2" />
+  </configuration>
+</component>
