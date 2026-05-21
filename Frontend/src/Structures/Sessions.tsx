@@ -85,8 +85,8 @@ export default function Sessions() {
             })
     }, [SendNotification, SendPost])
 
-    const RevokeDevice = (revokeAll: boolean, deviceID: string) => {
-        if (currentDevice == undefined && otherDevices.length === 0) return SendNotification("No devices visible. Refresh this page and retry.");
+    const RevokeDevice = useCallback((revokeAll: boolean, deviceID: string) => {
+        if (currentDevice == undefined) return SendNotification("No devices visible. Refresh this page and retry.");
 
         setUiDisabled(true)
         const form = new FormData();
@@ -107,7 +107,7 @@ export default function Sessions() {
             .finally(() => {
                 setUiDisabled(false)
             })
-    }
+    },[FetchDevices, SendNotification, SendPost, currentDevice])
 
     useEffect(() => {
         document.title = "Sessions - Bhariya";

@@ -1,4 +1,4 @@
-﻿import {useEffect, useRef, useState} from 'react'
+﻿import {useEffect, useMemo, useRef, useState} from 'react'
 import {Link, useNavigate, useLocation} from "react-router";
 import EmailInput from '../Elements/EmailInput'
 import PasswordInput from '../Elements/PasswordInput'
@@ -18,7 +18,7 @@ import OTPResendButton from "../Elements/OTPResendButton";
 export default function RegisterPage() {
     const navigate = useNavigate();
     const location = useLocation();
-    const params = new URLSearchParams(location.search);
+    const params = useMemo(() => {return new URLSearchParams(location.search)}, [location.search]);
 
     const {SendNotification} = NotificationManager();
     const {SendPost} = ConnectionManager()

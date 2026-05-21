@@ -141,7 +141,7 @@ function parseRows(dayFileName: string, rawText: string): LogRow[] {
                 content: parsed.c,
             });
         } catch {
-
+            console.log(line)
         }
     }
 
@@ -461,7 +461,7 @@ export default function LogsPage() {
                     </select>
 
                     <div className="text-sm text-gray-300 ml-2">Timezone</div>
-                    <div className="relative min-w-[260px]">
+                    <div className="relative min-w-65">
                         <input
                             value={timeZoneSearch}
                             onFocus={handleTimeZoneFocus}
@@ -607,7 +607,7 @@ export default function LogsPage() {
                                                             addFilter(column.key, rawValue);
                                                         }}
                                                         className={`p-2 border-r border-white/10 last:border-r-0 select-text cursor-text ${column.key === "time" ? "font-mono text-xs" : "text-xs"}`}>
-                                                <div className={`${column.key === "time" ? "whitespace-pre-wrap break-words" : "whitespace-pre-wrap break-words"}`}>
+                                                <div className={`${column.key === "time" ? "whitespace-pre-wrap wrap-break-word" : "whitespace-pre-wrap wrap-break-word"}`}>
                                                     {displayValue}
                                                 </div>
                                             </div>;

@@ -7,8 +7,6 @@ const PasswordResetStructure = lazy(() => import('../Structures/PasswordReset'))
 const MfaStructure = lazy(() => import('../Structures/Mfa'))
 const LogsStructure = lazy(() => import('./Logs'))
 
-import '../index.css'
-
 export default function Router() {
     return (
         <Suspense fallback={null}>
