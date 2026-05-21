@@ -1,9 +1,6 @@
 package notifications
 
-// Contains each notification contents
-
 const (
-	SessionExpired = "Current Session Expired. Please re-login"
 	SessionRevoked = "Current Session Revoked. Please re-login"
 
 	DBReadError    = "DB Read error. Retrying"

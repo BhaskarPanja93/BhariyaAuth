@@ -1,18 +1,18 @@
-import OTPInput from '../Elements/OTPInput'
+﻿import OTPInput from '../Elements/OTPInput'
 import SubmitButton from "../Elements/SubmitButton";
 import {OTPIsValid} from "../Utils/Strings";
 import {APIRoute} from "../Values/Constants";
 import {useLocation, useNavigate} from "react-router";
 import ConnectionManager from "../Contexts/Connection";
 import NotificationManager from "../Contexts/Notification";
-import {useEffect, useRef, useState} from "react";
+import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import OTPResendButton from "../Elements/OTPResendButton";
 import Countdown from "../Utils/Countdown";
 
 export default function Mfa() {
     const navigate = useNavigate();
     const location = useLocation();
-    const params = new URLSearchParams(location.search);
+    const params = useMemo(() => {return new URLSearchParams(location.search)}, [location.search]);
 
     const {SendNotification} = NotificationManager();
     const {SendPost} = ConnectionManager()
@@ -24,7 +24,7 @@ export default function Mfa() {
     const [verification, setVerification] = useState<string>("")
     const currentToken = useRef<string>("")
 
-    const Step1 = () => {
+    const Step1 = useCallback(() => {
         setUiDisabled(true);
         SendPost(true, false, true, APIRoute, "/mfa/step1")
             .then((data) => {
@@ -47,7 +47,7 @@ export default function Mfa() {
             .finally(() => {
                 setUiDisabled(false);
             });
-    }
+    },[SendNotification, SendPost])
 
     const Step2 = () => {
         if (!currentToken.current) {
@@ -119,3 +119,5 @@ export default function Mfa() {
         </div>
     </div>)
 }
+
+

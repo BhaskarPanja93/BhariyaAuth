@@ -1,4 +1,4 @@
-export default function Step2Toggle(
+﻿export default function Step2Toggle(
     { usingOTP, toggleUsingOTP, disabled }:
     {
         usingOTP: boolean,
@@ -14,3 +14,4 @@ export default function Step2Toggle(
         </button>
     )
 }
+

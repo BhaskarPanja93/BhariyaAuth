@@ -11,13 +11,13 @@ import (
 )
 
 const (
-	Intent    uint8 = iota // Before entering an operation
-	Info                   // After escaping an operation with a success
-	Warn                   // After escaping an operation with an ignorable warning
-	Error                  // After escaping an operation with an error
-	Benchmark              // After an operation for benchmarking
-	Test                   // During an operation for debugging internally
-	Blocked                // When an operation has been blocked without any error
+	Intent uint8 = iota
+	Info
+	Warn
+	Error
+	Benchmark
+	Test
+	Blocked
 )
 
 type Logger struct {
@@ -38,7 +38,7 @@ type LogEntry struct {
 }
 
 const (
-	MaxAge         = 7 * 24 * time.Hour
+	MaxAge         = 30 * 24 * time.Hour
 	FilenameFormat = "20060102"
 	TimeFormat     = "150405.000"
 	Path           = "./logs"
@@ -49,7 +49,7 @@ func CreateLogger(name string) *Logger {
 		Name:    name,
 		channel: make(chan LogEntry, 128),
 	}
-	_logger.reset()
+	_ = _logger.reset()
 	go _logger.listen()
 	return _logger
 }
@@ -66,24 +66,24 @@ func (logger *Logger) enforceMaxAge() {
 
 	for _, f := range files {
 		if f.IsDir() {
-			continue // skip folders
+			continue
 		}
 
 		name := f.Name()
 
 		if !strings.HasPrefix(name, logger.Name) {
-			continue // skip other logger files
+			continue
 		}
 
 		var startTime time.Time
 
 		startTime, err = time.Parse(FilenameFormat, strings.TrimPrefix(name, logger.Name))
 		if err != nil {
-			continue // skip unknown files
+			continue
 		}
 
 		if startTime.Before(cutoff) {
-			_ = os.Remove(filepath.Join(Path, name)) // delete older files
+			_ = os.Remove(filepath.Join(Path, name))
 		}
 	}
 }
@@ -162,13 +162,13 @@ func (logger *Logger) CheckAvailableLogFiles() []string {
 
 	for _, f := range files {
 		if f.IsDir() {
-			continue // skip folders
+			continue
 		}
 
 		name := f.Name()
 
 		if !strings.HasPrefix(name, logger.Name) {
-			continue // skip other files
+			continue
 		}
 		names = append(names, name)
 	}

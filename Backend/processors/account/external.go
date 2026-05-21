@@ -4,6 +4,7 @@ import (
 	Config "BhariyaAuth/constants/config"
 	ResponseModels "BhariyaAuth/models/responses"
 	Logs "BhariyaAuth/processors/logs"
+	StringProcessor "BhariyaAuth/processors/string"
 	Stores "BhariyaAuth/stores"
 	"errors"
 	"strconv"
@@ -13,84 +14,59 @@ import (
 	"github.com/bytedance/sonic"
 )
 
-// Ensures listener starts only once (thread-safe)
-var listenOnce sync.Once
+const externalFileName = "processors/account/external"
 
-// pendingAccountRequests maps userID → response channel
-// Used to correlate async responses with requests
+var listenOnce sync.Once
 var pendingAccountRequests sync.Map
 
-// ListenAccountResponses starts a background listener that:
-//   - Subscribes to Redis response channel (scoped by ServerID)
-//   - Receives account details responses
-//   - Routes them to the correct waiting request via channel
-//
-// Concurrency:
-// - Uses sync.Once to ensure single listener instance
-// - Uses sync.Map for concurrent request tracking
-//
-// Flow:
-//
-//	subscribe → receive message → unmarshal → lookup pending request → send response
+func pendingRequestKey(userID int32, requestID string) string {
+	if requestID != "" {
+		return requestID
+	}
+	return "uid:" + strconv.Itoa(int(userID))
+}
+
 func ListenAccountResponses() {
-
 	listenOnce.Do(func() {
-
 		channel := Stores.RedisClient.Subscribe(Config.CtxBG, Config.AccountDetailsResponseChannel+":"+Config.ServerID).Channel()
 
 		go func() {
-			for msg := range channel {
-
+			for message := range channel {
 				var response ResponseModels.AccountDetailsResponseT
-
-				// Ignore malformed messages
-				if err := sonic.Unmarshal([]byte(msg.Payload), &response); err != nil {
+				if err := sonic.Unmarshal([]byte(message.Payload), &response); err != nil {
+					Logs.RootLogger.Add(Logs.Error, externalFileName, "", "Unmarshal failed: "+err.Error())
 					continue
 				}
 
-				// Route response to waiting request
-				if val, ok := pendingAccountRequests.Load(response.UserID); ok {
+				key := pendingRequestKey(response.UserID, response.RequestID)
+				val, ok := pendingAccountRequests.Load(key)
+				if !ok {
+					continue
+				}
 
-					ch := val.(chan ResponseModels.AccountDetailsResponseT)
-
-					// Non-blocking send to avoid goroutine leak
-					select {
-					case ch <- response: // Send to channel
-					default: // Or skip the message
-					}
+				select {
+				case val.(chan ResponseModels.AccountDetailsResponseT) <- response:
+				default:
 				}
 			}
 		}()
 	})
 }
 
-// RequestAccountDetails performs an async request over Redis and waits for response.
-//
-//  1. Ensures listener is running.
-//  2. Registers a response channel for given userID.
-//  3. Publishes request to Redis.
-//  4. Waits for response or timeout.
-//
-// Guarantees:
-// - Request/response correlation via userID.
-// - Timeout protection (prevents deadlocks).
-//
-// Returns:
-// - Account details on success.
-// - Timeout or Redis error on failure.
 func RequestAccountDetails(userID int32) (ResponseModels.AccountDetailsResponseT, error) {
-
 	ListenAccountResponses()
 
-	responseChan := make(chan ResponseModels.AccountDetailsResponseT, 1)
+	requestID := StringProcessor.SafeString(5)
+	key := pendingRequestKey(userID, requestID)
+	responseChannel := make(chan ResponseModels.AccountDetailsResponseT, 1)
 
-	// Register request
-	pendingAccountRequests.Store(userID, responseChan)
-	defer pendingAccountRequests.Delete(userID)
+	pendingAccountRequests.Store(key, responseChannel)
+	defer pendingAccountRequests.Delete(key)
 
 	request := ResponseModels.AccountDetailsRequestT{
-		ServerID: Config.ServerID,
-		UserID:   userID,
+		ServerID:  Config.ServerID,
+		RequestID: requestID,
+		UserID:    userID,
 	}
 
 	payload, err := sonic.Marshal(request)
@@ -98,37 +74,21 @@ func RequestAccountDetails(userID int32) (ResponseModels.AccountDetailsResponseT
 		return ResponseModels.AccountDetailsResponseT{}, err
 	}
 
-	// Publish request
 	err = Stores.RedisClient.
 		Publish(Config.CtxBG, Config.AccountDetailsRequestChannel, payload).
 		Err()
-
 	if err != nil {
 		return ResponseModels.AccountDetailsResponseT{}, err
 	}
 
-	// Wait for response or timeout
 	select {
-	case res := <-responseChan:
-		return res, nil
-
-	case <-time.After(2 * time.Second):
+	case response := <-responseChannel:
+		return response, nil
+	case <-time.After(4 * time.Second):
 		return ResponseModels.AccountDetailsResponseT{}, errors.New("account data request: timed out")
 	}
 }
 
-// ServeAccountDetails listens for incoming requests and responds with user data.
-//
-//  1. Subscribes to request channel.
-//  2. Fetches user data from DB.
-//  3. Publishes response to server-specific response channel.
-//
-// Pattern:
-// - Acts like a worker handling RPC-style requests.
-//
-// Flow:
-//
-//	receive request → query DB → marshal → publish response
 func ServeAccountDetails() {
 	Logs.RootLogger.Add(Logs.Intent, "main", "", "Initializing Account serving")
 
@@ -137,53 +97,33 @@ func ServeAccountDetails() {
 		Channel()
 
 	for message := range channel {
-
 		var request ResponseModels.AccountDetailsRequestT
-
-		// Ignore malformed requests
 		if err := sonic.Unmarshal([]byte(message.Payload), &request); err != nil {
-			Logs.RootLogger.Add(Logs.Error, "processors/account/external", "", "Malformed request: "+message.Payload)
+			Logs.RootLogger.Add(Logs.Error, externalFileName, "", "Malformed request: "+message.Payload)
 			continue
 		}
 
 		var response ResponseModels.AccountDetailsResponseT
+		response.RequestID = request.RequestID
 
-		// Fetch user details from DB
-		err := Stores.SQLClient.QueryRow(
-			Config.CtxBG,
-			"SELECT user_id, mail, name, created FROM users WHERE user_id = $1 LIMIT 1",
-			request.UserID,
-		).Scan(
-			&response.UserID,
-			&response.Email,
-			&response.Name,
-			&response.Created,
-		)
-
+		err := Stores.SQLClient.QueryRow(Config.CtxBG, "SELECT user_id, mail, name, created FROM users WHERE user_id = $1 LIMIT 1", request.UserID).Scan(&response.UserID, &response.Email, &response.Name, &response.Created)
 		if err != nil {
-			Logs.RootLogger.Add(Logs.Error, "processors/account/external", "", "Serve account details - SQL query: "+err.Error())
+			Logs.RootLogger.Add(Logs.Error, externalFileName, "", "Serve account details - SQL query: "+err.Error())
 			continue
 		}
 
-		// Serialize before sending
 		payload, err := sonic.Marshal(response)
 		if err != nil {
-			Logs.RootLogger.Add(Logs.Error, "processors/account/external", "", "Serve account details - JSON marshal: "+request.ServerID+" "+strconv.Itoa(int(request.UserID))+" "+err.Error())
+			Logs.RootLogger.Add(Logs.Error, externalFileName, "", "Serve account details - JSON marshal: "+request.ServerID+" "+strconv.Itoa(int(request.UserID))+" "+err.Error())
 			continue
 		}
 
-		// Send response back to requesting server
-		err = Stores.RedisClient.Publish(
-			Config.CtxBG,
-			Config.AccountDetailsResponseChannel+":"+request.ServerID,
-			payload,
-		).Err()
-
+		err = Stores.RedisClient.Publish(Config.CtxBG, Config.AccountDetailsResponseChannel+":"+request.ServerID, payload).Err()
 		if err != nil {
-			Logs.RootLogger.Add(Logs.Error, "processors/account/external", "", "Serve account details - Redis publish: "+request.ServerID+" "+strconv.Itoa(int(request.UserID))+" "+err.Error())
+			Logs.RootLogger.Add(Logs.Error, externalFileName, "", "Serve account details - Redis publish: "+request.ServerID+" "+strconv.Itoa(int(request.UserID))+" "+err.Error())
 			continue
 		}
 
-		Logs.RootLogger.Add(Logs.Info, "processors/account/external", "", "Served account details to: "+request.ServerID+" account: "+strconv.Itoa(int(request.UserID)))
+		Logs.RootLogger.Add(Logs.Info, externalFileName, "", "Served account details to: "+request.ServerID+" account: "+strconv.Itoa(int(request.UserID)))
 	}
 }

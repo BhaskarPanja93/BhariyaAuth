@@ -12,27 +12,6 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-// CreateFreshToken generates a new access + refresh token pair for a user session.
-//
-// This function is used during initial authentication (signin/signup).
-// It creates:
-//  1. Access token (short-lived, used for API access).
-//  2. Refresh token (long-lived, used to renew access).
-//  3. CSRF token (bound to refresh token for protection).
-//
-// Flow:
-//
-//	build access token → generate CSRF → build refresh token → return combined
-//
-// Parameters:
-// - userID: authenticated user identifier.
-// - deviceID: unique device/session identifier.
-// - userType: role or classification of user.
-// - remember: whether session should persist longer.
-// - identifierType: source of signin (e.g., email, SSO).
-//
-// Returns:
-// - combined struct containing access + refresh tokens and metadata.
 func CreateFreshToken(
 	ctx fiber.Ctx,
 	userID int32,
@@ -65,7 +44,6 @@ func CreateFreshToken(
 
 	combined.RememberMe = remember
 
-	// CSRF token bound to refresh token
 	combined.CSRF = StringProcessor.SafeString(128)
 
 	combined.RefreshToken, err = StringProcessor.EncryptInterfaceToB64(
@@ -73,7 +51,7 @@ func CreateFreshToken(
 			TokenType:      refreshTokenType,
 			UserID:         userID,
 			DeviceID:       deviceID,
-			Visits:         math.MinInt16, // version counter for token rotation
+			Visits:         math.MinInt16,
 			Created:        now,
 			Updated:        now,
 			Expiry:         now.Add(Config.RefreshTokenExpireDelta),
@@ -90,20 +68,6 @@ func CreateFreshToken(
 	return combined, nil
 }
 
-// CreateRenewToken generates a new access and refresh token from an existing refresh token.
-//
-// This function is used during token refresh flow.
-// It:
-//   - Issues a new access token.
-//   - Rotates refresh token (new CSRF + incremented version).
-//
-// Flow:
-//
-//	validate refresh → create new access → rotate refresh → return updated tokens
-//
-// Security:
-// - Refresh token rotation prevents replay attacks.
-// - Visits counter acts as versioning mechanism.
 func CreateRenewToken(
 	ctx fiber.Ctx,
 	refresh TokenModels.RefreshToken,
@@ -130,10 +94,11 @@ func CreateRenewToken(
 
 	refresh.CSRF = StringProcessor.SafeString(128)
 	refresh.Expiry = now.Add(Config.RefreshTokenExpireDelta)
-	refresh.Visits++ // invalidate previous versions
+	refresh.Visits++
 
 	combined.CSRF = refresh.CSRF
 	combined.RememberMe = refresh.Remember
+	combined.AccessExpires = now.Add(Config.AccessTokenExpireDelta)
 
 	combined.RefreshToken, err = StringProcessor.EncryptInterfaceToB64(refresh)
 
@@ -143,38 +108,24 @@ func CreateRenewToken(
 	return combined, nil
 }
 
-// CreateMFAToken generates a token for MFA verification flow.
-//
-// Purpose:
-// - Used after OTP validation.
-//
-// Contains:
-// - Step2Code (OTP reference)
-// - User + Device identity
-// - Creation timestamp
-// - Verified flag
-func CreateMFAToken(ctx fiber.Ctx, userID int32, deviceID int16, step2code string) (string, error) {
+func CreateMFAToken(ctx fiber.Ctx, userID int32, deviceID int16, step2code string, verified bool) (string, error) {
+	code := step2code
+	if verified {
+		code = ""
+	}
 
 	return StringProcessor.EncryptInterfaceToB64(
 		TokenModels.MFAToken{
 			TokenType: mfaTokenType,
-			Step2Code: step2code,
+			Step2Code: code,
 			UserID:    userID,
 			DeviceID:  deviceID,
 			Created:   RequestProcessor.GetRequestTime(ctx),
-			Verified:  true,
+			Verified:  verified,
 		},
 	)
 }
 
-// CreateSSOToken generates state token for SSO flow.
-//
-// Purpose:
-// - Maintains state across OAuth redirects.
-// - Encodes provider + expiry + remember flag.
-//
-// Used in:
-// - SSO initiation → callback validation.
 func CreateSSOToken(ctx fiber.Ctx, provider string, state string, remember bool) (string, error) {
 
 	return StringProcessor.EncryptInterfaceToB64(
@@ -188,15 +139,6 @@ func CreateSSOToken(ctx fiber.Ctx, provider string, state string, remember bool)
 	)
 }
 
-// CreatePasswordResetToken generates token for password reset flow.
-//
-// Contains:
-// - User identity
-// - Email
-// - OTP reference
-//
-// Used in:
-// - Step1 → Step2 password reset verification.
 func CreatePasswordResetToken(mail string, userID int32, step2code string) (string, error) {
 
 	return StringProcessor.EncryptInterfaceToB64(
@@ -209,16 +151,6 @@ func CreatePasswordResetToken(mail string, userID int32, step2code string) (stri
 	)
 }
 
-// CreateSignInToken generates token for signin flow.
-//
-// Contains:
-// - User identity
-// - Selected authentication method (OTP/password)
-// - OTP reference (if applicable)
-// - Remember flag
-//
-// Used in:
-// - SignIn Step1 → Step2
 func CreateSignInToken(
 	form *FormModels.SignInForm1,
 	userID int32,
@@ -238,15 +170,6 @@ func CreateSignInToken(
 	)
 }
 
-// CreateSignUpToken generates token for multi-step registration flow.
-//
-// Contains:
-// - User input data (name, email, password)
-// - OTP reference
-// - Remember flag
-//
-// Used in:
-// - Signup Step1 → Step2
 func CreateSignUpToken(form *FormModels.SignUpForm1, step2code string) (string, error) {
 
 	return StringProcessor.EncryptInterfaceToB64(

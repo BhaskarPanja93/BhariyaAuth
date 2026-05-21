@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from 'react'
+﻿import {useEffect, useMemo, useRef, useState} from 'react'
 import SubmitButton from "../Elements/SubmitButton";
 import PasswordInput from "../Elements/PasswordInput";
 import {EmailIsValid, OTPIsValid} from "../Utils/Strings";
@@ -14,7 +14,7 @@ import OTPResendButton from "../Elements/OTPResendButton";
 export default function PasswordReset() {
     const navigate = useNavigate();
     const location = useLocation();
-    const params = new URLSearchParams(location.search);
+    const params = useMemo(() => {return new URLSearchParams(location.search)}, [location.search]);
 
     const {SendNotification} = NotificationManager();
     const {SendPost} = ConnectionManager()
@@ -134,3 +134,5 @@ export default function PasswordReset() {
             </div>
         </div>)
 }
+
+

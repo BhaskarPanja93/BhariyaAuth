@@ -1,9 +1,11 @@
-import {BrowserRouter} from 'react-router';
+﻿import {BrowserRouter} from 'react-router';
 import {createRoot} from 'react-dom/client'
 import {DarkModeContext} from './Contexts/DarkMode'
 import {NotificationContext} from './Contexts/Notification'
 import {ConnectionContext} from './Contexts/Connection'
 import Router from "./Structures/Router.tsx";
+
+import './index.css'
 
 createRoot(document.getElementById('root')!)
     .render(
@@ -17,3 +19,5 @@ createRoot(document.getElementById('root')!)
             </DarkModeContext>
         </BrowserRouter>
     );
+
+

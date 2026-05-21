@@ -2,18 +2,18 @@ package responses
 
 import "time"
 
-// All response types
-
 type AccountDetailsRequestT struct {
-	ServerID string `json:"sid"`
-	UserID   int32  `json:"uid"`
+	ServerID  string `json:"sid"`
+	RequestID string `json:"rid,omitempty"`
+	UserID    int32  `json:"uid"`
 }
 
 type AccountDetailsResponseT struct {
-	UserID  int32     `json:"uid"`
-	Email   string    `json:"mail"`
-	Name    string    `json:"name"`
-	Created time.Time `json:"created"`
+	RequestID string    `json:"rid,omitempty"`
+	UserID    int32     `json:"uid"`
+	Email     string    `json:"mail"`
+	Name      string    `json:"name"`
+	Created   time.Time `json:"created"`
 }
 
 type APIResponseT struct {

@@ -1,4 +1,4 @@
-import {type RefObject, useEffect, useRef, useState} from 'react'
+﻿import {type RefObject, useEffect, useMemo, useRef, useState} from 'react'
 import {Link, useLocation, useNavigate} from "react-router";
 import {APIRoute} from '../Values/Constants'
 import EmailInput from '../Elements/EmailInput'
@@ -18,7 +18,7 @@ import OTPResendButton from "../Elements/OTPResendButton";
 export default function LoginPage() {
     const navigate = useNavigate()
     const location = useLocation();
-    const params = new URLSearchParams(location.search);
+    const params = useMemo(() => {return new URLSearchParams(location.search)}, [location.search]);
 
     const {SendNotification} = NotificationManager();
     const {SendPost} = ConnectionManager()
@@ -207,3 +207,5 @@ export default function LoginPage() {
         </div>
     )
 }
+
+

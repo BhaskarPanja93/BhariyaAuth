@@ -1,4 +1,4 @@
-import {createContext, type ReactNode, useContext, useEffect, useState} from "react";
+﻿import {createContext, type ReactNode, useContext, useEffect, useState} from "react";
 import {Favicon} from "../Utils/Favicon";
 import {FrontendRoute} from "../Values/Constants";
 
@@ -6,10 +6,11 @@ interface DarkModeContextType {
     IsDarkMode: boolean;
 }
 
-const Context = createContext<DarkModeContextType | undefined>(undefined);
+const context = createContext<DarkModeContextType | undefined>(undefined);
 
 export function DarkModeContext({children}: { children: ReactNode }) {
     const [IsDarkMode, setIsDarkMode] = useState<boolean>(false);
+
     useEffect(() => {
         const applyMode = (isDarkMode: boolean): void => {
             setIsDarkMode(isDarkMode);
@@ -24,15 +25,17 @@ export function DarkModeContext({children}: { children: ReactNode }) {
         return () => mediaQuery.removeEventListener("change", handleChange);
     }, []);
 
-    return (<Context.Provider value={{IsDarkMode}}>
+    return (<context.Provider value={{IsDarkMode}}>
         {children}
-    </Context.Provider>)
+    </context.Provider>)
 }
 
 export default function DarkModeManager(): DarkModeContextType {
-    const context = useContext(Context);
-    if (context === undefined) {
+    const ctx = useContext(context);
+    if (ctx === undefined) {
         throw new Error('DarkModeManager() must be used within a DarkModeContext');
     }
-    return context;
+    return ctx;
 };
+
+

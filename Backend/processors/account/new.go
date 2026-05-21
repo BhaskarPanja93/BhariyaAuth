@@ -33,7 +33,7 @@ func RecordNewUser(ctx fiber.Ctx, userType string, password string, mail string,
 		return 0, errors.New("Record new user - SQL query: " + err.Error())
 	}
 	os, device, browser := StringProcessor.ParseUA(ua)
-	MailNotifier.SignUp(mail, name, MailModels.SignUpComplete, IP, os, device, browser, 2)
+	_ = MailNotifier.SignUp(mail, name, MailModels.SignUpComplete, IP, os, device, browser)
 	return userID, nil
 }
 
@@ -50,7 +50,7 @@ func RecordReturningUser(ctx fiber.Ctx, mail string, userID int32, rememberMe bo
 		return deviceID, errors.New("Record returning user - SQL query: " + err.Error())
 	}
 	if sendMail {
-		MailNotifier.SignIn(mail, MailModels.SignInComplete, IP, os, device, browser, 2)
+		_ = MailNotifier.SignIn(mail, MailModels.SignInComplete, IP, os, device, browser)
 	}
 	return deviceID, nil
 }

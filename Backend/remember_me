@@ -30,7 +30,8 @@ ISSUES:
 websocket buffer infinite
 
 FUTURE:
-recheck where post and get are used
+change logs filename to sender/reason
+use fetch instead of axios
 make a field in request to allow large files like logs to be sent without the server reading into memory for json (request.config.passThroughResponseBody)
 change comments, recreate readme
 try different encoder, instead of json

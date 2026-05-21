@@ -11,81 +11,51 @@ import (
 	graphusers "github.com/microsoftgraph/msgraph-sdk-go/users"
 )
 
-// sendMail sends an email using Microsoft Graph API with retry logic.
-//
-// - Constructs email message (HTML).
-// - Sends via Graph API.
-// - Retries on failure with credential refresh.
-//
-// Flow Summary:
-//
-//	build message → send → retry (on failure)
-//
-// Parameters:
-// - mail: recipient email address.
-// - subject: email subject.
-// - content: HTML content.
-// - attempts: number of retry attempts remaining.
-//
-// Returns:
-// - true if mail sent successfully.
-// - false if all retries fail.
-//
-// Retry Strategy:
-// - Fixed delay (5 seconds).
-// - Recursive retry until attempts exhausted.
-//
-// Security Considerations:
-// - Uses application-level credentials (client secret).
-// - Does not expose sensitive data externally.
 func sendMail(mail, subject, content string, attempts uint8) error {
-
-	// Stop retrying if attempts exhausted
-	if attempts <= 0 {
-		return errors.New("send mail - retries exhausted")
+	if attempts == 0 {
+		return errors.New("send mail: retries exhausted")
 	}
 
-	// Construct email body (HTML)
+	if client == nil {
+		refreshCredentials()
+		if client == nil {
+			time.Sleep(time.Second)
+			return sendMail(mail, subject, content, attempts-1)
+		}
+	}
+
 	body := graphmodels.NewItemBody()
 	body.SetContentType(new(graphmodels.HTML_BODYTYPE))
 	body.SetContent(&content)
 
-	// Create message object
 	message := graphmodels.NewMessage()
 	message.SetSubject(&subject)
 	message.SetBody(body)
 
-	// Configure recipient
-	recipient := graphmodels.NewRecipient()
 	emailAddress := graphmodels.NewEmailAddress()
 	emailAddress.SetAddress(&mail)
+
+	recipient := graphmodels.NewRecipient()
 	recipient.SetEmailAddress(emailAddress)
 
 	message.SetToRecipients([]graphmodels.Recipientable{recipient})
 
-	// Build request payload
 	requestBody := graphusers.NewItemSendMailPostRequestBody()
 	requestBody.SetMessage(message)
 	requestBody.SetSaveToSentItems(new(true))
 
-	// Send email via Graph API
 	err := client.
 		Users().
 		ByUserId(Secrets.MicrosoftMailId).
 		SendMail().
 		Post(Config.CtxBG, requestBody, nil)
 
-	if err != nil {
-		Logs.RootLogger.Add(Logs.Error, "processors/mail/sender", "", "Send mail failed: "+err.Error())
-		// On failure:
-		// - wait
-		// - refresh credentials
-		// - retry
-		time.Sleep(time.Second)
-		refreshCredentials()
-
-		return sendMail(mail, subject, content, attempts-1)
+	if err == nil {
+		return nil
 	}
 
-	return nil
+	Logs.RootLogger.Add(Logs.Error, "processors/mail/sender", "", "Send mail failed: "+err.Error())
+	time.Sleep(time.Second)
+	refreshCredentials()
+	return sendMail(mail, subject, content, attempts-1)
 }

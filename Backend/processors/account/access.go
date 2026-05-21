@@ -8,7 +8,7 @@ import (
 )
 
 func denySingleDeviceAccess(userID int32, deviceID int16) error {
-	key := Config.RefreshBlocked + ":" + strconv.Itoa(int(userID)) + strconv.Itoa(int(deviceID))
+	key := Config.RefreshBlocked + ":" + strconv.Itoa(int(userID)) + ":" + strconv.Itoa(int(deviceID))
 	err := Stores.RedisClient.Set(Config.CtxBG, key, nil, Config.AccessTokenExpireDelta).Err()
 	if err != nil {
 		return errors.New("Deny single device access - redis set: " + err.Error())
@@ -17,7 +17,7 @@ func denySingleDeviceAccess(userID int32, deviceID int16) error {
 }
 
 func CheckDeviceAccessDenied(userID int32, deviceID int16) (bool, error) {
-	key := Config.RefreshBlocked + ":" + strconv.Itoa(int(userID)) + strconv.Itoa(int(deviceID))
+	key := Config.RefreshBlocked + ":" + strconv.Itoa(int(userID)) + ":" + strconv.Itoa(int(deviceID))
 	exists, err := Stores.RedisClient.Exists(Config.CtxBG, key).Result()
 	if err != nil {
 		return true, errors.New("Check single device access - redis exists: " + err.Error())
@@ -68,15 +68,15 @@ func DenySingleDeviceFromRenewing(userID int32, deviceID int16) error {
 }
 
 func BlacklistUser(userID int32) error {
-	err := DenyAllDevicesFromRenewing(userID)
-	if err != nil {
-		return errors.New("Blacklist user: " + err.Error())
-	}
-	_, err = Stores.SQLClient.Exec(
+	_, err := Stores.SQLClient.Exec(
 		Config.CtxBG,
 		"UPDATE users SET blocked = TRUE WHERE user_id = $1", userID)
 	if err != nil {
 		return errors.New("Blacklist user - SQL exec: " + err.Error())
+	}
+	err = DenyAllDevicesFromRenewing(userID)
+	if err != nil {
+		return errors.New("Blacklist user: " + err.Error())
 	}
 	return nil
 }

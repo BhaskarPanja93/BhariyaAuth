@@ -1,4 +1,4 @@
-import {lazy, Suspense} from "react";
+﻿import {lazy, Suspense} from "react";
 import {Navigate, Route, Routes} from 'react-router';
 const LoginStructure = lazy(() => import('../Structures/SignIn'))
 const RegisterStructure = lazy(() => import('../Structures/SignUp'))
@@ -6,8 +6,6 @@ const SessionsStructure = lazy(() => import('../Structures/Sessions'))
 const PasswordResetStructure = lazy(() => import('../Structures/PasswordReset'))
 const MfaStructure = lazy(() => import('../Structures/Mfa'))
 const LogsStructure = lazy(() => import('./Logs'))
-
-import '../index.css'
 
 export default function Router() {
     return (
@@ -24,3 +22,5 @@ export default function Router() {
         </Suspense>
     )
 }
+
+

@@ -1,4 +1,4 @@
-import React, {useState} from 'react'
+﻿import React, {useState} from 'react'
 
 export default function PasswordInput(
     { value, onValueChange, confirm, onConfirmChange, disabled, needsConfirm }:
@@ -42,3 +42,4 @@ export default function PasswordInput(
         </div>
     )
 }
+

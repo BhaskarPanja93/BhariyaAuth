@@ -21,18 +21,6 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-// ReceiveCLIFlags parses CLI flags and determines how the server should bind.
-//
-// Overview:
-// - Supports optional UNIX socket binding via `-bind` flag.
-// - Falls back to TCP port 3000 if not provided.
-//
-// Flow:
-//
-//	parse flags → check socket → start server accordingly
-//
-// Parameters:
-// - MainApp: initialized Fiber application instance.
 func ReceiveCLIFlags(MainApp *fiber.App) {
 	unixSocket := flag.String("bind", "", "Unix socket path (optional)")
 	flag.Parse()
@@ -46,17 +34,6 @@ func ReceiveCLIFlags(MainApp *fiber.App) {
 	}
 }
 
-// StartOnSocket starts the server on a UNIX domain socket.
-//
-// Overview:
-// - Uses fiber's Unix socket listener.
-// - Sets file permissions to 0760.
-//
-// Behavior:
-// - Falls back to TCP port if socket binding fails.
-//
-// Parameters:
-// - unixSocket: filesystem path to socket file.
 func StartOnSocket(MainApp *fiber.App, unixSocket string) {
 	Logs.RootLogger.Add(Logs.Intent, "main", "", "Attempting run on unix socket")
 	err := MainApp.Listen(unixSocket, fiber.ListenConfig{
@@ -69,11 +46,6 @@ func StartOnSocket(MainApp *fiber.App, unixSocket string) {
 	}
 }
 
-// StartOnPort starts the server on TCP port 3000.
-//
-// Overview:
-// - Default fallback when no socket is provided.
-// - Logs startup attempt and failure if any.
 func StartOnPort(MainApp *fiber.App) {
 	Logs.RootLogger.Add(Logs.Intent, "main", "", "Attempting run on port 3000")
 	if err := MainApp.Listen(":3000"); err != nil {
@@ -82,26 +54,13 @@ func StartOnPort(MainApp *fiber.App) {
 	}
 }
 
-// main is the entry point of the application.
-//
-// Startup Sequence:
-//  1. Initialize database (PostgreSQL).
-//  2. Initialize Redis.
-//  3. Start background workers.
-//  4. Configure Fiber app.
-//  5. Register routes and middleware.
-//  6. Start server (socket or port).
-//
-// Concurrency:
-// - Background workers run as goroutines.
-// - HTTP server runs in the main thread.
 func main() {
 	Logs.RootLogger.Add(Logs.Info, "main", "", "Server startup")
-	Stores.ConnectSQL()   // blocking until DB is available
-	Stores.ConnectRedis() // blocking until Redis is available
+	Stores.ConnectSQL()
+	Stores.ConnectRedis()
 
-	go AccountProcessor.ServeAccountDetails() // async worker
-	go AccountProcessor.DatabaseAutoVacuum()  // periodic DB cleanup
+	go AccountProcessor.ServeAccountDetails()
+	go AccountProcessor.DatabaseAutoVacuum()
 	SSORouters.AttachProviders()
 
 	MainApp := fiber.New(fiber.Config{
@@ -120,7 +79,7 @@ func main() {
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
 
-		BodyLimit: 10 * 1024, // max request body size (10 KB)
+		BodyLimit: 10 * 1024,
 
 		JSONEncoder: sonic.Marshal,
 		JSONDecoder: sonic.Unmarshal,
@@ -128,7 +87,6 @@ func main() {
 
 	APIGroup := MainApp.Group("/auth/api")
 
-	// Global middleware for API routes
 	Logs.RootLogger.Add(Logs.Intent, "main", "", "Attaching Profiling Middleware")
 	APIGroup.Use(Middlewares.ProfilingMiddleware())
 
@@ -142,9 +100,6 @@ func main() {
 	SessionRouters.AttachRoutes(APIGroup)
 	MFARouters.AttachRoutes(APIGroup)
 	LogsRouters.AttachRoutes(APIGroup)
-
-	// WSGroup := MainApp.Group("/auth/ws")
-	// ChatRouters.AttachRoutes(WSGroup)
 
 	Logs.RootLogger.Add(Logs.Intent, "main", "", "Reading app run parameters")
 	ReceiveCLIFlags(MainApp)

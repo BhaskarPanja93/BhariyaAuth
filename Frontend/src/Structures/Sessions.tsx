@@ -1,4 +1,4 @@
-import {useEffect, useState} from "react";
+﻿import {useCallback, useEffect, useState} from "react";
 import ConnectionManager from "../Contexts/Connection.tsx";
 import {APIRoute} from "../Values/Constants";
 import NotificationManager from "../Contexts/Notification.tsx";
@@ -9,8 +9,8 @@ type SingleUserDeviceUnprocessed = {
     id: string;
     count: number;
     remembered: boolean;
-    created: string;  // ISO date string
-    updated: string;  // ISO date string
+    created: string;
+    updated: string;
     os: string;
     device: string;
     browser: string;
@@ -35,16 +35,16 @@ export type SingleUserDeviceProcessed = {
 
 export default function Sessions() {
     const {SendNotification} = NotificationManager();
-    const {SendPost} = ConnectionManager()
+    const {SendGet, SendPost} = ConnectionManager()
 
     const [uiDisabled, setUiDisabled] = useState<boolean>(false)
     const [loading, setLoading] = useState<boolean>(false)
     const [currentDevice, setCurrentDevice] = useState<SingleUserDeviceProcessed | undefined>(undefined);
     const [otherDevices, setOtherDevices] = useState<SingleUserDeviceProcessed[]>([]);
 
-    const FetchDevices = () => {
+    const FetchDevices = useCallback(() => {
         setLoading(true);
-        SendPost(true, false, false, APIRoute, "/sessions/fetch")
+        SendGet(true, false, false, APIRoute, "/sessions/fetch")
             .then((data) => {
                 if (data.success) {
                     const reply: UserDevicesResponse = data.reply
@@ -58,7 +58,7 @@ export default function Sessions() {
                         remembered: device.remembered,
                         count: device.count,
                         isCurrent: device.id === reply.current,
-                        icon: `/auth/device-icons/${device.device}.svg`
+                        icon: `/auth/device-icons/${device.device || "Unknown"}.svg`
                     }))
 
                     mapped.sort((a, b) => {
@@ -83,10 +83,10 @@ export default function Sessions() {
             .finally(() => {
                 setLoading(false);
             })
-    }
+    }, [SendNotification, SendGet])
 
-    const RevokeDevice = (revokeAll: boolean, deviceID: string) => {
-        if (currentDevice == undefined && otherDevices.length === 0) return SendNotification("No devices visible, please refresh page to recheck");
+    const RevokeDevice = useCallback((revokeAll: boolean, deviceID: string) => {
+        if (currentDevice == undefined) return SendNotification("No devices visible. Refresh this page and retry.");
 
         setUiDisabled(true)
         const form = new FormData();
@@ -95,10 +95,10 @@ export default function Sessions() {
         SendPost(true, false, false, APIRoute, "/sessions/revoke", form)
             .then((data) => {
                 if (data.success) {
-                    if (revokeAll) SendNotification("All sessions have been revoked and has lost access instantly")
-                    else SendNotification("Session has been revoked and has lost access instantly")
+                    if (revokeAll) SendNotification("All sessions have been revoked and lost access instantly.")
+                    else SendNotification("Session has been revoked and lost access instantly.")
 
-                    if (!revokeAll && deviceID !== currentDevice?.id) setOtherDevices(otherDevices.filter(s => s.id !== deviceID)); else FetchDevices()
+                    if (!revokeAll && deviceID !== currentDevice?.id) setOtherDevices((current) => current.filter((s) => s.id !== deviceID)); else FetchDevices()
                 }
             })
             .catch((error) => {
@@ -107,12 +107,15 @@ export default function Sessions() {
             .finally(() => {
                 setUiDisabled(false)
             })
-    }
+    },[FetchDevices, SendNotification, SendPost, currentDevice])
 
     useEffect(() => {
         document.title = "Sessions - Bhariya";
-        FetchDevices()
-    }, []);
+        const timeoutId = window.setTimeout(() => {
+            FetchDevices()
+        }, 0);
+        return () => window.clearTimeout(timeoutId);
+    }, [FetchDevices]);
 
     return <div className="p-5 box-border overflow-hidden">
         <div className="mx-auto max-w-4xl h-70vh px-4">
@@ -134,7 +137,7 @@ export default function Sessions() {
 
                 <div className="flex items-center justify-between mb-6">
                     <h1 className="text-lg md:text-xl font-semibold text-white">
-                        Your devices where you are signed in
+                        Devices signed in to your account
                     </h1>
                     <button className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-md"
                             onClick={() => RevokeDevice(true, "")}
@@ -145,7 +148,7 @@ export default function Sessions() {
                 <div className="flex flex-col gap-6">
                     <div>
                         {loading ? <div className="text-sm text-gray-400">
-                            Loading current device…
+                            Loading current device
                         </div> : <>
                             {currentDevice ? <>
                                 <div className="text-sm text-gray-400 mb-2">
@@ -170,14 +173,14 @@ export default function Sessions() {
                     <div className="other-scroll h-[45vh] overflow-y-auto pr-2">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
                             {loading && <div className="text-sm text-gray-400">
-                                Loading devices…
+                                Loading devices
                             </div>}
                             {!loading && otherDevices.length === 0 && <div className="text-sm text-gray-400">
                                 No other active devices.
                             </div>}
                             {
                                 !loading && otherDevices.map(device =>
-                                    <SessionDevice device={device} disabled={uiDisabled} revoke={(deviceId:string)=>RevokeDevice(false, deviceId)} />
+                                    <SessionDevice key={device.id} device={device} disabled={uiDisabled} revoke={(deviceId:string)=>RevokeDevice(false, deviceId)} />
                             )}
                         </div>
                     </div>
@@ -186,3 +189,5 @@ export default function Sessions() {
         </div>
     </div>
 }
+
+
