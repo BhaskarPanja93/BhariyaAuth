@@ -66,12 +66,11 @@ interface ConnectionContextType {
     EnsureLoggedIn: EnsureLoggedInT;
 }
 
-const {SendNotification} = NotificationManager();
-
-const Context = createContext<ConnectionContextType | undefined>(undefined);
+const context = createContext<ConnectionContextType | undefined>(undefined);
 
 export function ConnectionContext({children}: { children: ReactNode }) {
     const navigate = useNavigate();
+    const {SendNotification} = NotificationManager();
 
     const AccessToken = useRef("");
     const AccessExpiry = useRef(new Date(0));
@@ -94,7 +93,7 @@ export function ConnectionContext({children}: { children: ReactNode }) {
             SendNotification("Server is back online");
             GatewayErrors.current[host] = 0;
         }
-    },[])
+    },[SendNotification])
 
     const incrementGatewayErrors = useCallback((host: string) => {
         const current = getGatewayErrors(host);
@@ -102,7 +101,7 @@ export function ConnectionContext({children}: { children: ReactNode }) {
         if (current === 0) {
             SendNotification("Server unreachable. Retrying..");
         }
-    },[])
+    },[SendNotification])
 
     const validateConnectionConfig: (config: AxiosRequestConfig) => asserts config is ConnectionRequestConfig = (config) => {
         if (!config.connection || !config.HostURL || !config.RemainingPath) {
@@ -211,7 +210,7 @@ export function ConnectionContext({children}: { children: ReactNode }) {
         }
 
         return currentPopups.current[URL];
-    }, [])
+    }, [SendNotification])
 
     const Logout: LogoutT = async () => {
         if (currentLogout.current == null) {
@@ -316,7 +315,7 @@ export function ConnectionContext({children}: { children: ReactNode }) {
         }
 
         return config;
-    }, [EnsureLoggedIn, pingServer, PromptLogin, PromptMFA])
+    }, [pingServer, SendNotification, EnsureLoggedIn, PromptMFA, PromptLogin])
 
     const RequestRejectedInterceptor = useCallback(async (error: AxiosError) => Promise.reject(error),[])
 
@@ -351,7 +350,7 @@ export function ConnectionContext({children}: { children: ReactNode }) {
         }
 
         return {success: data.success, reply: data.reply};
-    },[resetGatewayErrors])
+    },[SendNotification, resetGatewayErrors])
 
     const ResponseRejectedInterceptor = useCallback(async (error: AxiosError<RawAPIResponseT>) => {
         const response = error.response;
@@ -428,7 +427,7 @@ export function ConnectionContext({children}: { children: ReactNode }) {
         }
 
         return Promise.reject(error);
-    }, [incrementGatewayErrors, PromptLogin, refreshToken, RetryRequest, navigate])
+    }, [SendNotification, RetryRequest, navigate, refreshToken, PromptLogin, incrementGatewayErrors])
 
     const ResponseFulfilledInterceptorCompat = ResponseFulfilledInterceptor as unknown as (response: AxiosResponse) => AxiosResponse | Promise<AxiosResponse>;
 
@@ -446,17 +445,17 @@ export function ConnectionContext({children}: { children: ReactNode }) {
         };
     }, [RequestFulfilledInterceptor, RequestRejectedInterceptor, ResponseFulfilledInterceptorCompat, ResponseRejectedInterceptor, cookieDisabledConnection, refreshCredentialConnection]);
 
-    return <Context.Provider value={{SendGet, SendPost, OpenPopup, Logout, EnsureLoggedIn}}>
+    return <context.Provider value={{SendGet, SendPost, OpenPopup, Logout, EnsureLoggedIn}}>
         {children}
-    </Context.Provider>;
+    </context.Provider>;
 }
 
 export default function ConnectionManager() {
-    const context = useContext(Context);
-    if (context === undefined) {
+    const ctx = useContext(context);
+    if (ctx === undefined) {
         throw new Error("ConnectionManager() must be used within a ConnectionContext");
     }
-    return context;
+    return ctx;
 }
 
 

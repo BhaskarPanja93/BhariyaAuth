@@ -1,4 +1,4 @@
-﻿import {type Context, createContext, type ReactNode, useCallback, useContext, useRef, useState} from "react";
+﻿import {createContext, type ReactNode, useCallback, useContext, useRef, useState} from "react";
 import {Sleep} from "../Utils/Time.ts";
 
 type SendNotificationT = (message: string) => void
@@ -7,7 +7,7 @@ interface NotificationContextType {
     SendNotification: SendNotificationT;
 }
 
-const Context = createContext<NotificationContextType | undefined>(undefined)
+const context = createContext<NotificationContextType | undefined>(undefined)
 
 export function NotificationContext({children}: { children: ReactNode }) {
     const [notifications, setNotifications] = useState<Array<{ id: number, message: string }>>([]);
@@ -29,7 +29,7 @@ export function NotificationContext({children}: { children: ReactNode }) {
         Sleep(7000).then(() => removeNotification(id));
     }, [])
 
-    return (<Context.Provider value={{SendNotification}}>
+    return (<context.Provider value={{SendNotification}}>
         <div className="fixed top-4 space-y-2 flex flex-col"
              style={{zIndex: 50}}>
             {
@@ -46,15 +46,15 @@ export function NotificationContext({children}: { children: ReactNode }) {
             }
         </div>
         {children}
-    </Context.Provider>);
+    </context.Provider>);
 }
 
 export default function NotificationManager() {
-    const context = useContext(Context);
-    if (context === undefined) {
+    const ctx = useContext(context);
+    if (ctx === undefined) {
         throw new Error('NotificationManager() must be used within a NotificationContext');
     }
-    return context;
+    return ctx;
 };
 
 
