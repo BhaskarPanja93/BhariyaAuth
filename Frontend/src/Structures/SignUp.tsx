@@ -21,7 +21,7 @@ export default function RegisterPage() {
     const params = useMemo(() => {return new URLSearchParams(location.search)}, [location.search]);
 
     const {SendNotification} = NotificationManager();
-    const {SendPost} = ConnectionManager()
+    const {SendAPIRequest} = ConnectionManager()
 
     const [uiDisabled, setUiDisabled] = useState<boolean>(false)
     const [currentStep, setCurrentStep] = useState<number>(1)
@@ -48,18 +48,18 @@ export default function RegisterPage() {
         form.append("name", name);
         form.append("password", password);
         form.append("remember", remember ? "yes" : "no");
-        SendPost(false, false, false, APIRoute, "/signup/step1", form)
+        SendAPIRequest("POST", false, false, false, false, APIRoute, "/signup/step1", form)
             .then((data) => {
                 if (data.success) {
                     SendNotification("Please enter the OTP sent to your mail")
-                    currentToken.current = data.reply;
+                    currentToken.current = data.reply as string;
                     setCurrentStep(2)
                 } else if (data.reply) {
                     const countdown = otpCountdownRef.current
                     if (!countdown) {
-                        otpCountdownRef.current = new Countdown(data.reply, 0.1, setOTPDelay).start()
+                        otpCountdownRef.current = new Countdown(data.reply as number, 0.1, setOTPDelay).start()
                     } else {
-                        countdown.resetDuration(data.reply)
+                        countdown.resetDuration(data.reply as number)
                     }
                 }
             })
@@ -81,7 +81,7 @@ export default function RegisterPage() {
         const form = new FormData();
         form.append("token", currentToken.current);
         form.append("verification", verification);
-        SendPost(false, false, true, APIRoute,"/signup/step2", form)
+        SendAPIRequest("POST", false, false, true, true, APIRoute,"/signup/step2", form)
             .then((data) => {
                 if (data.success) {
                     SendNotification("Registered and logged in Successfully")
@@ -172,7 +172,10 @@ export default function RegisterPage() {
                             disabled={uiDisabled}/>
                         <p className="text-center text-sm text-gray-500 mt-4">
                             Already have an account?&nbsp;
-                            <Link to="/signin" className="text-indigo-400 hover:underline">
+                            <Link className="text-indigo-400 hover:underline"
+                                  to="/signin"
+                                  state={{return_to:"/signin"}}
+                            >
                                 SignIn
                             </Link>
                         </p>

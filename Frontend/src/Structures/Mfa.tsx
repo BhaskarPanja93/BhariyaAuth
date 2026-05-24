@@ -15,7 +15,7 @@ export default function Mfa() {
     const params = useMemo(() => {return new URLSearchParams(location.search)}, [location.search]);
 
     const {SendNotification} = NotificationManager();
-    const {SendPost} = ConnectionManager()
+    const {SendAPIRequest} = ConnectionManager()
 
     const [uiDisabled, setUiDisabled] = useState<boolean>(false)
     const [currentStep, setCurrentStep] = useState<number>(1)
@@ -26,18 +26,18 @@ export default function Mfa() {
 
     const Step1 = useCallback(() => {
         setUiDisabled(true);
-        SendPost(true, false, true, APIRoute, "/mfa/step1")
+        SendAPIRequest("POST", true, false, true, false, APIRoute, "/mfa/step1")
             .then((data) => {
                 if (data.success) {
                     SendNotification("Please enter the OTP sent to your mail for MFA")
-                    currentToken.current = data.reply
+                    currentToken.current = data.reply as string
                     setCurrentStep(2)
                 } else if (data.reply) {
                     const countdown = otpCountdownRef.current
                     if (!countdown) {
-                        otpCountdownRef.current = new Countdown(data.reply, 0.1, setOTPDelay).start()
+                        otpCountdownRef.current = new Countdown(data.reply as number, 0.1, setOTPDelay).start()
                     } else {
-                        countdown.resetDuration(data.reply)
+                        countdown.resetDuration(data.reply as number)
                     }
                 }
             })
@@ -47,7 +47,7 @@ export default function Mfa() {
             .finally(() => {
                 setUiDisabled(false);
             });
-    },[SendNotification, SendPost])
+    },[SendNotification, SendAPIRequest])
 
     const Step2 = () => {
         if (!currentToken.current) {
@@ -61,7 +61,7 @@ export default function Mfa() {
         const form = new FormData();
         form.append("token", currentToken.current);
         form.append("verification", verification);
-        SendPost(true, false, true, APIRoute, "/mfa/step2", form)
+        SendAPIRequest("POST", true, false, true, true, APIRoute, "/mfa/step2", form)
             .then((data) => {
                 if (data.success) {
                     SendNotification("Verification complete")
