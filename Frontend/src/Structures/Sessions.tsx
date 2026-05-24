@@ -35,7 +35,7 @@ export type SingleUserDeviceProcessed = {
 
 export default function Sessions() {
     const {SendNotification} = NotificationManager();
-    const {SendGet, SendPost} = ConnectionManager()
+    const {SendAPIRequest} = ConnectionManager()
 
     const [uiDisabled, setUiDisabled] = useState<boolean>(false)
     const [loading, setLoading] = useState<boolean>(false)
@@ -44,10 +44,10 @@ export default function Sessions() {
 
     const FetchDevices = useCallback(() => {
         setLoading(true);
-        SendGet(true, false, false, APIRoute, "/sessions/fetch")
+        SendAPIRequest("GET", true, false, false, false, APIRoute, "/sessions/fetch")
             .then((data) => {
                 if (data.success) {
-                    const reply: UserDevicesResponse = data.reply
+                    const reply: UserDevicesResponse = data.reply as UserDevicesResponse
                     const mapped: SingleUserDeviceProcessed[] = reply.devices.map(device => ({
                         id: device.id,
                         device: device.device,
@@ -83,7 +83,7 @@ export default function Sessions() {
             .finally(() => {
                 setLoading(false);
             })
-    }, [SendNotification, SendGet])
+    }, [SendNotification, SendAPIRequest])
 
     const RevokeDevice = useCallback((revokeAll: boolean, deviceID: string) => {
         if (currentDevice == undefined) return SendNotification("No devices visible. Refresh this page and retry.");
@@ -92,7 +92,7 @@ export default function Sessions() {
         const form = new FormData();
         form.append("all", revokeAll ? "yes" : "no")
         if (!revokeAll) form.append("device", deviceID)
-        SendPost(true, false, false, APIRoute, "/sessions/revoke", form)
+        SendAPIRequest("POST", true, true, false, false, APIRoute, "/sessions/revoke", form)
             .then((data) => {
                 if (data.success) {
                     if (revokeAll) SendNotification("All sessions have been revoked and lost access instantly.")
@@ -107,7 +107,7 @@ export default function Sessions() {
             .finally(() => {
                 setUiDisabled(false)
             })
-    },[FetchDevices, SendNotification, SendPost, currentDevice])
+    },[FetchDevices, SendNotification, SendAPIRequest, currentDevice])
 
     useEffect(() => {
         document.title = "Sessions - Bhariya";
@@ -130,7 +130,11 @@ export default function Sessions() {
                         {label: "MFA", href: "/mfa"},
                         {label: "Change Password", href: "/passwordreset"}
                     ].map(item =>
-                        <Link to={item.href} key={item.label} className="relative text-gray-300 hover:text-white transition after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-0.5 after:bg-indigo-500 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:origin-left">
+                        <Link className="relative text-gray-300 hover:text-white transition after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-0.5 after:bg-indigo-500 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:origin-left"
+                              to={item.href}
+                              key={item.label}
+                              state={{return_to:"/sessions"}}
+                        >
                             {item.label}
                         </Link>)}
                 </div>

@@ -21,7 +21,7 @@ export default function LoginPage() {
     const params = useMemo(() => {return new URLSearchParams(location.search)}, [location.search]);
 
     const {SendNotification} = NotificationManager();
-    const {SendPost} = ConnectionManager()
+    const {SendAPIRequest} = ConnectionManager()
 
     const [uiDisabled, setUiDisabled] = useState<boolean>(false)
     const [currentStep, setCurrentStep] = useState<number>(1)
@@ -53,19 +53,19 @@ export default function LoginPage() {
         form.append("mail", email);
         form.append("remember", remember ? "yes" : "no");
         form.append("process", usingOTP ? "otp" : "password");
-        SendPost(false, false, false, APIRoute, "/signin/step1", form)
+        SendAPIRequest("POST", false, false, false, false, APIRoute, "/signin/step1", form)
             .then((data) => {
                 if (data.success) {
-                    tokens.current[email][usingOTP ? 1 : 0] = data.reply
+                    tokens.current[email][usingOTP ? 1 : 0] = data.reply as string
                     setUseOtp(usingOTP)
                     setCurrentStep(2)
                     SendNotification(`Please enter the ${usingOTP ? "OTP" : "Password"}`)
                 } else if (usingOTP && data.reply) {
                     const countdown = otpCountdownRef.current
                     if (!countdown) {
-                        otpCountdownRef.current = new Countdown(data.reply, 0.1, setOTPDelay).start()
+                        otpCountdownRef.current = new Countdown(data.reply as number, 0.1, setOTPDelay).start()
                     } else {
-                        countdown.resetDuration(data.reply)
+                        countdown.resetDuration(data.reply as number)
                     }
                 }
             })
@@ -90,7 +90,7 @@ export default function LoginPage() {
         const form = new FormData();
         form.append("token", tokens.current[email][useOtp ? 1 : 0]);
         form.append("verification", verification);
-        SendPost(false, false, true, APIRoute, "/signin/step2", form)
+        SendAPIRequest("POST", false, false, true, true, APIRoute, "/signin/step2", form)
             .then((data) => {
                 if (data.success) {
                     SendNotification("Logged In Successfully")
@@ -163,7 +163,9 @@ export default function LoginPage() {
                                     {
                                         !useOtp ?
                                             <Link className="text-xs text-indigo-400 hover:underline"
-                                                  to="/passwordreset">
+                                                  to="/passwordreset"
+                                                  state={{return_to:"/signin"}}
+                                            >
                                                 Forgot Password?
                                             </Link>
                                             :
@@ -197,7 +199,9 @@ export default function LoginPage() {
                         <SSOButtons disabled={uiDisabled}/>
                         <p className="text-center text-sm text-gray-500 mt-4">
                             New here?&nbsp;
-                            <Link className="text-indigo-400 hover:underline" to="/signup">
+                            <Link className="text-indigo-400 hover:underline"
+                                to="/signup"
+                            >
                             Create an account
                             </Link>
                         </p>
