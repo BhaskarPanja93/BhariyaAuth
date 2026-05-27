@@ -9,6 +9,8 @@ import (
 func DetachAuthCookies(ctx fiber.Ctx) {
 	ctx.ClearCookie(Config.RefreshTokenInCookie)
 	ctx.ClearCookie(Config.CSRFInCookie)
+	DetachMFACookies(ctx)
+	DetachSSOCookies(ctx)
 }
 
 func DetachSSOCookies(ctx fiber.Ctx) {

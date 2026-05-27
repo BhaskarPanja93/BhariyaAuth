@@ -10,16 +10,12 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-func ReadHeaderCSRF(ctx fiber.Ctx) string {
-	return strings.TrimSpace(ctx.Get(Config.CSRFInHeader))
+func readMFAValue(ctx fiber.Ctx) string {
+	return strings.TrimSpace(ctx.Cookies(Config.MFATokenInHeader))
 }
 
-func ReadCookieCSRF(ctx fiber.Ctx) string {
-	return strings.TrimSpace(ctx.Cookies(Config.CSRFInCookie))
-}
-
-func readBearerValue(rawHeader string) string {
-	header := strings.TrimSpace(rawHeader)
+func readBearerValue(ctx fiber.Ctx) string {
+	header := strings.TrimSpace(ctx.Get(Config.AccessTokenInHeader))
 	if len(header) < 7 {
 		return header
 	}
@@ -31,9 +27,25 @@ func readBearerValue(rawHeader string) string {
 	return header
 }
 
-func ReadAccessToken(ctx fiber.Ctx) (TokenModels.AccessToken, error) {
+func ReadMFAHeader(ctx fiber.Ctx) (TokenModels.MFAToken, error) {
+	var mfa TokenModels.MFAToken
+	token := readMFAValue(ctx)
+
+	err := StringProcessor.DecryptInterfaceFromB64(token, &mfa)
+	if err != nil {
+		return mfa, err
+	}
+
+	if mfa.TokenType != mfaTokenType {
+		return mfa, errors.New("read mfa token: incorrect type")
+	}
+
+	return mfa, nil
+}
+
+func ReadAccessHeader(ctx fiber.Ctx) (TokenModels.AccessToken, error) {
 	var access TokenModels.AccessToken
-	token := readBearerValue(ctx.Get(Config.AccessTokenInHeader))
+	token := readBearerValue(ctx)
 
 	err := StringProcessor.DecryptInterfaceFromB64(token, &access)
 	if err != nil {
@@ -47,7 +59,11 @@ func ReadAccessToken(ctx fiber.Ctx) (TokenModels.AccessToken, error) {
 	return access, nil
 }
 
-func ReadRefreshToken(ctx fiber.Ctx) (TokenModels.RefreshToken, error) {
+func ReadHeaderCSRF(ctx fiber.Ctx) string {
+	return strings.TrimSpace(ctx.Get(Config.CSRFInHeader))
+}
+
+func ReadRefreshCookie(ctx fiber.Ctx) (TokenModels.RefreshToken, error) {
 	var refresh TokenModels.RefreshToken
 	cookie := strings.TrimSpace(ctx.Cookies(Config.RefreshTokenInCookie))
 

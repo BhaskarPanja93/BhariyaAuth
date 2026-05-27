@@ -67,7 +67,7 @@ func AttachMFACookie(ctx fiber.Ctx, value string) {
 		Value:    value,
 		MaxAge:   0,
 		Secure:   true,
-		HTTPOnly: true,
+		HTTPOnly: false,
 		SameSite: fiber.CookieSameSiteStrictMode,
 		Domain:   Config.Domain,
 		Path:     "/",

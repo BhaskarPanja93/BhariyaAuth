@@ -12,11 +12,11 @@ authorization -
 refresh -
     cookie(checked) : <token>
 csrf -
-    header(checked) : csrf <token>
+    header(checked) : <token>
     cookie(checked) : <token>
 mfa -
-    header(checked) : mfa <token>
-    cookie(skipped) : <token>
+    header : <token>
+    cookie : (ignored)
 
 200: (ok, soft reject or accept)
 401: (reject, user not authenticated)
@@ -30,6 +30,11 @@ ISSUES:
 websocket buffer infinite
 
 FUTURE:
+add 409 for when user logs in different account in new tab
+cleanup logs
+cleanup old cookies after a login/register/sso
+create and/or merge functions for validating mfa, access and others
+cleanup duplicates
 should password reset auto login?
 change logs fetching require mfa
 change server so it doesnt try to send cookies when frontend isnt allowing
