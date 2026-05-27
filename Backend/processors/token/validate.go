@@ -13,12 +13,9 @@ func VerifyCSRF(ctx fiber.Ctx, refresh TokenModels.RefreshToken) bool {
 		return false
 	}
 
-	cookie := ReadCookieCSRF(ctx)
 	header := ReadHeaderCSRF(ctx)
 
-	return cookie != "" &&
-		header != "" &&
-		cookie == refresh.CSRF &&
+	return header != "" &&
 		header == refresh.CSRF
 }
 

@@ -41,10 +41,10 @@ var (
 )
 
 const (
+	MFATokenInCookie     = "mfa"
+	MFATokenInHeader     = MFATokenInCookie
 	CSRFInHeader         = "csrf"
-	MFATokenInHeader     = "mfa"
 	CSRFInCookie         = CSRFInHeader
-	MFATokenInCookie     = MFATokenInHeader
 	AccessTokenInHeader  = "authorization"
 	RefreshTokenInCookie = "refresh"
 	SSOStateInCookie     = "sso"

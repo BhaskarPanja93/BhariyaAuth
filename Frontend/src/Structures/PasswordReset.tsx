@@ -126,9 +126,9 @@ export default function PasswordReset() {
                             </>
                         }
                         <SubmitButton
-                            text={currentStep === 1 ? "Send OTP" : "Update Password"}
+                            text={currentStep === 1 ? OTPDelay === 0 ? "Send OTP" : `OTP disabled for  ${OTPDelay.toFixed(0)}s`: "Set Password"}
                             onClick={currentStep === 1 ? Step1 : Step2}
-                            disabled={uiDisabled}/>
+                            disabled={uiDisabled || currentStep === 1 && OTPDelay !== 0}/>
                     </div>
                 </div>
             </div>

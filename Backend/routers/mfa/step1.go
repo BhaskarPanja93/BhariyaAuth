@@ -22,7 +22,7 @@ const step1FileName = "routers/mfa/step1"
 
 func Step1(ctx fiber.Ctx) error {
 
-	access, err := TokenProcessor.ReadAccessToken(ctx)
+	access, err := TokenProcessor.ReadAccessHeader(ctx)
 
 	if err != nil || !TokenProcessor.AccessIsFresh(ctx, access) {
 		Logs.RootLogger.Add(Logs.Blocked, step1FileName, RequestProcessor.GetRequestId(ctx), "Access invalid/expired")

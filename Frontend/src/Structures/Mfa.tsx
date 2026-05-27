@@ -26,7 +26,7 @@ export default function Mfa() {
 
     const Step1 = useCallback(() => {
         setUiDisabled(true);
-        SendPost(true, false, false, APIRoute, "/mfa/step1")
+        SendAPIRequest("POST", true, false, false, false, APIRoute, "/mfa/step1")
             .then((data) => {
                 if (data.success) {
                     SendNotification("Please enter the OTP sent to your mail for MFA")

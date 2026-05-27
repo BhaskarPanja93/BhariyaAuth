@@ -2,7 +2,6 @@
 import {Link, useLocation, useNavigate} from "react-router";
 import {APIRoute} from '../Values/Constants'
 import EmailInput from '../Elements/EmailInput'
-import Step2Toggle from '../Elements/Step2Toggle'
 import OTPInput from '../Elements/OTPInput'
 import PasswordInput from '../Elements/PasswordInput'
 import RememberCheckbox from '../Elements/RememberCheckbox'
@@ -155,10 +154,12 @@ export default function LoginPage() {
                         }
                         <div className="text-xs text-gray-400">
                             <div className="flex items-center justify-between">
-                                <Step2Toggle
-                                    usingOTP={useOtp}
-                                    toggleUsingOTP={() => Step1(!useOtp, false)}
-                                    disabled={uiDisabled}/>
+                                <button
+                                    disabled={uiDisabled}
+                                    onClick={() => Step1(!useOtp, false)}
+                                    type="button" className="text-xs text-indigo-400 hover:underline">
+                                    {useOtp ? 'Use Password' : OTPDelay === 0 ? 'Use OTP' : `OTP disabled for  ${OTPDelay.toFixed(0)}s`}
+                                </button>
                                 <div className="flex items-center gap-3">
                                     {
                                         !useOtp ?
@@ -192,7 +193,7 @@ export default function LoginPage() {
                                 </div>}
                         </div>
                         <SubmitButton
-                            text={currentStep === 1 ? "Continue with Email" : "Sign In"}
+                            text={currentStep === 1 ? "Continue with Password" : "Sign In"}
                             onClick={currentStep === 1 ? () => Step1(false, false) : Step2}
                             disabled={uiDisabled}/>
                         <Divider/>

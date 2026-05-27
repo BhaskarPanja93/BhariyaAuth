@@ -17,7 +17,7 @@ const dateFileName = "routers/logs/date"
 
 func Date(ctx fiber.Ctx) error {
 
-	access, err := TokenProcessor.ReadAccessToken(ctx)
+	access, err := TokenProcessor.ReadAccessHeader(ctx)
 	if err != nil || !TokenProcessor.AccessIsFresh(ctx, access) || UserTypes.Find(access.UserType).Authority < UserTypes.All.Moderator.Authority {
 		Logs.RootLogger.Add(Logs.Blocked, dateFileName, RequestProcessor.GetRequestId(ctx), "Access invalid/expired/lacks permissions")
 

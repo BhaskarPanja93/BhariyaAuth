@@ -95,8 +95,8 @@ export default function Sessions() {
         SendAPIRequest("POST", true, true, false, false, APIRoute, "/sessions/revoke", form)
             .then((data) => {
                 if (data.success) {
-                    if (revokeAll) SendNotification("All sessions have been revoked and lost access instantly.")
-                    else SendNotification("Session has been revoked and lost access instantly.")
+                    if (revokeAll) SendNotification("All sessions have been revoked.")
+                    else SendNotification("Session has been revoked.")
 
                     if (!revokeAll && deviceID !== currentDevice?.id) setOtherDevices((current) => current.filter((s) => s.id !== deviceID)); else FetchDevices()
                 }

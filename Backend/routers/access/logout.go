@@ -17,7 +17,7 @@ const logoutFileName = "routers/access/logout"
 
 func Logout(ctx fiber.Ctx) error {
 
-	access, err := TokenProcessor.ReadAccessToken(ctx)
+	access, err := TokenProcessor.ReadAccessHeader(ctx)
 
 	if err != nil || !TokenProcessor.AccessIsFresh(ctx, access) {
 		Logs.RootLogger.Add(Logs.Blocked, logoutFileName, RequestProcessor.GetRequestId(ctx), "Access invalid/expired")

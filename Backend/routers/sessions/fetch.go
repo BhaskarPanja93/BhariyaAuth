@@ -19,7 +19,7 @@ const fetchFilename = "routers/sessions/fetch"
 
 func Fetch(ctx fiber.Ctx) error {
 
-	access, err := TokenProcessor.ReadAccessToken(ctx)
+	access, err := TokenProcessor.ReadAccessHeader(ctx)
 
 	if err != nil || !TokenProcessor.AccessIsFresh(ctx, access) {
 		Logs.RootLogger.Add(Logs.Blocked, fetchFilename, RequestProcessor.GetRequestId(ctx), "Access invalid/expired")

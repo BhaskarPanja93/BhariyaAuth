@@ -20,7 +20,7 @@ const refreshFileName = "routers/access/refresh"
 
 func Refresh(ctx fiber.Ctx) error {
 
-	refresh, err := TokenProcessor.ReadRefreshToken(ctx)
+	refresh, err := TokenProcessor.ReadRefreshCookie(ctx)
 
 	if err != nil || !TokenProcessor.VerifyCSRF(ctx, refresh) || !TokenProcessor.RefreshIsFresh(ctx, refresh) {
 		Logs.RootLogger.Add(Logs.Blocked, refreshFileName, RequestProcessor.GetRequestId(ctx), "Refresh invalid/expired/CSRF incorrect")

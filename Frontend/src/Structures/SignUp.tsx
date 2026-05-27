@@ -164,9 +164,9 @@ export default function RegisterPage() {
                             </>
                         }
                         <SubmitButton
-                            text={currentStep === 1 ? "Verify Email" : "Verify OTP"}
+                            text={currentStep === 1 ? OTPDelay === 0 ? "Verify Mail" : `OTP disabled for  ${OTPDelay.toFixed(0)}s`: "Create Account"}
                             onClick={currentStep === 1 ? Step1 : Step2}
-                            disabled={uiDisabled}/>
+                            disabled={uiDisabled || currentStep === 1 && OTPDelay !== 0}/>
                         <Divider/>
                         <SSOButtons
                             disabled={uiDisabled}/>
