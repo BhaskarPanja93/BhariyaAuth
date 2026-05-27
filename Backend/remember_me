@@ -36,10 +36,8 @@ cleanup old cookies after a login/register/sso
 create and/or merge functions for validating mfa, access and others
 cleanup duplicates
 should password reset auto login?
-change logs fetching require mfa
 change server so it doesnt try to send cookies when frontend isnt allowing
 change logs filename to sender/reason
-use fetch instead of axios
 make a field in request to allow large files like logs to be sent without the server reading into memory for json (request.config.passThroughResponseBody)
 change comments, recreate readme
 try different encoder, instead of json
