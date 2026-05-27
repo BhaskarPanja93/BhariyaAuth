@@ -26,7 +26,7 @@ export default function Mfa() {
 
     const Step1 = useCallback(() => {
         setUiDisabled(true);
-        SendPost(true, false, true, APIRoute, "/mfa/step1")
+        SendPost(true, false, false, APIRoute, "/mfa/step1")
             .then((data) => {
                 if (data.success) {
                     SendNotification("Please enter the OTP sent to your mail for MFA")
@@ -111,9 +111,9 @@ export default function Mfa() {
                         </>
                     }
                     <SubmitButton
-                        text={currentStep === 1 ? "Send OTP" : "Verify"}
+                        text={currentStep === 1 ? OTPDelay === 0 ? "Send OTP" : `OTP disabled for  ${OTPDelay.toFixed(0)}s`: "Complete MFA"}
                         onClick={currentStep === 1 ? Step1 : Step2}
-                        disabled={uiDisabled}/>
+                        disabled={uiDisabled || currentStep === 1 && OTPDelay !== 0}/>
                 </div>
             </div>
         </div>

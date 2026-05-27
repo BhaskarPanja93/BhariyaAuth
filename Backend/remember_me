@@ -12,11 +12,11 @@ authorization -
 refresh -
     cookie(checked) : <token>
 csrf -
-    header(checked) : csrf <token>
+    header(checked) : <token>
     cookie(checked) : <token>
 mfa -
-    header(checked) : mfa <token>
-    cookie(skipped) : <token>
+    header : <token>
+    cookie : (ignored)
 
 200: (ok, soft reject or accept)
 401: (reject, user not authenticated)
@@ -30,8 +30,11 @@ ISSUES:
 websocket buffer infinite
 
 FUTURE:
-change logs filename to sender/reason
-use fetch instead of axios
+add 409 for when user logs in different account in new tab
+cleanup logs
+cleanup old cookies after a login/register/sso
+create and/or merge functions for validating mfa, access and others
+cleanup duplicates
 make a field in request to allow large files like logs to be sent without the server reading into memory for json (request.config.passThroughResponseBody)
 change comments, recreate readme
 try different encoder, instead of json

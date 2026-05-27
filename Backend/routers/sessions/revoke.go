@@ -19,7 +19,7 @@ const revokeFileName = "routers/sessions/revoke"
 
 func Revoke(ctx fiber.Ctx) error {
 
-	access, err := TokenProcessor.ReadAccessToken(ctx)
+	access, err := TokenProcessor.ReadAccessHeader(ctx)
 	if err != nil || !TokenProcessor.AccessIsFresh(ctx, access) {
 		Logs.RootLogger.Add(Logs.Blocked, revokeFileName, RequestProcessor.GetRequestId(ctx), "Access invalid/expired")
 
@@ -44,6 +44,14 @@ func Revoke(ctx fiber.Ctx) error {
 		RequestProcessor.AddRateLimitWeight(ctx, 60_000)
 
 		return ctx.SendStatus(fiber.StatusUnauthorized)
+	}
+
+	mfa, err := TokenProcessor.ReadMFAHeader(ctx)
+	if err != nil || !mfa.Verified || mfa.UserID != access.UserID || mfa.DeviceID != access.DeviceID {
+		Logs.RootLogger.Add(Logs.Blocked, revokeFileName, RequestProcessor.GetRequestId(ctx), "MFA invalid/missing")
+		RequestProcessor.AddRateLimitWeight(ctx, 60_000)
+
+		return ctx.SendStatus(fiber.StatusForbidden)
 	}
 
 	form := new(FormModels.DeviceRevokeForm)
