@@ -17,7 +17,7 @@ export default function PasswordReset() {
     const params = useMemo(() => {return new URLSearchParams(location.search)}, [location.search]);
 
     const {SendNotification} = NotificationManager();
-    const {SendPost} = ConnectionManager()
+    const {SendAPIRequest} = ConnectionManager()
 
     const [uiDisabled, setUiDisabled] = useState<boolean>(false)
     const [currentStep, setCurrentStep] = useState<number>(1)
@@ -35,18 +35,18 @@ export default function PasswordReset() {
         setUiDisabled(true);
         const form = new FormData();
         form.append("mail", email);
-        SendPost(false, false, false, APIRoute,  "/passwordreset/step1", form)
+        SendAPIRequest("POST", false, false, false, false, APIRoute,  "/passwordreset/step1", form)
             .then((data) => {
                 if (data.success) {
                     SendNotification("Please enter the OTP sent to your mail for Password Reset")
-                    currentToken.current = data.reply
+                    currentToken.current = data.reply as string
                     setCurrentStep(2)
                 } else if (data.reply) {
                     const countdown = otpCountdownRef.current
                     if (!countdown) {
-                        otpCountdownRef.current = new Countdown(data.reply, 0.1, setOTPDelay).start()
+                        otpCountdownRef.current = new Countdown(data.reply as number, 0.1, setOTPDelay).start()
                     } else {
-                        countdown.resetDuration(data.reply)
+                        countdown.resetDuration(data.reply as number)
                     }
                 }
             })
@@ -70,11 +70,11 @@ export default function PasswordReset() {
         form.append("token", currentToken.current);
         form.append("verification", verification);
         form.append("password", password);
-        SendPost(false, false, false, APIRoute, "/passwordreset/step2", form)
+        SendAPIRequest("POST", false, false, false, false, APIRoute, "/passwordreset/step2", form)
             .then((data) => {
                 if (data.success) {
                     SendNotification("Password changed successfully")
-                    navigate(location.state?.return_to || params.get("return_to") || "/")
+                    navigate(location.state?.return_to || params.get("return_to") || "/", {replace: true})
                 }
             })
             .catch((error)=>{console.log("PasswordReset Step2 stopped because:", error)})

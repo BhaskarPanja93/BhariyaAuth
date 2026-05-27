@@ -1,8 +1,8 @@
 ﻿const env = import.meta.env;
 
-export const BetaFrontend = env.VITE_BETA_FRONTEND === "true";
-export const BetaAPI = env.VITE_BETA_API === "true";
-export const BetaWS = env.VITE_BETA_WS === "true";
+const BetaFrontend = env.VITE_BETA_FRONTEND === "true";
+const BetaAPI = env.VITE_BETA_API === "true";
+const BetaWS = env.VITE_BETA_WS === "true";
 
 export const Domain = (env.VITE_AUTH_DOMAIN as string | undefined)?.trim() || "bhariya.ddns.net";
 export const Origin = (env.VITE_AUTH_ORIGIN as string | undefined)?.trim() || `https://${Domain}`;
