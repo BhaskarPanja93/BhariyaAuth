@@ -1,4 +1,4 @@
-export default function Divider(){
+﻿export default function Divider(){
     return (
         <div className="flex items-center gap-3 my-2">
             <div className="flex-1" style={{ height: 1, background: 'linear-gradient(90deg,transparent,#2b2f36,transparent)' }} />
@@ -7,3 +7,4 @@ export default function Divider(){
         </div>
     )
 }
+

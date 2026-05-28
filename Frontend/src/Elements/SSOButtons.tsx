@@ -1,13 +1,16 @@
-import ConnectionManager from "../Contexts/Connection.tsx";
+﻿import ConnectionManager from "../Contexts/Connection.tsx";
 import {APIRoute} from "../Values/Constants.ts";
-import {useNavigate} from "react-router";
+import {useLocation, useNavigate} from "react-router";
 import NotificationManager from "../Contexts/Notification.tsx";
+import {useMemo} from "react";
 
 export default function SSOButtons(
     { disabled }:
     {
         disabled: boolean
     }) {
+    const location = useLocation();
+    const params = useMemo(() => {return new URLSearchParams(location.search)}, [location.search]);
     const navigate = useNavigate()
     const {SendNotification} = NotificationManager();
     const {OpenPopup} = ConnectionManager()
@@ -15,7 +18,7 @@ export default function SSOButtons(
     const SSOAction = async (URL:string) => {
         if (await OpenPopup("SSO", URL, true)) {
             SendNotification("Logged In Successfully")
-            navigate("/");
+            navigate(location.state?.return_to || params.get("return_to") || "/", {replace: true});
         }
     }
 
@@ -57,3 +60,4 @@ export default function SSOButtons(
         </div>
     )
 }
+

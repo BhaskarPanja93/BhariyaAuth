@@ -1,4 +1,4 @@
-export default function OTPResendButton(
+﻿export default function OTPResendButton(
     { delay, onClick, disabled }:
     {
         delay:number,
@@ -11,7 +11,8 @@ export default function OTPResendButton(
             disabled={disabled || delay !== 0}
             className="text-xs text-indigo-400 hover:underline"
             type="button">
-            {delay <= 0 ? "Resend OTP" : "Resend in "+delay.toFixed(1)}
+            {delay <= 0 ? "Resend OTP" : `OTP disabled for  ${delay.toFixed(0)}s`}
         </button>
     )
 }
+

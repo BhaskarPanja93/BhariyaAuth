@@ -7,10 +7,7 @@ import (
 	"math/rand"
 )
 
-// OTP sends a one-time password email.
-//
-// Randomly selects a subject and injects OTP into HTML template.
-func OTP(mail, otp string, model MailModels.T, attempts uint8) error {
+func OTP(mail, otp string, model MailModels.T) error {
 	return sendMail(
 		mail,
 		model.Subjects[rand.Intn(len(model.Subjects))],
@@ -20,43 +17,47 @@ func OTP(mail, otp string, model MailModels.T, attempts uint8) error {
 			otp,
 			model.Ignorable,
 		),
-		attempts,
+		3,
 	)
 }
 
-// SignIn sends a login notification email (new device/login alert).
-func SignIn(mail string, model MailModels.T, IP, OS, device, browser string, attempts uint8) error {
+func SignIn(mail string, model MailModels.T, IP, OS, device, browser string) error {
 	return sendMail(
 		mail,
 		model.Subjects[rand.Intn(len(model.Subjects))],
 		HTMLTemplates.NewLogin(Config.FrontendRoute, OS, device, browser, IP),
-		attempts,
+		5,
 	)
 }
 
-// SignUp sends a new account creation notification email.
-func SignUp(mail, name string, model MailModels.T, IP, OS, device, browser string, attempts uint8) error {
+func SignUp(mail, name string, model MailModels.T, IP, OS, device, browser string) error {
 	return sendMail(
 		mail,
 		model.Subjects[rand.Intn(len(model.Subjects))],
 		HTMLTemplates.NewAccount(Config.FrontendRoute, name, OS, device, browser, IP),
-		attempts,
+		3,
 	)
 }
 
-// PasswordReset sends a password reset confirmation email.
-func PasswordReset(mail string, model MailModels.T, IP, OS, device, browser string, attempts uint8) error {
+func PasswordReset(mail string, model MailModels.T, IP, OS, device, browser string) error {
 	return sendMail(
 		mail,
 		model.Subjects[rand.Intn(len(model.Subjects))],
 		HTMLTemplates.PasswordReset(Config.FrontendRoute, OS, device, browser, IP),
-		attempts,
+		5,
 	)
 }
 
-// AccountBlacklisted sends a security alert when account is blocked.
-func AccountBlacklisted(mail string, attempts uint8) error {
-	content := `Your account has been flagged. All future actions will be blocked. Contact support ASAP if you think this is a mistake.`
+func AccountBlacklisted(mail string) error {
+	content := `Your account has been flagged. All future actions will be blocked. Contact support ASAP if you think this was a mistake.`
 
-	return sendMail(mail, "Account Blacklisted", content, attempts)
+	return sendMail(mail, "Account Blacklisted", content, 5)
+}
+
+func Raw(mails []string, subject string, content string) {
+	for _, mail := range mails {
+		go func() {
+			_ = sendMail(mail, subject, content, 3)
+		}()
+	}
 }

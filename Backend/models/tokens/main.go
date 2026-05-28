@@ -4,8 +4,6 @@ import (
 	"time"
 )
 
-// All tokens  that are either generated, for eg, Step1 of a process, Cookie etc
-
 type SignIn struct {
 	TokenType    string `json:"tt"`
 	UserID       int32  `json:"uid"`

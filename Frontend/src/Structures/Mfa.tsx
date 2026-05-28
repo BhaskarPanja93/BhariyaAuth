@@ -1,21 +1,21 @@
-import OTPInput from '../Elements/OTPInput'
+﻿import OTPInput from '../Elements/OTPInput'
 import SubmitButton from "../Elements/SubmitButton";
 import {OTPIsValid} from "../Utils/Strings";
 import {APIRoute} from "../Values/Constants";
 import {useLocation, useNavigate} from "react-router";
 import ConnectionManager from "../Contexts/Connection";
 import NotificationManager from "../Contexts/Notification";
-import {useEffect, useRef, useState} from "react";
+import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import OTPResendButton from "../Elements/OTPResendButton";
 import Countdown from "../Utils/Countdown";
 
 export default function Mfa() {
     const navigate = useNavigate();
     const location = useLocation();
-    const params = new URLSearchParams(location.search);
+    const params = useMemo(() => {return new URLSearchParams(location.search)}, [location.search]);
 
     const {SendNotification} = NotificationManager();
-    const {SendPost} = ConnectionManager()
+    const {SendAPIRequest} = ConnectionManager()
 
     const [uiDisabled, setUiDisabled] = useState<boolean>(false)
     const [currentStep, setCurrentStep] = useState<number>(1)
@@ -24,20 +24,20 @@ export default function Mfa() {
     const [verification, setVerification] = useState<string>("")
     const currentToken = useRef<string>("")
 
-    const Step1 = () => {
+    const Step1 = useCallback(() => {
         setUiDisabled(true);
-        SendPost(true, false, true, APIRoute, "/mfa/step1")
+        SendAPIRequest("POST", true, false, false, false, APIRoute, "/mfa/step1")
             .then((data) => {
                 if (data.success) {
                     SendNotification("Please enter the OTP sent to your mail for MFA")
-                    currentToken.current = data.reply
+                    currentToken.current = data.reply as string
                     setCurrentStep(2)
                 } else if (data.reply) {
                     const countdown = otpCountdownRef.current
                     if (!countdown) {
-                        otpCountdownRef.current = new Countdown(data.reply, 0.1, setOTPDelay).start()
+                        otpCountdownRef.current = new Countdown(data.reply as number, 0.1, setOTPDelay).start()
                     } else {
-                        countdown.resetDuration(data.reply)
+                        countdown.resetDuration(data.reply as number)
                     }
                 }
             })
@@ -47,7 +47,7 @@ export default function Mfa() {
             .finally(() => {
                 setUiDisabled(false);
             });
-    }
+    },[SendNotification, SendAPIRequest])
 
     const Step2 = () => {
         if (!currentToken.current) {
@@ -61,7 +61,7 @@ export default function Mfa() {
         const form = new FormData();
         form.append("token", currentToken.current);
         form.append("verification", verification);
-        SendPost(true, false, true, APIRoute, "/mfa/step2", form)
+        SendAPIRequest("POST", true, false, true, true, APIRoute, "/mfa/step2", form)
             .then((data) => {
                 if (data.success) {
                     SendNotification("Verification complete")
@@ -111,11 +111,13 @@ export default function Mfa() {
                         </>
                     }
                     <SubmitButton
-                        text={currentStep === 1 ? "Send OTP" : "Verify"}
+                        text={currentStep === 1 ? OTPDelay === 0 ? "Send OTP" : `OTP disabled for  ${OTPDelay.toFixed(0)}s`: "Complete MFA"}
                         onClick={currentStep === 1 ? Step1 : Step2}
-                        disabled={uiDisabled}/>
+                        disabled={uiDisabled || currentStep === 1 && OTPDelay !== 0}/>
                 </div>
             </div>
         </div>
     </div>)
 }
+
+

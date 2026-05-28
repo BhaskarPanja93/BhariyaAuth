@@ -1,13 +1,11 @@
-import {lazy, Suspense} from "react";
+﻿import {lazy, Suspense} from "react";
 import {Navigate, Route, Routes} from 'react-router';
 const LoginStructure = lazy(() => import('../Structures/SignIn'))
 const RegisterStructure = lazy(() => import('../Structures/SignUp'))
 const SessionsStructure = lazy(() => import('../Structures/Sessions'))
 const PasswordResetStructure = lazy(() => import('../Structures/PasswordReset'))
 const MfaStructure = lazy(() => import('../Structures/Mfa'))
-const MailStructure = lazy(() => import('../Structures/Mail'))
-
-import '../index.css'
+const LogsStructure = lazy(() => import('./Logs'))
 
 export default function Router() {
     return (
@@ -17,10 +15,12 @@ export default function Router() {
                 <Route path="/signup" element={<RegisterStructure/>}/>
                 <Route path="/sessions" element={<SessionsStructure/>}/>
                 <Route path="/mfa" element={<MfaStructure/>}/>
-                <Route path="/mail" element={<MailStructure/>}/>
                 <Route path="/passwordreset" element={<PasswordResetStructure/>}/>
+                <Route path="/logs" element={<LogsStructure/>}/>
                 <Route path="*" element={<Navigate to="/sessions" replace/>}/>
             </Routes>
         </Suspense>
     )
 }
+
+

@@ -1,4 +1,4 @@
-import type {Dispatch, SetStateAction} from "react";
+﻿import type {Dispatch, SetStateAction} from "react";
 import {Sleep} from "./Time";
 
 type CountdownSetter = Dispatch<SetStateAction<number>>;
@@ -66,3 +66,5 @@ export default class Countdown {
         }
     }
 }
+
+
