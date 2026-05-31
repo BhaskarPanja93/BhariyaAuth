@@ -9,7 +9,7 @@ import (
 
 func OTP(mail, otp string, model MailModels.T) error {
 	return sendMail(
-		mail,
+		[]string{mail},
 		model.Subjects[rand.Intn(len(model.Subjects))],
 		HTMLTemplates.OTP(
 			Config.FrontendRoute,
@@ -23,7 +23,7 @@ func OTP(mail, otp string, model MailModels.T) error {
 
 func SignIn(mail string, model MailModels.T, IP, OS, device, browser string) error {
 	return sendMail(
-		mail,
+		[]string{mail},
 		model.Subjects[rand.Intn(len(model.Subjects))],
 		HTMLTemplates.NewLogin(Config.FrontendRoute, OS, device, browser, IP),
 		5,
@@ -32,7 +32,7 @@ func SignIn(mail string, model MailModels.T, IP, OS, device, browser string) err
 
 func SignUp(mail, name string, model MailModels.T, IP, OS, device, browser string) error {
 	return sendMail(
-		mail,
+		[]string{mail},
 		model.Subjects[rand.Intn(len(model.Subjects))],
 		HTMLTemplates.NewAccount(Config.FrontendRoute, name, OS, device, browser, IP),
 		3,
@@ -41,7 +41,7 @@ func SignUp(mail, name string, model MailModels.T, IP, OS, device, browser strin
 
 func PasswordReset(mail string, model MailModels.T, IP, OS, device, browser string) error {
 	return sendMail(
-		mail,
+		[]string{mail},
 		model.Subjects[rand.Intn(len(model.Subjects))],
 		HTMLTemplates.PasswordReset(Config.FrontendRoute, OS, device, browser, IP),
 		5,
@@ -51,13 +51,9 @@ func PasswordReset(mail string, model MailModels.T, IP, OS, device, browser stri
 func AccountBlacklisted(mail string) error {
 	content := `Your account has been flagged. All future actions will be blocked. Contact support ASAP if you think this was a mistake.`
 
-	return sendMail(mail, "Account Blacklisted", content, 5)
+	return sendMail([]string{mail}, "Account Blacklisted", content, 5)
 }
 
-func Raw(mails []string, subject string, content string) {
-	for _, mail := range mails {
-		go func() {
-			_ = sendMail(mail, subject, content, 3)
-		}()
-	}
+func Raw(mails []string, subject string, content string) error {
+	return sendMail(mails, subject, content, 3)
 }

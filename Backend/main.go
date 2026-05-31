@@ -6,6 +6,7 @@ import (
 	Logs "BhariyaAuth/processors/logs"
 	AccountRouters "BhariyaAuth/routers/access"
 	LogsRouters "BhariyaAuth/routers/logs"
+	MailRouters "BhariyaAuth/routers/mail"
 	MFARouters "BhariyaAuth/routers/mfa"
 	PasswordResetRouters "BhariyaAuth/routers/passwordreset"
 	SessionRouters "BhariyaAuth/routers/sessions"
@@ -100,6 +101,7 @@ func main() {
 	SessionRouters.AttachRoutes(APIGroup)
 	MFARouters.AttachRoutes(APIGroup)
 	LogsRouters.AttachRoutes(APIGroup)
+	MailRouters.AttachRoutes(APIGroup)
 
 	Logs.RootLogger.Add(Logs.Intent, "main", "", "Reading app run parameters")
 	ReceiveCLIFlags(MainApp)
