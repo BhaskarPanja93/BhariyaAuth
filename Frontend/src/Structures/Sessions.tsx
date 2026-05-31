@@ -20,6 +20,12 @@ type UserDevicesResponse = {
     current: string; devices: SingleUserDeviceUnprocessed[];
 };
 
+const placeholderUser = {
+    username: "Riya Bhariya",
+    role: "Admin",
+    email: "riya@example.com",
+};
+
 export type SingleUserDeviceProcessed = {
     id: string,
     device: string,
@@ -41,6 +47,7 @@ export default function Sessions() {
     const [loading, setLoading] = useState<boolean>(false)
     const [currentDevice, setCurrentDevice] = useState<SingleUserDeviceProcessed | undefined>(undefined);
     const [otherDevices, setOtherDevices] = useState<SingleUserDeviceProcessed[]>([]);
+    const [userDropdownOpen, setUserDropdownOpen] = useState<boolean>(false);
 
     const FetchDevices = useCallback(() => {
         setLoading(true);
@@ -123,20 +130,63 @@ export default function Sessions() {
                  style={{
                      background: "linear-gradient(180deg, rgba(12,14,18,0.9), rgba(7,8,10,0.85))", border: "1px solid rgba(255,255,255,0.02)"
                  }}>
-                <div className="flex flex-wrap items-center gap-6 md:gap-10 mb-6 text-md font-medium p-3 rounded-lg border-2 border-gray-800 justify-center">
-                    {[
-                        {label: "SignIn", href: "/signin"},
-                        {label: "SignUp", href: "/signup"},
-                        {label: "MFA", href: "/mfa"},
-                        {label: "Change Password", href: "/passwordreset"}
-                    ].map(item =>
-                        <Link className="relative text-gray-300 hover:text-white transition after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-0.5 after:bg-indigo-500 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:origin-left"
-                              to={item.href}
-                              key={item.label}
-                              state={{return_to:"/sessions"}}
+                <div className="relative flex flex-wrap items-center gap-4 mb-6 text-md font-medium p-3 rounded-lg border-2 border-gray-800">
+                    <div className="flex flex-1 flex-wrap items-center justify-center gap-6 md:gap-10">
+                        {[
+                            {label: "SignIn", href: "/signin"},
+                            {label: "SignUp", href: "/signup"},
+                            {label: "MFA", href: "/mfa"},
+                            {label: "Change Password", href: "/passwordreset"}
+                        ].map(item =>
+                            <Link className="relative text-gray-300 hover:text-white transition after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-0.5 after:bg-indigo-500 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:origin-left"
+                                  to={item.href}
+                                  key={item.label}
+                                  state={{return_to:"/sessions"}}
+                            >
+                                {item.label}
+                            </Link>)}
+                    </div>
+                    <div className="relative ml-auto">
+                        <button
+                            type="button"
+                            className="flex items-center gap-2 rounded-md border border-gray-700 bg-gray-900/70 px-3 py-2 text-sm text-gray-200 transition hover:border-indigo-500 hover:text-white"
+                            onClick={() => setUserDropdownOpen((current) => !current)}
+                            aria-haspopup="true"
+                            aria-expanded={userDropdownOpen}
                         >
-                            {item.label}
-                        </Link>)}
+                            <svg
+                                className="h-5 w-5 text-indigo-300"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                                aria-hidden="true"
+                            >
+                                <path
+                                    d="M12 12C14.2091 12 16 10.2091 16 8C16 5.79086 14.2091 4 12 4C9.79086 4 8 5.79086 8 8C8 10.2091 9.79086 12 12 12Z"
+                                    stroke="currentColor"
+                                    strokeWidth="1.8"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                />
+                                <path
+                                    d="M4.5 20C5.24785 16.55 8.30743 14 12 14C15.6926 14 18.7522 16.55 19.5 20"
+                                    stroke="currentColor"
+                                    strokeWidth="1.8"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                />
+                            </svg>
+                            <span>{placeholderUser.username}</span>
+                        </button>
+                        {userDropdownOpen && <div className="absolute right-0 top-full z-20 mt-2 w-64 rounded-lg border border-gray-700 bg-gray-950 p-4 text-left shadow-xl shadow-black/40">
+                            <div className="text-sm font-semibold text-white">
+                                {placeholderUser.role}
+                            </div>
+                            <div className="mt-1 break-all text-sm font-normal text-gray-400">
+                                {placeholderUser.email}
+                            </div>
+                        </div>}
+                    </div>
                 </div>
 
                 <div className="flex items-center justify-between mb-6">
