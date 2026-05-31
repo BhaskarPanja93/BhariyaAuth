@@ -42,3 +42,10 @@ type MFAForm struct {
 	Token        string `form:"token"`
 	Verification string `form:"verification"`
 }
+
+type MailSendForm struct {
+	Subject    string   `form:"subject"`
+	Audience   string   `form:"audience"`
+	Recipients []string `form:"recipients"`
+	Body       string   `form:"body"`
+}

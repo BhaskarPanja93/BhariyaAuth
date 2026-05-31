@@ -11,7 +11,9 @@ import (
 	graphusers "github.com/microsoftgraph/msgraph-sdk-go/users"
 )
 
-func sendMail(mail, subject, content string, attempts uint8) error {
+const batchSize = 500
+
+func sendMail(mails []string, subject, content string, attempts uint8) error {
 	if attempts == 0 {
 		return errors.New("send mail: retries exhausted")
 	}
@@ -20,7 +22,7 @@ func sendMail(mail, subject, content string, attempts uint8) error {
 		refreshCredentials()
 		if client == nil {
 			time.Sleep(time.Second)
-			return sendMail(mail, subject, content, attempts-1)
+			return sendMail(mails, subject, content, attempts-1)
 		}
 	}
 
@@ -32,30 +34,47 @@ func sendMail(mail, subject, content string, attempts uint8) error {
 	message.SetSubject(&subject)
 	message.SetBody(body)
 
-	emailAddress := graphmodels.NewEmailAddress()
-	emailAddress.SetAddress(&mail)
+	if len(mails) <= batchSize {
+		recipients := make([]graphmodels.Recipientable, 0, len(mails))
 
-	recipient := graphmodels.NewRecipient()
-	recipient.SetEmailAddress(emailAddress)
+		for _, mail := range mails {
+			emailAddress := graphmodels.NewEmailAddress()
+			emailAddress.SetAddress(&mail)
 
-	message.SetToRecipients([]graphmodels.Recipientable{recipient})
+			recipient := graphmodels.NewRecipient()
+			recipient.SetEmailAddress(emailAddress)
 
-	requestBody := graphusers.NewItemSendMailPostRequestBody()
-	requestBody.SetMessage(message)
-	requestBody.SetSaveToSentItems(new(true))
+			recipients = append(recipients, recipient)
+		}
 
-	err := client.
-		Users().
-		ByUserId(Secrets.MicrosoftMailId).
-		SendMail().
-		Post(Config.CtxBG, requestBody, nil)
+		message.SetToRecipients(recipients)
 
-	if err == nil {
-		return nil
+		requestBody := graphusers.NewItemSendMailPostRequestBody()
+		requestBody.SetMessage(message)
+		requestBody.SetSaveToSentItems(new(true))
+
+		err := client.
+			Users().
+			ByUserId(Secrets.MicrosoftMailId).
+			SendMail().
+			Post(Config.CtxBG, requestBody, nil)
+
+		if err == nil {
+			return nil
+		}
+
+		Logs.RootLogger.Add(Logs.Error, "processors/mail/sender", "", "Send mail failed: "+err.Error())
+		time.Sleep(time.Second)
+		refreshCredentials()
+		return sendMail(mails, subject, content, attempts-1)
 	}
 
-	Logs.RootLogger.Add(Logs.Error, "processors/mail/sender", "", "Send mail failed: "+err.Error())
-	time.Sleep(time.Second)
-	refreshCredentials()
-	return sendMail(mail, subject, content, attempts-1)
+	for i := 0; i < len(mails); i += batchSize {
+		end := i + batchSize
+		if end > len(mails) {
+			end = len(mails)
+		}
+		go func() { _ = sendMail(mails[i:end], subject, content, attempts) }()
+	}
+	return nil
 }

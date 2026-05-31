@@ -30,6 +30,10 @@ ISSUES:
 websocket buffer infinite
 
 FUTURE:
+Send profile with a always 200 response for pages, that will prevent some pages from loading if not enough permission.
+unify rate limit values as grade, with better understanding of remaining attempts + recheck admin ratelimit weights
+all admin actions should require mfa
+separate folders for admin routes from non admin (group files and folders)
 add 409 for when user logs in different account in new tab
 cleanup logs
 cleanup old cookies after a login/register/sso
